@@ -43,3 +43,7 @@ cat /root/code/requirements.txt
 - matplotlib
 
 ### Screenshots
+<img width="1575" height="778" alt="image" src="https://github.com/user-attachments/assets/328b292b-da8a-47ae-b4c9-5180f9f60e9b" />
+<img width="1588" height="771" alt="image" src="https://github.com/user-attachments/assets/e01044f4-3094-46f5-be3a-a19addf7610d" />
+
+
