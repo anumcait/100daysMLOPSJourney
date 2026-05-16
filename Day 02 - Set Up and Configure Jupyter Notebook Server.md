@@ -42,3 +42,8 @@ netstat -tuln | grep 8888
 ```
 
 The server should now be accessible, and clicking the Jupyter logo should redirect to the `/tree` endpoint.
+
+### Screenshots
+
+<img width="500" height="600" alt="image" src="https://github.com/user-attachments/assets/f3d32193-1419-4f03-9302-6f1678c31f9b" />
+
