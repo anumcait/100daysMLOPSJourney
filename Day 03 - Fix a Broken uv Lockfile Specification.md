@@ -42,3 +42,8 @@ The resulting `requirements.txt` now contains exact versions (e.g., `pandas==2.1
 # Preview the generated lockfile
 cat requirements.txt
 ```
+### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/a99a11ac-682c-4033-aaca-d4e244194fa0" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/0d7cbb72-c561-48e8-b1be-a2ac6c12d81f" />
+
+
