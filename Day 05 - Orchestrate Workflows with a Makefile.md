@@ -78,3 +78,15 @@ make all
 This should run the environment setup, process raw data, train the fraud detection model, and run unit tests successfully!
 
 ### Screenshots
+
+<img width="520" height="590" alt="image" src="https://github.com/user-attachments/assets/49c31eb1-fd18-4b50-bced-157eddd4b0cf" />
+<img width="520" height="591" alt="image" src="https://github.com/user-attachments/assets/f740680e-9880-4d9c-8170-d457019c9485" />
+<img width="520" height="515" alt="image" src="https://github.com/user-attachments/assets/f9ffe274-b8c9-49d9-ad5d-7408f7cce07a" />
+<img width="520" height="591" alt="image" src="https://github.com/user-attachments/assets/9e780b95-a648-4d26-8144-c6ed8c43fc4e" />
+<img width="520" height="590" alt="image" src="https://github.com/user-attachments/assets/1acf9637-5089-49b7-a728-5dfb8bc9121e" />
+
+
+
+
+
+
