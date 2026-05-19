@@ -60,3 +60,8 @@ black --check src/
 When both commands return no errors, the repository is fully compliant with the team's automated code quality checks and ready for PR integration!
 
 ### Screenshots
+<img width="520" height="590" alt="image" src="https://github.com/user-attachments/assets/1c1eefcc-ac06-4332-b3c6-6f09fe3a42d0" />
+<img width="520" height="509" alt="image" src="https://github.com/user-attachments/assets/184dbed0-70bf-4204-8e0a-13690b9767cb" />
+
+
+
