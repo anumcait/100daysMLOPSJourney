@@ -76,3 +76,8 @@ You can verify the final structure with:
 ```bash
 tree /root/code/fraud-detection
 ```
+### Screenshots
+<img width="1127" height="602" alt="image" src="https://github.com/user-attachments/assets/2394274f-4151-4c20-80f9-81159e669fe6" />
+<img width="1128" height="643" alt="image" src="https://github.com/user-attachments/assets/7847e3b0-b8e5-41e0-9ada-8854348509a3" />
+
+
