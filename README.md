@@ -10,4 +10,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 - [Day 4: Create a Standard ML Project Structure](./Day%2004%20-%20Create%20a%20Standard%20ML%20Project%20Structure.md)
 - [Day 5: Orchestrate Workflows with a Makefile](./Day%2005%20-%20Orchestrate%20Workflows%20with%20a%20Makefile.md)
 - [Day 6: Set Up Code Quality Tools for ML Code](./Day%2006%20-%20Set%20Up%20Code%20Quality%20Tools%20for%20ML%20Code.md)
+- [Day 7: Package an ML Project as Installable Python Package](./Day%2007%20-%20Package%20an%20ML%20Project%20as%20Installable%20Python%20Package.md)
+- [Day 8: Configure Pre-Commit Hooks for ML Repository](./Day%2008%20-%20Configure%20Pre-Commit%20Hooks%20for%20ML%20Repository.md)
 
