@@ -335,4 +335,197 @@ Execute the hooks manually across all tracked files to perform an initial code s
 pre-commit run --all-files
 ```
 
+---
+
+## 📅 Day 9: Create a Custom ML Project Template with Cookiecutter
+
+### Task Description
+Fix a broken Cookiecutter template at `/root/code/mlops-template/` so it renders correctly, then use it to generate a new ML project at `/root/code/churn-model/` with `sklearn` as the ML framework.
+
+### Concept Summary
+**Cookiecutter** is a command-line tool that generates projects from predefined templates. Instead of manually creating folder structures, config files, and boilerplate code for every new ML project, teams maintain a single Cookiecutter template. Every new project is then stamped out from this template, guaranteeing consistency across the entire organization.
+
+- **`cookiecutter.json`**: The configuration file at the template root that declares all user-facing variables and their default values. Cookiecutter reads this file to know what questions to ask (or what defaults to use with `--no-input`).
+- **Template Directory (`{{cookiecutter.project_name}}/`)**: A folder named using Jinja2 syntax. When the project is generated, Cookiecutter replaces this with the actual project name provided by the user.
+- **Jinja2 Templating**: Inside any file within the template directory, you can use `{{ cookiecutter.variable }}` for variable substitution and `{% if %}` / `{% elif %}` / `{% endif %}` for conditional logic.
+- **Choice Variables**: When a variable in `cookiecutter.json` is defined as a JSON array (e.g., `["sklearn", "pytorch", "tensorflow"]`), Cookiecutter presents it as a selectable list. The first item is the default.
+
+### Step-by-Step Execution
+
+**Step 1: Inspect the Existing Broken Template**
+First, examine what currently exists to identify all the issues:
+```bash
+# View the folder structure
+find /root/code/mlops-template/ -type f | sort
+
+# Check the current cookiecutter.json
+cat /root/code/mlops-template/cookiecutter.json
+
+# Check the template directory name
+ls -la /root/code/mlops-template/
+```
+
+Common problems that prevent rendering:
+- Malformed JSON in `cookiecutter.json` (missing keys, wrong types, trailing commas)
+- Incorrectly named template directory (must be exactly `{{cookiecutter.project_name}}`)
+- Jinja2 syntax errors in template files (missing `{{`, `}}`, `{%`, `%}`)
+- Missing required files or directories
+
+**Step 2: Fix `cookiecutter.json`**
+The configuration file must declare exactly four variables with specific defaults. The `ml_framework` variable uses a JSON array for choice selection:
+```bash
+cat > /root/code/mlops-template/cookiecutter.json << 'EOF'
+{
+  "project_name": "my-ml-project",
+  "author": "xFusionCorp",
+  "python_version": "3.11",
+  "ml_framework": ["sklearn", "pytorch", "tensorflow"]
+}
+EOF
+```
+
+> **Key Detail**: `ml_framework` is an array `["sklearn", "pytorch", "tensorflow"]`, not a plain string. This tells Cookiecutter to present choices. The first element (`sklearn`) becomes the default.
+
+**Step 3: Fix the Template Directory Name**
+The template directory must be named exactly `{{cookiecutter.project_name}}`. If it has any other name (e.g., `{{project_name}}`, `project/`, etc.), rename it:
+```bash
+cd /root/code/mlops-template/
+
+# Rename the incorrectly named directory (adjust source name as needed)
+mv "$(ls -d */ | head -1)" "{{cookiecutter.project_name}}" 2>/dev/null
+
+# OR create it fresh if it doesn't exist
+mkdir -p "{{cookiecutter.project_name}}"
+```
+
+**Step 4: Create Required Subdirectories**
+The template must contain `data/`, `models/`, `src/`, and `tests/` directories. Since Cookiecutter skips empty directories during generation, we add `.gitkeep` placeholder files:
+```bash
+mkdir -p "/root/code/mlops-template/{{cookiecutter.project_name}}/data"
+mkdir -p "/root/code/mlops-template/{{cookiecutter.project_name}}/models"
+mkdir -p "/root/code/mlops-template/{{cookiecutter.project_name}}/src"
+mkdir -p "/root/code/mlops-template/{{cookiecutter.project_name}}/tests"
+
+touch "/root/code/mlops-template/{{cookiecutter.project_name}}/data/.gitkeep"
+touch "/root/code/mlops-template/{{cookiecutter.project_name}}/models/.gitkeep"
+touch "/root/code/mlops-template/{{cookiecutter.project_name}}/src/.gitkeep"
+touch "/root/code/mlops-template/{{cookiecutter.project_name}}/tests/.gitkeep"
+```
+
+**Step 5: Fix `README.md` Template**
+The README must reference both `project_name` and `author` using Jinja2 substitution:
+```bash
+cat > "/root/code/mlops-template/{{cookiecutter.project_name}}/README.md" << 'EOF'
+# {{ cookiecutter.project_name }}
+
+Author: {{ cookiecutter.author }}
+
+## Overview
+
+This is the {{ cookiecutter.project_name }} ML project created by {{ cookiecutter.author }}.
+
+## Python Version
+
+This project uses Python {{ cookiecutter.python_version }}.
+
+## ML Framework
+
+This project uses the {{ cookiecutter.ml_framework }} framework.
+
+## Project Structure
+
+```
+{{ cookiecutter.project_name }}/
+├── data/          # Dataset storage
+├── models/        # Trained model artifacts
+├── src/           # Source code
+├── tests/         # Unit tests
+├── README.md
+└── requirements.txt
+```
+EOF
+```
+
+**Step 6: Fix `requirements.txt` Template**
+The requirements file uses Jinja2 conditional logic to map framework choice names to their actual PyPI package names:
+```bash
+cat > "/root/code/mlops-template/{{cookiecutter.project_name}}/requirements.txt" << 'REQEOF'
+{% if cookiecutter.ml_framework == "sklearn" -%}
+scikit-learn
+{% elif cookiecutter.ml_framework == "pytorch" -%}
+torch
+{% elif cookiecutter.ml_framework == "tensorflow" -%}
+tensorflow
+{% endif -%}
+pandas
+numpy
+REQEOF
+```
+
+> **Critical Mapping**: The framework choice name and PyPI package name are different:
+> - `sklearn` → installs `scikit-learn`
+> - `pytorch` → installs `torch`
+> - `tensorflow` → installs `tensorflow`
+>
+> The `-%}` syntax strips trailing whitespace to keep the output file clean.
+
+**Step 7: Verify the Final Template Structure**
+```bash
+find /root/code/mlops-template/ -not -path '*/.git/*' | sort
+```
+
+Expected:
+```
+/root/code/mlops-template/
+/root/code/mlops-template/cookiecutter.json
+/root/code/mlops-template/{{cookiecutter.project_name}}/
+/root/code/mlops-template/{{cookiecutter.project_name}}/README.md
+/root/code/mlops-template/{{cookiecutter.project_name}}/data/.gitkeep
+/root/code/mlops-template/{{cookiecutter.project_name}}/models/.gitkeep
+/root/code/mlops-template/{{cookiecutter.project_name}}/requirements.txt
+/root/code/mlops-template/{{cookiecutter.project_name}}/src/.gitkeep
+/root/code/mlops-template/{{cookiecutter.project_name}}/tests/.gitkeep
+```
+
+**Step 8: Generate the Project**
+```bash
+cookiecutter /root/code/mlops-template/ -o /root/code/ --no-input project_name=churn-model ml_framework=sklearn
+```
+
+**Step 9: Verify the Generated Project**
+```bash
+# Check structure
+find /root/code/churn-model/ | sort
+
+# Verify requirements.txt lists scikit-learn
+cat /root/code/churn-model/requirements.txt
+
+# Verify README.md mentions xFusionCorp (default author)
+cat /root/code/churn-model/README.md
+
+# Quick grep checks
+grep "scikit-learn" /root/code/churn-model/requirements.txt
+grep "xFusionCorp" /root/code/churn-model/README.md
+```
+
+### Key Concepts & Takeaways
+
+| Concept | Detail |
+|---------|--------|
+| `cookiecutter.json` | Declares template variables, defaults, and choices |
+| Choice variables | JSON arrays: `["opt1", "opt2", "opt3"]` — first item is default |
+| Template directory | Must be `{{cookiecutter.project_name}}` exactly |
+| `{{ var }}` | Jinja2 substitution — replaced with actual value at render time |
+| `{% if %} / {% endif %}` | Jinja2 conditional blocks for dynamic content |
+| `-%}` | Strips trailing whitespace/newlines for clean output |
+| `--no-input` | Non-interactive mode — uses defaults or CLI overrides |
+| `-o` | Output directory for the generated project |
+| `.gitkeep` | Placeholder to preserve empty directories in templates |
+
+### Common Pitfalls
+1. **Wrong PyPI names**: `sklearn` ≠ `scikit-learn`, `pytorch` ≠ `torch`
+2. **Trailing commas in JSON**: `cookiecutter.json` must be valid JSON (no trailing commas)
+3. **Template dir typos**: Even one wrong character in `{{cookiecutter.project_name}}` breaks rendering
+4. **Empty directories skipped**: Cookiecutter won't copy empty folders — always add `.gitkeep`
+5. **Jinja2 whitespace**: Use `-%}` to avoid unwanted blank lines in generated files
 
