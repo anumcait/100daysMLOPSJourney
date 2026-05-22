@@ -95,5 +95,12 @@ python -c "import fraud_detection; print(fraud_detection.__name__, 'installed su
 Once completed, the ML model package is ready to be published to a private registry (like PyPI, AWS CodeArtifact, or Nexus) or directly bundled into target production deployment environments.
 
 ### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/1518051f-3e91-40f7-87cd-ad7cafed6c8c" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/b82c118b-3ef9-4808-a047-a5f231be066d" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/2580aa3b-24f0-4961-b017-b2a05632c0ff" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/3cf78b04-b9a2-4919-8319-c813274e3dd8" />
 
-<!-- Add your execution/build screenshots here -->
+
+
+
+
