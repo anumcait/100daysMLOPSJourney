@@ -221,3 +221,12 @@ Expected results:
 3. **Empty directories**: Cookiecutter skips empty dirs — add `.gitkeep` files
 4. **JSON syntax**: Trailing commas in `cookiecutter.json` break parsing
 5. **Template dir typos**: Even one wrong character in `{{cookiecutter.project_name}}` will fail
+
+### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/b453df63-40de-4323-877e-4332ef23f4e0" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/5d2acf50-b4df-46db-906f-a34d696e48ec" />
+
+
+
+
+

@@ -80,5 +80,15 @@ black....................................................................Passed
 Any subsequent `git commit` command will trigger these checks automatically before allowing the commit to be finalized. If any checks fail, `pre-commit` will format or lint the code and abort the commit, allowing you to review changes, stage them, and attempt the commit again.
 
 ### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/e079f187-dad2-4473-91eb-13a109ba3f88" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/8e0e8cd5-1cfe-4813-8b2a-37f9431e43b8" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/c9e01dbe-9836-44ce-b2ed-1bcda8ef7399" />
+<img width="500" height="500" alt="image" src="https://github.com/user-attachments/assets/e954cbe5-bee7-47b9-8931-8f43600c9602" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/cc83202d-bf10-4352-b90c-820a79351e6c" />
 
-<!-- Add your execution/build screenshots here -->
+
+
+
+
+
+
