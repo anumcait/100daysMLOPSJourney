@@ -529,3 +529,79 @@ grep "xFusionCorp" /root/code/churn-model/README.md
 4. **Empty directories skipped**: Cookiecutter won't copy empty folders — always add `.gitkeep`
 5. **Jinja2 whitespace**: Use `-%}` to avoid unwanted blank lines in generated files
 
+---
+
+## 📅 Day 10: Install and Initialize DVC in an ML Project
+
+### Task Description
+The xFusionCorp Industries ML team is adopting DVC (Data Version Control) so that datasets and model files are versioned separately from code. Initialise DVC inside the existing Git repository at `/root/code/fraud-detection/` and record the initialisation in Git.
+
+### Concept Summary
+**DVC (Data Version Control)** is an open-source tool that works alongside Git to version large files — datasets, model weights, and other binary artifacts — that Git was never designed to handle efficiently. Instead of storing the actual data in the Git repository, DVC creates lightweight `.dvc` metafiles (pointers) that Git tracks, while the real data lives in configurable remote storage (S3, GCS, local, etc.).
+
+- **`.dvc/` directory**: The internal control directory for DVC, similar to `.git/` for Git. Contains configuration (`config`), a local file cache (`cache/`), and temporary files (`tmp/`). The `.dvc/.gitignore` file automatically prevents the cache and temp files from being committed to Git.
+- **`.dvcignore`**: Functions identically to `.gitignore` but for DVC operations. It tells DVC which files and directories to skip when scanning the workspace.
+- **`dvc init`**: The initialization command that creates the `.dvc/` directory and `.dvcignore` file inside an existing Git repository. DVC requires Git — it cannot be initialized independently.
+- **Separation of Concerns**: After initialization, Git continues to track code and DVC metafiles, while DVC manages the actual large data files. This keeps the Git repository small and fast while still maintaining full version history of datasets and models.
+
+### Step-by-Step Execution
+
+**Step 1: Navigate to the Project & Initialize DVC**
+Navigate into the existing Git repository and run the DVC initialization command:
+```bash
+cd /root/code/fraud-detection/
+
+dvc init
+```
+
+This creates the following files and directories:
+
+| File/Directory | Purpose |
+|----------------|---------|
+| `.dvc/` | DVC control directory (internal config, cache, tmp) |
+| `.dvc/.gitignore` | Prevents DVC internals (cache, tmp) from being committed to Git |
+| `.dvc/config` | DVC configuration file (remote storage settings, etc.) |
+| `.dvcignore` | Works like `.gitignore` but for DVC — tells DVC which files to ignore |
+
+**Step 2: Stage and Commit DVC Files**
+Stage all files produced by DVC initialization and record them in a Git commit:
+```bash
+git add .dvc/ .dvcignore
+
+git commit -m "Initialize DVC"
+```
+
+> **Key Detail**: Only `.dvc/.gitignore` and `.dvc/config` get committed to Git. The `.dvc/.gitignore` ensures internal directories like `cache/` and `tmp/` are excluded automatically.
+
+**Step 3: Verify the Setup**
+```bash
+git log --oneline -1
+ls -la
+```
+
+Expected output from `git log`:
+```
+<hash> Initialize DVC
+```
+
+The `ls -la` output should show `.dvc/` and `.dvcignore` alongside the existing `.git/` directory.
+
+### Key Concepts & Takeaways
+
+| Concept | Detail |
+|---------|--------|
+| DVC | Data Version Control — a Git-like tool for versioning data and models |
+| `dvc init` | Initializes DVC in an existing Git repo, creating `.dvc/` and `.dvcignore` |
+| `.dvc/` directory | Internal DVC control directory (config, cache, tmp) |
+| `.dvc/config` | Stores DVC configuration such as remote storage settings |
+| `.dvc/.gitignore` | Automatically excludes DVC internals (cache, tmp) from Git |
+| `.dvcignore` | Tells DVC which files/directories to ignore (similar to `.gitignore`) |
+| Code vs Data versioning | Git tracks code + DVC metafiles; DVC tracks large data/model files |
+
+### Common Pitfalls
+1. **Running `dvc init` outside a Git repo** — DVC requires an existing Git repository; it will error without one
+2. **Forgetting to `git add .dvc`** — The `.dvc/` directory contents must be committed to Git for team collaboration
+3. **Running `dvc init` twice** — Will error; use `dvc init --force` to re-initialize if needed
+4. **Confusing `.dvcignore` with `.gitignore`** — `.dvcignore` is for DVC operations, `.gitignore` is for Git
+5. **Committing DVC cache** — The `.dvc/.gitignore` prevents this, but removing that file would bloat the repo
+

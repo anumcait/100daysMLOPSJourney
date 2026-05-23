@@ -13,4 +13,5 @@ Tracking my 100-day journey into Machine Learning Operations.
 - [Day 7: Package an ML Project as Installable Python Package](./Day%2007%20-%20Package%20an%20ML%20Project%20as%20Installable%20Python%20Package.md)
 - [Day 8: Configure Pre-Commit Hooks for ML Repository](./Day%2008%20-%20Configure%20Pre-Commit%20Hooks%20for%20ML%20Repository.md)
 - [Day 9: Create a Custom ML Project Template with Cookiecutter](./Day%2009%20-%20Create%20a%20Custom%20ML%20Project%20Template%20with%20Cookiecutter.md)
+- [Day 10: Install and Initialize DVC in an ML Project](./Day%2010%20-%20Install%20and%20Initialize%20DVC%20in%20an%20ML%20Project.md)
 
