@@ -98,3 +98,11 @@ git commit -m "Initialize DVC"
 3. **Running `dvc init` twice** — Will error; use `dvc init --force` to re-initialize
 4. **Confusing `.dvcignore` with `.gitignore`** — `.dvcignore` is for DVC operations, `.gitignore` is for Git
 5. **Committing DVC cache** — The `.dvc/.gitignore` prevents this, but don't remove it
+
+### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/d19c3f11-5323-4486-89c8-01ae4264a1c3" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/b91f2b63-9cc7-4f45-8d9a-60825520c0f0" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/2f0e39d5-5cd5-4195-b3fa-52431827d5c5" />
+
+
+
