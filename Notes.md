@@ -605,3 +605,55 @@ The `ls -la` output should show `.dvc/` and `.dvcignore` alongside the existing 
 4. **Confusing `.dvcignore` with `.gitignore`** — `.dvcignore` is for DVC operations, `.gitignore` is for Git
 5. **Committing DVC cache** — The `.dvc/.gitignore` prevents this, but removing that file would bloat the repo
 
+---
+
+## 📅 Day 11: Track a Dataset with DVC
+
+### Task Description
+A teammate added the `transactions.csv` dataset directly to Git. The goal is to migrate it to DVC control to align with team standards, ensuring that all datasets under `data/` are managed by DVC while keeping the local files intact.
+
+### Concept Summary
+Moving a dataset from Git to DVC involves two main phases: **de-tracking** from Git and **onboarding** to DVC. Git is excellent for source code but struggles with large binary files. DVC solves this by storing the data in a cache and providing Git with a tiny "receipt" or "pointer" (the `.dvc` file).
+
+- **`git rm --cached`**: This command is surgical—it tells Git to stop watching the file without deleting it.
+- **`.dvc` Pointer Files**: These are the bridge between Git and DVC. They contain the MD5 hash of the data, allowing Git to version the *metadata* while DVC versions the *actual data*.
+- **Automatic Gitignore**: When you `dvc add` a file, DVC is smart enough to update (or create) a `.gitignore` file in that directory to prevent the data from ever leaking back into Git.
+
+### Step-by-Step Execution
+
+**Step 1: Remove from Git Index**
+We must first strip Git of its control over the file. The `--cached` flag is critical here to ensure the data remains on our disk.
+```bash
+cd /root/code/fraud-detection
+git rm --cached data/raw/transactions.csv
+```
+
+**Step 2: Initialize DVC Tracking**
+By adding the file to DVC, we generate the tracking metadata.
+```bash
+dvc add data/raw/transactions.csv
+```
+
+**Step 3: Commit the Result**
+We commit the `.dvc` "receipt" and the updated `.gitignore` to Git. This tells the rest of the team that this file is now managed by DVC.
+```bash
+git add data/raw/transactions.csv.dvc data/raw/.gitignore
+git commit -m "Track transactions dataset with DVC"
+```
+
+### Key Concepts & Takeaways
+
+| Concept | Detail |
+|---------|--------|
+| Metadata vs. Data | Git stores the `.dvc` metadata; DVC stores the actual file content |
+| `git rm --cached` | Decouples a file from Git without physical deletion |
+| `.dvc` Pointer | A small, text-based manifest file containing hashes and file paths |
+| DVC Workflow | Add data → Commit pointer to Git → Push data to DVC remote |
+| Repo Hygiene | Keeps the Git history clean and clones lightning fast |
+
+### Common Pitfalls
+1. **Accidental Deletion**: Running `git rm` without `--cached` will remove your source data.
+2. **Ignored .dvc files**: Never add `.dvc` files to `.gitignore`; they MUST be in Git.
+3. **Dirty State**: Always ensure your Git workspace is clean before starting this migration to avoid confusion.
+4. **Mismatched Remote**: Ensure DVC is configured to push to a remote storage if you intend for others to access the data.
+
