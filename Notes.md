@@ -657,3 +657,63 @@ git commit -m "Track transactions dataset with DVC"
 3. **Dirty State**: Always ensure your Git workspace is clean before starting this migration to avoid confusion.
 4. **Mismatched Remote**: Ensure DVC is configured to push to a remote storage if you intend for others to access the data.
 
+---
+
+## 📅 Day 12: Configure a DVC Remote Storage
+
+### Task Description
+The xFusionCorp Industries ML team uses SeaweedFS as the shared S3-compatible object store for DVC-tracked data. A `.dvc/config` already declares a remote called `s3` for the fraud-detection project, but `dvc push` currently fails. Correct the configuration and push the tracked data into the SeaweedFS bucket.
+
+### Concept Summary
+A **DVC Remote** is a storage location (S3, GCS, Azure, SSH, etc.) where DVC-tracked data is stored and shared among team members. When using **S3-Compatible Storage** (like SeaweedFS, MinIO, or Ceph), DVC must be configured with a custom `endpointurl` to point to the correct server instead of the default AWS S3 service.
+
+### Step-by-Step Execution
+
+**Step 1: Navigate to the Project & Verify Config**
+```bash
+cd /root/code/fraud-detection
+cat .dvc/config
+```
+
+**Step 2: Correct the Remote URL**
+Point the `s3` remote to the specific bucket name.
+```bash
+dvc remote modify s3 url s3://dvc-storage
+```
+
+**Step 3: Configure the Custom S3 Endpoint**
+Tell DVC to use the SeaweedFS S3 endpoint instead of standard AWS.
+```bash
+dvc remote modify s3 endpointurl http://localhost:8333
+```
+
+**Step 4: Set the Default Remote**
+Mark `s3` as the default destination for push/pull operations.
+```bash
+dvc remote default s3
+```
+
+**Step 5: Push Data to Remote**
+Upload the tracked dataset to the SeaweedFS storage.
+```bash
+dvc push
+```
+
+**Step 6: Verify Success**
+```bash
+dvc status -c
+```
+
+### Key Concepts & Takeaways
+
+| Concept | Detail |
+|---------|--------|
+| `dvc remote modify` | Used to update specific parameters (url, endpoint, credentials) of an existing remote |
+| `endpointurl` | Critical for S3-compatible storage to redirect requests from AWS to the local/private server |
+| Default Remote | Simplifies workflow by allowing `dvc push/pull` without specifying the remote name |
+| `dvc status -c` | Compares local data with the remote cache to ensure everything is synchronized |
+
+### Common Pitfalls
+1. **Missing Schema** — Forgetting `s3://` in the URL prevents DVC from knowing which driver to use.
+2. **Incorrect Port** — Ensure the `endpointurl` includes the correct port (e.g., `8333` for SeaweedFS S3).
+3. **No Default Set** — Running `dvc push` without a default remote or a specified `-r` flag will result in an error.

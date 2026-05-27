@@ -15,4 +15,5 @@ Tracking my 100-day journey into Machine Learning Operations.
 - [Day 9: Create a Custom ML Project Template with Cookiecutter](./Day%2009%20-%20Create%20a%20Custom%20ML%20Project%20Template%20with%20Cookiecutter.md)
 - [Day 10: Install and Initialize DVC in an ML Project](./Day%2010%20-%20Install%20and%20Initialize%20DVC%20in%20an%20ML%20Project.md)
 - [Day 11: Track a Dataset with DVC](./Day%2011%20-%20Track%20a%20Dataset%20with%20DVC.md)
+- [Day 12: Configure a DVC Remote Storage](./Day%2012%20-%20Configure%20a%20DVC%20Remote%20Storage.md)
 
