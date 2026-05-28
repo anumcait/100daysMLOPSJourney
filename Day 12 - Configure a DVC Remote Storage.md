@@ -126,3 +126,13 @@ dvc status -c
 2. **Missing Bucket Prefix** — The `url` must start with the schema (e.g., `s3://`) followed by the bucket name.
 3. **Credentials Placement** — For security, credentials like `access_key_id` are often stored in `.dvc/config.local` (not committed to Git), but in this lab environment they are in the project config.
 4. **Not Setting Default** — If no default remote is set, `dvc push` will fail unless you run `dvc push -r s3`.
+
+
+### Screenshots
+
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/5bc9404f-5630-41d0-83b8-138f2cfb4401" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/fc8dfe1b-825c-432a-bb70-e0d865887776" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/13f3ded9-70ad-4abb-93f7-7a232064ac81" />
+
+
+

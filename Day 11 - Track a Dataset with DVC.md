@@ -105,7 +105,7 @@ git status
 
 ### Screenshots
 
-<img width="500" height="590" alt="image" src="https://github.com/user-attachments/assets/7ba95b2b-cec1-47da-9d6d-3d49ffa248e6" />
-<img width="500" height="591" alt="image" src="https://github.com/user-attachments/assets/6262928b-6dba-4934-b0a5-95ad92eebd3e" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/7ba95b2b-cec1-47da-9d6d-3d49ffa248e6" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/6262928b-6dba-4934-b0a5-95ad92eebd3e" />
 
 
