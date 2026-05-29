@@ -117,8 +117,19 @@ head data/raw/transactions.csv
 
 ---
 
+
 ## ⚠️ Common Pitfalls
 
 1. **Hardcoding Credentials** — Never run `dvc remote modify s3 access_key_id ...` without `--local` unless you want your keys committed to Git!
 2. **Missing Endpoint** — Standard DVC assumes AWS S3. For SeaweedFS/MinIO, the `endpointurl` is mandatory.
 3. **Cache Mismatch** — If `dvc pull` says "Everything is up to date" but the file is missing, check if the `.dvc` pointer file matches the remote hash.
+
+---
+
+### Screenshots
+
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/bbad7bc8-ce00-4a55-a065-13b0bb996a1d" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/46922672-18ec-4f86-a7ac-e10bb4993c42" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/1bbf3ece-5a26-48be-8af6-0e352a5d002f" />
+
+
