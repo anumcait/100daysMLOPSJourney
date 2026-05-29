@@ -717,3 +717,139 @@ dvc status -c
 1. **Missing Schema** — Forgetting `s3://` in the URL prevents DVC from knowing which driver to use.
 2. **Incorrect Port** — Ensure the `endpointurl` includes the correct port (e.g., `8333` for SeaweedFS S3).
 3. **No Default Set** — Running `dvc push` without a default remote or a specified `-r` flag will result in an error.
+
+---
+
+## 📅 Day 13: Pull DVC-Tracked Data from Remote
+
+### Task Description
+A new xFusionCorp Industries team member has cloned the `fraud-detection` repository onto a fresh machine. The DVC remote is already configured to point at the team's SeaweedFS bucket, but `dvc pull` is failing. Diagnose the cause, correct the configuration, and pull the dataset.
+
+### Concept Summary
+**Pulling Data** in DVC is the process of downloading the actual file content from a remote storage to the local cache and linking it to the workspace. On a new machine, DVC pointers (`.dvc` files) exist, but the data does not. 
+
+When working with private remotes, credentials should be stored in the **Local Configuration** (`.dvc/config.local`). This file is excluded from Git to prevent sensitive keys from leaking, making it the correct place for individual developer access keys.
+
+- **Local Config**: Stores credentials and environment-specific settings.
+- **`use_ssl false`**: Required when the remote server (like a local SeaweedFS) uses pure HTTP.
+- **`dvc pull`**: Merges `dvc fetch` (downloading data to cache) and `dvc checkout` (linking cache to workspace).
+
+### Step-by-Step Execution
+
+**Step 1: Navigate to the Project**
+```bash
+cd /root/code/fraud-detection
+```
+
+**Step 2: Configure Local Credentials**
+Use the `--local` flag to ensure these settings are saved to `.dvc/config.local` and not shared via Git.
+```bash
+# Set access key
+dvc remote modify --local s3 access_key_id weedadmin
+
+# Set secret key
+dvc remote modify --local s3 secret_access_key weedadmin123
+
+# Set custom endpoint URL and disable SSL
+dvc remote modify --local s3 endpointurl http://localhost:8333
+dvc remote modify --local s3 use_ssl false
+```
+
+**Step 3: Verify the Local Config**
+```bash
+cat .dvc/config.local
+```
+Expected output:
+```ini
+['remote "s3"']
+    access_key_id = weedadmin
+    secret_access_key = weedadmin123
+    endpointurl = http://localhost:8333
+    use_ssl = false
+```
+
+**Step 4: Pull the Data**
+Download the dataset from SeaweedFS to the local machine.
+```bash
+dvc pull -v
+```
+
+**Step 5: Verify the Dataset**
+Check that the file is present and readable.
+```bash
+ls -l data/raw/transactions.csv
+head data/raw/transactions.csv
+```
+
+### Key Concepts & Takeaways
+
+| Concept | Detail |
+|---------|--------|
+| `dvc pull` | Synchronizes the local workspace with the remote storage |
+| `--local` | Saves configuration changes to `.dvc/config.local` (ignored by Git) |
+| Credentials | Access keys and secrets should always be set locally, never in the shared config |
+| SSL Configuration | `use_ssl false` is necessary for local development environments on HTTP |
+
+### Common Pitfalls
+1. **Missing `--local` flag**: Accidentally committing credentials to the shared `.dvc/config` is a major security risk.
+2. **Incorrect Endpoint**: Forgetting the `http://` prefix in `endpointurl` will cause connection errors.
+3. **Cache Sync**: If `dvc pull` fails, ensure the remote bucket actually contains the objects listed in the `.dvc` files.
+
+---
+
+## 📅 Day 14: Reproducible ML Pipelines with DVC
+
+### Task Description
+Correct the `dvc.yaml` pipeline in the `fraud-detection` project to ensure data processing and splitting run end-to-end. The pipeline must consist of two stages: `process_data` (cleans raw transactions) and `split_data` (divides cleaned data into train/test sets).
+
+### Concept Summary
+**DVC Pipelines** allow you to define ML workflows as a sequence of modular steps. By declaring **dependencies** (`deps`) and **outputs** (`outs`) for each stage in a `dvc.yaml` file, DVC can automatically track which parts of the pipeline need to be re-run when data or code changes. This creates a **Directed Acyclic Graph (DAG)** that guarantees reproducibility.
+
+### Step-by-Step Execution
+
+**Step 1: Configure the Pipeline Stages**
+Update `/root/code/fraud-detection/dvc.yaml` to define the data processing and splitting steps:
+```yaml
+stages:
+  process_data:
+    cmd: python src/data/process_data.py
+    deps:
+      - data/raw/transactions.csv
+      - src/data/process_data.py
+    outs:
+      - data/processed/clean_transactions.csv
+
+  split_data:
+    cmd: python src/data/split_data.py
+    deps:
+      - data/processed/clean_transactions.csv
+      - src/data/split_data.py
+    outs:
+      - data/processed/train.csv
+      - data/processed/test.csv
+```
+
+**Step 2: Reproduce the Pipeline**
+Run the complete workflow using the `dvc repro` command. DVC will execute the stages in the correct order based on their dependencies.
+```bash
+cd /root/code/fraud-detection
+dvc repro
+```
+
+**Step 3: Verify Pipeline Integrity**
+Check the status of the pipeline to ensure all outputs are up to date and consistent with the current dependencies.
+```bash
+dvc status
+```
+*Expected Output:* `Data and pipelines are up to date.`
+
+**Step 4: Visualize Dependencies**
+Display the pipeline's DAG to verify the logical flow between stages.
+```bash
+dvc dag
+```
+```text
++--------------+          +------------+
+| process_data | -------->| split_data |
++--------------+          +------------+
+```

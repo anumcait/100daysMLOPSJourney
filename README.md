@@ -16,4 +16,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 - [Day 10: Install and Initialize DVC in an ML Project](./Day%2010%20-%20Install%20and%20Initialize%20DVC%20in%20an%20ML%20Project.md)
 - [Day 11: Track a Dataset with DVC](./Day%2011%20-%20Track%20a%20Dataset%20with%20DVC.md)
 - [Day 12: Configure a DVC Remote Storage](./Day%2012%20-%20Configure%20a%20DVC%20Remote%20Storage.md)
+- [Day 13: Pull DVC-Tracked Data from Remote](./Day%2013%20-%20Pull%20DVC-Tracked%20Data%20from%20Remote.md)
+- [Day 14: Reproducible ML Pipelines with DVC](./Day%2014%20-%20Reproducible%20ML%20Pipelines%20with%20DVC.md)
 
