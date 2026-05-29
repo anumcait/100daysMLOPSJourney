@@ -8,6 +8,12 @@ The corrected pipeline must declare two stages:
 1. **process_data** – Depends on `data/raw/transactions.csv` and `src/data/process_data.py`; produces `data/processed/clean_transactions.csv`.
 2. **split_data** – Depends on `data/processed/clean_transactions.csv` and `src/data/split_data.py`; produces `data/processed/train.csv` and `data/processed/test.csv`.
 
+3. Review the existing dvc.yaml and correct everything that prevents dvc repro from completing.
+
+4. After your changes, dvc repro must run end to end and dvc status must report no stale stages.
+
+| Once the pipeline is valid, the DVC extension's PIPELINES section under the DVC view will list both stages and visualise the dependency graph between them.
+
 ## 📋 Task Summary
 
 Correct the `dvc.yaml` file to ensure:
