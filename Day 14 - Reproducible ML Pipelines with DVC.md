@@ -112,3 +112,12 @@ dvc dag
 2. **Missing Dependencies** — Forgetting to include the Python script itself in `deps` means the stage won't re-run if the code changes.
 3. **Overlapping Outputs** — Multiple stages should not produce the same output file, as this creates ambiguity in the DAG.
 4. **Manual Output Modification** — Never manually edit files in `outs`; they should only be modified by the stage command to maintain reproducibility.
+
+### Screenshots
+
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/6ea70e4c-8d9c-4544-8297-ee2a6f0b6716" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/2e1945f2-5db8-47b6-8af6-71de9b8fdd09" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/aa2f967f-8e04-4347-b6dd-7f6797514735" />
+
+
+
