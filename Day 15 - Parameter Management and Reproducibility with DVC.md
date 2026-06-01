@@ -130,6 +130,18 @@ train:
 
 ---
 
+### Screenshots
+
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/251f0a80-d0ec-45f9-a4a7-b8ad71fac827" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/0d71e779-d191-4405-b4b8-32bbfeeeb270" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/5b3a5056-a3d2-4ba1-8f36-4aba4192ac2f" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/170041f4-96d8-4b87-950d-59f5c20ee2cb" />
+
+
+
+
+
+
 ## ⚠️ Common Pitfalls
 
 1.  **Missing Keys** — Every name listed under `params:` in `dvc.yaml` must exist as a key in `params.yaml`.
