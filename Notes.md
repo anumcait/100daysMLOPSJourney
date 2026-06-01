@@ -853,3 +853,62 @@ dvc dag
 | process_data | -------->| split_data |
 +--------------+          +------------+
 ```
+
+---
+
+## 📅 Day 15: Parameter Management and Reproducibility with DVC
+
+### Task Description
+The xFusionCorp Industries ML team manages model hyperparameters through `params.yaml` so experiments can vary without code changes. The goal is to correct the parameter wiring in `dvc.yaml` and demonstrate that DVC re-runs the train stage when a parameter changes.
+
+### Concept Summary
+**Parameter Management** in DVC decouples hyperparameters from source code. By tracking `params.yaml`, DVC can detect changes in configuration without requiring changes to the execution scripts. This ensures that every experiment is reproducible and the exact parameters used are recorded in `dvc.lock`.
+
+### Step-by-Step Execution
+
+**Step 1: Define Parameters**
+Ensure `params.yaml` contains the correct keys.
+```yaml
+train:
+  n_estimators: 100
+```
+
+**Step 2: Wire Parameters in `dvc.yaml`**
+Update the `train` stage to reference the parameters correctly.
+```yaml
+  train:
+    cmd: python src/models/train.py
+    deps:
+      - data/processed/train.csv
+      - src/models/train.py
+    params:
+      - train.n_estimators
+    outs:
+      - models/model.pkl
+```
+
+**Step 3: Execute and Verify**
+Run the pipeline to record the initial state.
+```bash
+cd /root/code/fraud-detection
+dvc repro
+```
+
+**Step 4: Change Parameters and Re-run**
+Modify `n_estimators` to `200` in `params.yaml` and run `dvc repro`. DVC skips the data processing stages and only re-executes the training stage.
+```bash
+# Update params.yaml to n_estimators: 200
+dvc repro
+```
+
+*Expected Output:*
+```text
+Stage 'process_data' didn't change, skipping
+Stage 'split_data' didn't change, skipping
+Running stage 'train':
+> python src/models/train.py
+Updating lock file 'dvc.lock'
+```
+
+**Step 5: Verify results in `dvc.lock`**
+The `dvc.lock` file now shows the updated parameter value for the train stage.

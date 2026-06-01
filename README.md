@@ -18,4 +18,5 @@ Tracking my 100-day journey into Machine Learning Operations.
 - [Day 12: Configure a DVC Remote Storage](./Day%2012%20-%20Configure%20a%20DVC%20Remote%20Storage.md)
 - [Day 13: Pull DVC-Tracked Data from Remote](./Day%2013%20-%20Pull%20DVC-Tracked%20Data%20from%20Remote.md)
 - [Day 14: Reproducible ML Pipelines with DVC](./Day%2014%20-%20Reproducible%20ML%20Pipelines%20with%20DVC.md)
+- [Day 15: Parameter Management and Reproducibility with DVC](./Day%2015%20-%20Parameter%20Management%20and%20Reproducibility%20with%20DVC.md)
 
