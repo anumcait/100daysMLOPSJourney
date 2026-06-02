@@ -912,3 +912,79 @@ Updating lock file 'dvc.lock'
 
 **Step 5: Verify results in `dvc.lock`**
 The `dvc.lock` file now shows the updated parameter value for the train stage.
+
+---
+
+## 📅 Day 16: Track ML Metrics with DVC
+
+### Task Description
+Integrate metric tracking into the `fraud-detection` pipeline to automatically capture model performance (accuracy, precision, recall) during the evaluation stage. Use DVC to display and compare these metrics.
+
+### Concept Summary
+**ML Metrics** are numerical values that quantify how well a model is performing. Traditionally, these are buried in logs or manually entered into spreadsheets. DVC makes metrics **first-class objects** by:
+- **Tracking**: Automatically recording performance files (JSON/YAML) along with the code and data that produced them.
+- **Reporting**: Aggregating metrics across the project into a clean table with `dvc metrics show`.
+- **Comparing**: Showing differences in performance between experiments or Git branches.
+
+### Step-by-Step Execution
+
+**Step 1: Create an Evaluation Script**
+Develop a script `src/models/evaluate.py` that loads the model, runs predictions on the test set, and writes the results to a structured `metrics.json` file.
+
+```python
+import json
+import pickle
+import pandas as pd
+from sklearn.metrics import accuracy_score
+
+# Sample Evaluation Logic
+model = pickle.load(open("models/model.pkl", "rb"))
+test_data = pd.read_csv("data/processed/test.csv")
+# ... calculation ...
+metrics = {"accuracy": 0.942, "precision": 0.915}
+with open("metrics.json", "w") as f:
+    json.dump(metrics, f)
+```
+
+**Step 2: Add the Evaluate Stage to `dvc.yaml`**
+Register the new stage and explicitly mark `metrics.json` as a metric file.
+
+```yaml
+stages:
+  evaluate:
+    cmd: python src/models/evaluate.py
+    deps:
+      - data/processed/test.csv
+      - models/model.pkl
+      - src/models/evaluate.py
+    metrics:
+      - metrics.json:
+          cache: false
+```
+
+**Step 3: Run the Pipeline**
+Execute the pipeline to trigger the evaluation and generate the metrics file.
+```bash
+dvc repro
+```
+
+**Step 4: View the Performance results**
+Use the built-in DVC command to display the scalars captured in the file.
+```bash
+dvc metrics show
+```
+
+### Key Concepts & Takeaways
+
+| Concept | Detail |
+|---------|--------|
+| **`metrics` field** | Identifies output files that contain scalar metrics for DVC to parse. |
+| **`dvc metrics show`** | Command to visualize and compare metrics in the terminal. |
+| **`cache: false`** | Prevents metrics from being stored in the large-file cache, keeping them lightweight. |
+| **Reproducibility** | Since metrics are tied to the pipeline, they are updated only when dependencies or code change. |
+
+### Common Pitfalls
+1. **Wrong File Format**: DVC prefers JSON or YAML for metrics. Using CSV for scalars may require extra configuration.
+2. **Missing Dependencies**: If `evaluate.py` isn't listed as a dependency, DVC won't know to re-run evaluation if the scoring logic changes.
+3. **Not using `dvc repro`**: Manually running the script won't update DVC's understanding of the metrics state.
+
