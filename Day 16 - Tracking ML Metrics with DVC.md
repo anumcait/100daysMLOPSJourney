@@ -135,3 +135,12 @@ DVC also supports tracking data for plots (like Confusion Matrices or Precision-
 3.  **Dependency Tracking** — Ensure `metrics.json` is listed under `metrics` in `dvc.yaml`, not just as a regular output.
 
 ### Screenshots
+
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/d360ec4d-ca52-4340-8fc6-2dc8592a95f0" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/1ce87831-b82b-4f2a-a62e-a7b107f610e7" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/8d6c29f5-2ac2-4818-ae86-476067ac8369" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/bb7e5b9f-1ceb-43de-afe4-aaeac84f4550" />
+
+
+
+
