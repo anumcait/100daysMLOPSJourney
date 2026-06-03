@@ -102,3 +102,15 @@ git commit -m "Optimize model: set n_estimators to 200 (best F1-score)"
 1.  **Forgetting to Apply** — If you run 20 experiments but don't `dvc exp apply`, your workspace still reflects the old baseline.
 2.  **Experiment Pollution** — If you don't commit your baseline before starting experiments, DVC might not have a clean "parent" commit to compare against.
 3.  **Large Models** — Remember that every experiment produces artifacts. Use `dvc exp gc` occasionally to clean up failed or useless experiment data if storage becomes an issue.
+
+### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/940c9ae7-5fb1-43eb-a48f-c62fee856d2c" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/4458a4b9-03b7-4b7b-a705-1920b1d22b55" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/e29623a7-2bfb-4a7e-8cb3-87a6779ab66b" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/9a8f77ef-6686-4ebe-9f67-e4960b8d3787" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/5892bd3e-9b6b-4174-9dcd-b48c4144e945" />
+
+
+
+
+
