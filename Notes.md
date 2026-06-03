@@ -988,3 +988,66 @@ dvc metrics show
 2. **Missing Dependencies**: If `evaluate.py` isn't listed as a dependency, DVC won't know to re-run evaluation if the scoring logic changes.
 3. **Not using `dvc repro`**: Manually running the script won't update DVC's understanding of the metrics state.
 
+---
+
+## 📅 Day 17: Run and Compare DVC Experiments
+
+### Task Description
+Run multiple training experiments varying the `n_estimators` hyperparameter, compare their performance results (F1-score), and apply the best configuration to the project workspace.
+
+### Concept Summary
+**DVC Experiments** provide a way to iterate on models without creating extra Git branches. They allow you to test hundreds of hyperparameter combinations while keeping the project history clean. 
+- **Shadow commits**: Experiments are stored in special Git refs (`refs/exps`) that don't appear in your regular `git log`.
+- **Param Overrides**: You can change values on the fly without editing the `params.yaml` file manually.
+- **Applying Results**: Once you find a "winner," you can swap the current workspace state with that experiment's state.
+
+### Step-by-Step Execution
+
+**Step 1: Execute Experiments with Parameter Overrides**
+Run three separate experiments by setting the `n_estimators` to 50, 200, and 500 using the CLI.
+```bash
+# cd /root/code/fraud-detection
+dvc exp run --set-param train.n_estimators=50
+dvc exp run --set-param train.n_estimators=200
+dvc exp run --set-param train.n_estimators=500
+```
+
+**Step 2: Compare Experiment Performance**
+Display the experiment leaderboard to compare the `f1_score` and other metrics across all runs.
+```bash
+dvc exp show
+```
+
+**Step 3: Identify and Select the Best Run**
+Look for the run with the highest `f1_score`. In our scenario, let's assume the run with `n_estimators=200` performed best.
+
+**Step 4: Promote the Winning Experiment to Workspace**
+Apply the chosen experiment's state to the workspace. This overwrites the local `params.yaml`, `metrics.json`, and `model.pkl`.
+```bash
+# Substitute <exp_id> with the actual ID from dvc exp show (e.g., exp-c3d4)
+dvc exp apply <exp_id>
+```
+
+**Step 5: Verify and Commit**
+Verify that the workspace now reflects the optimal parameters and commit the change to Git.
+```bash
+cat params.yaml  # Should show n_estimators: 200
+git add .
+git commit -m "Promote best experiment (n_estimators=200) to main track"
+```
+
+### Key Concepts & Takeaways
+
+| Concept | Detail |
+|---------|--------|
+| **`dvc exp run`** | Runs the pipeline and captures the state as an experiment. |
+| **`--set-param`** | Overrides `params.yaml` keys specifically for the duration of that experiment run. |
+| **`dvc exp show`** | A powerful summary table for comparing metrics and parameters. |
+| **`dvc exp apply`** | Updates the workspace with the data and config from a specific experiment. |
+
+### Common Pitfalls
+1. **Uncommitted Changes**: DVC requires a clean Git state (or at least a baseline commit) to anchor experiments.
+2. **Naming Experiments**: If you don't name them, DVC gives them random names like `topaz-pug`. Use `--name` if you want identifiable runs.
+3. **Conflicting parameters**: If you override a parameter via CLI, it takes precedence over the value in `params.yaml`.
+
+
