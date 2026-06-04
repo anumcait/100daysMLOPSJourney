@@ -1049,6 +1049,7 @@ git commit -m "Promote best experiment (n_estimators=200) to main track"
 1. **Uncommitted Changes**: DVC requires a clean Git state (or at least a baseline commit) to anchor experiments.
 2. **Naming Experiments**: If you don't name them, DVC gives them random names like `topaz-pug`. Use `--name` if you want identifiable runs.
 3. **Conflicting parameters**: If you override a parameter via CLI, it takes precedence over the value in `params.yaml`.
+
 ---
 
 ## 📅 Day 18: Dataset Versioning with Git and DVC
@@ -1115,3 +1116,92 @@ dvc checkout
 1. **Forget `dvc checkout`**: Switching Git branches only changes the `.dvc` files; the actual massive data stays the same on disk until `dvc checkout` is run.
 2. **Tagging Uncommitted Changes**: Ensure everything (especially `dvc.lock` and `.dvc` files) is committed before tagging.
 3. **Cache Size**: Keeping many versions of huge datasets can consume significant disk space in `.dvc/cache`.
+
+---
+
+## 📅 Day 19: Build Complete DVC ML Pipeline with Remote Storage and Experiments
+
+### Task Description
+Complete the xFusionCorp Industries fraud-detection production DVC pipeline. Fix an incorrect output path in the existing stages, add `train` and `evaluate` stages, run the full pipeline, push artifacts to SeaweedFS remote storage, and tag the release as `v1.0`.
+
+### Concept Summary
+A **Full DVC Pipeline** orchestrates the entire ML lifecycle from data ingestion to model evaluation. 
+- **SeaweedFS / S3 Remotes**: Provide a centralized, scalable storage for datasets and models, ensuring that anyone on the team can reproduce the results by pulling the exact data versions.
+- **Reproducibility**: By defining clear `deps` and `outs` for each stage, DVC ensures that only necessary steps are re-run when changes occur.
+- **Release Management**: Tagging a specific Git commit as `v1.0` (along with its `dvc.lock` and `.dvc` files) creates a permanent record of a production-ready model and the exact data used to train it.
+
+### Step-by-Step Execution
+
+**Step 1: Fix Existing Configuration**
+Identify and correct any path errors in `dvc.yaml`. In this case, ensuring that early stages like `ingest` or `preprocess` correctly define their output paths so downstream stages can find them.
+
+**Step 2: Prepare Pipeline Scripts**
+Copy the necessary Python scripts for training and evaluation into the `scripts/` directory.
+```bash
+cp scripts-staging/train.py scripts/train.py
+cp scripts-staging/evaluate.py scripts/evaluate.py
+```
+
+**Step 3: Define the Train Stage**
+Add the training logic to `dvc.yaml`, linking it to hyperparameter tracking.
+```yaml
+  train:
+    cmd: python scripts/train.py
+    deps:
+      - data/processed/preprocessed.csv
+      - scripts/train.py
+    params:
+      - n_estimators
+      - max_depth
+      - test_size
+      - random_seed
+    outs:
+      - models/model.pkl
+      - data/processed/test_split.csv
+    metrics:
+      - metrics.json:
+          cache: false
+```
+
+**Step 4: Define the Evaluate Stage**
+Add the evaluation step to capture model performance.
+```yaml
+  evaluate:
+    cmd: python scripts/evaluate.py
+    deps:
+      - models/model.pkl
+      - data/processed/test_split.csv
+      - scripts/evaluate.py
+    outs:
+      - reports/evaluation.json:
+          cache: false
+```
+
+**Step 5: Run the Pipeline and Push to Remote**
+Execute the workflow and sync the results to the remote SeaweedFS storage.
+```bash
+dvc repro
+dvc push
+```
+
+**Step 6: Tag the Release**
+State the version clearly in Git.
+```bash
+git add .
+git commit -m "Complete pipeline and release v1.0"
+git tag -a v1.0 -m "Release v1.0: Complete fraud-detection pipeline"
+```
+
+### Key Concepts & Takeaways
+
+| Concept | Detail |
+|---------|--------|
+| **Production DAG** | A fully interconnected graph of stages from raw data to final report. |
+| **Remote Cache** | Shared storage (e.g., SeaweedFS) that prevents re-running expensive stages on different machines. |
+| **Pipeline Metrics** | Integrating performance data (`metrics.json`, `evaluation.json`) directly into the pipeline metadata. |
+| **Versioning** | Using Git tags to lock the entire state (code + data + model) for production stability. |
+
+### Common Pitfalls
+1. **Dangling Dependencies**: If a stage's `deps` are missing or misnamed, `dvc repro` will fail to link the stages.
+2. **Cache Policy**: Forgetting `cache: false` on small metrics files can clutter the remote storage with many tiny versions of text files.
+3. **Environment Mismatch**: Ensure that libraries used in scripts are consistent across the development and remote environments.
