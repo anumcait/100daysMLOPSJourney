@@ -21,6 +21,4 @@ Tracking my 100-day journey into Machine Learning Operations.
 - [Day 15: Parameter Management and Reproducibility with DVC](./Day%2015%20-%20Parameter%20Management%20and%20Reproducibility%20with%20DVC.md)
 - [Day 16: Tracking ML Metrics with DVC](./Day%2016%20-%20Tracking%20ML%20Metrics%20with%20DVC.md)
 - [Day 17: Comparing DVC Experiments](./Day%2017%20-%20Comparing%20DVC%20Experiments.md)
-
-
-
+- [Day 18: Dataset Versioning with Git and DVC](./Day%2018%20-%20Dataset%20Versioning%20with%20Git%20and%20DVC.md)

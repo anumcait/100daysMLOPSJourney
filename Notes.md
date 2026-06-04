@@ -1049,5 +1049,69 @@ git commit -m "Promote best experiment (n_estimators=200) to main track"
 1. **Uncommitted Changes**: DVC requires a clean Git state (or at least a baseline commit) to anchor experiments.
 2. **Naming Experiments**: If you don't name them, DVC gives them random names like `topaz-pug`. Use `--name` if you want identifiable runs.
 3. **Conflicting parameters**: If you override a parameter via CLI, it takes precedence over the value in `params.yaml`.
+---
 
+## 📅 Day 18: Dataset Versioning with Git and DVC
 
+### Task Description
+The xFusionCorp Industries ML team keeps different dataset and model versions on different Git branches so that the team can roll between versions cleanly. Tag the current state as v1.0, produce a v2-improved branch based on a newer dataset, and confirm that switching back restores the original data.
+
+### Concept Summary
+**Dataset Versioning** with DVC and Git combines Git's branching and tagging capabilities with DVC's efficient large-file handling. 
+- **Git Tags**: Used to mark specific milestones (like `v1.0`) in the project history, including the exact `.dvc` file versions at that time.
+- **Git Branches**: Allow parallel development (e.g., experimental data or model architectures) without affecting the stable `main` branch.
+- **`dvc checkout`**: The command that "materializes" the data files corresponding to the current Git branch or tag by linking them from the DVC cache.
+
+### Step-by-Step Execution
+
+**Step 1: Tag the Current Version (v1.0)**
+Mark the current stable state of the project.
+```bash
+cd /root/code/fraud-detection
+git tag -a v1.0 -m "Baseline dataset and model"
+```
+
+**Step 2: Create a New Branch for Improvements**
+Branch off to work on the updated dataset.
+```bash
+git checkout -b v2-improved
+```
+
+**Step 3: Update the Dataset**
+Replace the tracked dataset with the new version and update DVC metadata.
+```bash
+# Replace old data with new data
+cp data/raw/transactions_v2.csv data/raw/transactions.csv
+
+# Update tracking
+dvc add data/raw/transactions.csv
+```
+
+**Step 4: Reproduce the Pipeline and Commit**
+Update the model and lockfile for the new branch.
+```bash
+dvc repro
+git add data/raw/transactions.csv.dvc dvc.lock
+git commit -m "Incorporate v2 dataset and retrain model"
+```
+
+**Step 5: Restore to Previous Version**
+Switch back to `main` and restore the original `v1` dataset.
+```bash
+git checkout main
+dvc checkout
+```
+
+### Key Concepts & Takeaways
+
+| Concept | Detail |
+|---------|--------|
+| **`git tag`** | Creates a named reference to a specific commit. |
+| **Branching** | Isolates different data/model evolutions. |
+| **`dvc checkout`** | Syncs data on disk with the metadata on the current branch/tag. |
+| **MD5 Hashing** | DVC uses content hashes to avoid duplicating identical files in the cache. |
+
+### Common Pitfalls
+1. **Forget `dvc checkout`**: Switching Git branches only changes the `.dvc` files; the actual massive data stays the same on disk until `dvc checkout` is run.
+2. **Tagging Uncommitted Changes**: Ensure everything (especially `dvc.lock` and `.dvc` files) is committed before tagging.
+3. **Cache Size**: Keeping many versions of huge datasets can consume significant disk space in `.dvc/cache`.
