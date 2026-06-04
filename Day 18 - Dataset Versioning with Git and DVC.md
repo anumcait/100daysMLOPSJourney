@@ -114,3 +114,16 @@ cat data/raw/transactions.csv.dvc
 1.  **Forgetting `dvc checkout`** — Git only restores the `.dvc` pointer files. You must run `dvc checkout` to actually swap the large files on your disk.
 2.  **Deleting Source Files** — When replacing data, ensure you don't delete files that DVC is currently tracking until you've successfully committed the new state.
 3.  **Hash Mismatch** — If you manually edit a `.dvc` file, DVC will report a hash mismatch. Always use `dvc add` or `dvc repro` to update metadata.
+
+### Screenshots
+
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/44639b23-9267-451a-abeb-25b954002c4a" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/755879b3-949b-49ef-9b27-94fbebdc4686" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/5b48eed4-0da7-4206-a8b2-c5ace1ef6318" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/30c431fb-947a-4f3d-a00b-4f38bbc4bac0" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/73bb8de7-33d4-4770-a946-2a92cc722954" />
+
+
+
+
+
