@@ -59,3 +59,18 @@ Confirm the artefacts are pushed to the SeaweedFS Filer under `/buckets/dvc-stor
 
 ## Summary
 By the end of this day, the fraud-detection pipeline will be fully automated, tracked, and versioned, providing a solid foundation for further experiments and production deployment.
+
+### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/3842a39a-385c-4412-ad78-05d36d626ee5" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/3e70fe1e-70a2-428f-9c31-32249c3082c0" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/18f36ed5-d783-4a7b-a611-d3ce9e0c6f30" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/7dbd48ac-9ce4-4e2c-bc74-a64725c9a834" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/95bb47c3-e7c0-42a0-9c9d-1a300dd16983" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/b1e6d3ca-9f26-4a66-bd30-bc3b2231bd62" />
+
+
+
+
+
+
+
