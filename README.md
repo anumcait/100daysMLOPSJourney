@@ -22,3 +22,5 @@ Tracking my 100-day journey into Machine Learning Operations.
 - [Day 16: Tracking ML Metrics with DVC](./Day%2016%20-%20Tracking%20ML%20Metrics%20with%20DVC.md)
 - [Day 17: Comparing DVC Experiments](./Day%2017%20-%20Comparing%20DVC%20Experiments.md)
 - [Day 18: Dataset Versioning with Git and DVC](./Day%2018%20-%20Dataset%20Versioning%20with%20Git%20and%20DVC.md)
+- [Day 19: Build Complete DVC ML Pipeline with Remote Storage and Experiments](./Day%2019%20-%20Build%20Complete%20DVC%20ML%20Pipeline%20with%20Remote%20Storage%20and%20Experiments.md)
+- [Day 20: Setting Up and Launching MLflow Tracking Server](./Day%2020%20-%20Setting%20Up%20and%20Launching%20MLflow%20Tracking%20Server.md)

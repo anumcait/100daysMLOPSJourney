@@ -1116,7 +1116,6 @@ dvc checkout
 1. **Forget `dvc checkout`**: Switching Git branches only changes the `.dvc` files; the actual massive data stays the same on disk until `dvc checkout` is run.
 2. **Tagging Uncommitted Changes**: Ensure everything (especially `dvc.lock` and `.dvc` files) is committed before tagging.
 3. **Cache Size**: Keeping many versions of huge datasets can consume significant disk space in `.dvc/cache`.
-
 ---
 
 ## 📅 Day 19: Build Complete DVC ML Pipeline with Remote Storage and Experiments
@@ -1205,3 +1204,60 @@ git tag -a v1.0 -m "Release v1.0: Complete fraud-detection pipeline"
 1. **Dangling Dependencies**: If a stage's `deps` are missing or misnamed, `dvc repro` will fail to link the stages.
 2. **Cache Policy**: Forgetting `cache: false` on small metrics files can clutter the remote storage with many tiny versions of text files.
 3. **Environment Mismatch**: Ensure that libraries used in scripts are consistent across the development and remote environments.
+
+---
+
+## 📅 Day 20: Setting Up and Launching MLflow Tracking Server
+
+### Task Description
+Configure and launch a persistent MLflow Tracking Server using a SQLite backend and a local artifact store. Ensure the server is accessible through a proxy by configuring CORS and host settings.
+
+### Concept Summary
+**MLflow Tracking** is an API and UI for logging parameters, code versions, metrics, and output files. 
+- **Backend Store**: Where MLflow stores metadata (experiment names, runs, parameters, metrics). SQLite is a common choice for local or small-team setups.
+- **Artifact Store**: Where MLflow stores large files like models, plots, and data samples. This can be a local directory or a cloud bucket (S3, GCS).
+- **Tracking Server**: A centralized service that allows multiple users/scripts to log data to the same backend and artifact stores.
+
+### Step-by-Step Execution
+
+**Step 1: Create Storage Directories**
+Initialize the directories where the tracking data will reside.
+```bash
+mkdir -p /root/code/mlflow-backend
+mkdir -p /root/code/mlflow-artifacts
+```
+
+**Step 2: Start the MLflow Tracking Server**
+Launch the server in the background using `nohup`. We use `--host 0.0.0.0` to listen on all interfaces and configure CORS to allow proxy access.
+```bash
+nohup mlflow server \
+  --host 0.0.0.0 \
+  --port 5000 \
+  --backend-store-uri sqlite:////root/code/mlflow-backend/mlflow.db \
+  --artifacts-destination /root/code/mlflow-artifacts \
+  --cors-allowed-origins '*' \
+  --allowed-hosts '*' \
+  > /root/mlflow-server.log 2>&1 &
+```
+
+**Step 3: Verify the Deployment**
+Check that the server process is alive and the database file has been successfully created.
+```bash
+ps -ef | grep mlflow
+ls -l /root/code/mlflow-backend/mlflow.db
+ss -tulpn | grep 5000
+```
+
+### Key Concepts & Takeaways
+
+| Concept | Detail |
+|---------|--------|
+| **`--backend-store-uri`** | Defines the database connection string. `sqlite:///` indicates a local file database. |
+| **`--artifacts-destination`** | Specifies the base location for storing run artifacts. |
+| **`nohup ... &`** | Commands that ensure the server runs independently of the terminal session. |
+| **CORS/Allowed Hosts** | Necessary for the MLflow UI to be served correctly through web proxies. |
+
+### Common Pitfalls
+1. **Directory Permissions**: Ensure the user running the server has write access to the backend and artifact directories.
+2. **Port Conflicts**: If port 5000 is already in use by another service (like a default Flask app), the server will fail to start.
+3. **Database Locks**: SQLite can sometimes experience locking issues if accessed simultaneously by multiple processes in a specific way, though rare for basic tracking.
