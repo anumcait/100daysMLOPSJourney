@@ -43,3 +43,8 @@ Open the **MLflow UI** button at the top of your lab interface. You should see t
 
 ## Summary
 By the end of this day, you have a functional MLflow Tracking Server that serves as the central hub for all future model training experiments.
+
+### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/f80015f0-2d3e-43e2-a777-f16f3f745f3e" />
+
+
