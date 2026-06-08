@@ -76,5 +76,11 @@ python3 /root/code/log_experiment.py
    - The model artifact is available under the **Artifacts** section.
 
 ### Screenshots
-<img width="1600" height="800" alt="MLflow UI Experiment Run" src="https://github.com/user-attachments/assets/placeholder-run-list" />
-<img width="1600" height="800" alt="MLflow Run Details" src="https://github.com/user-attachments/assets/placeholder-run-details" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/1f63028e-6314-42ee-ba68-e232e5521518" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/0d6f13be-b2e7-457a-9a81-5c7615b58743" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/f451eccc-fb88-4a90-8b82-9be6c1c59424" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/9f258191-0042-4c9d-a6ab-2cb5ab26f28c" />
+
+
+
+
