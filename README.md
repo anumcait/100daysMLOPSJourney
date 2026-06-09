@@ -30,4 +30,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 ## 📘 Extra Resources
 
-- [Simple MLOps Guide (For Kids & Beginners)](./Simple_MLOps_Guide.md)
+- [Simple MLOps Guide (For Beginners)](./Simple_MLOps_Guide.md)
+- [Simple GenAI Guide (For Beginners)](./Simple_GenAI_Guide.md)
+- [Simple AI/ML Engineer Guide (For Beginners)](./Simple_ML_Engineer_Guide.md)
