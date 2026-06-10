@@ -72,4 +72,6 @@ for r in client.search_runs([exp.experiment_id]):
 ```
 
 ### Screenshots
-<img width="1603" height="781" alt="MLflow UI Filtered Runs" src="https://github.com/user-attachments/assets/e06b95c0-a7d1-4564-9b1d-875e8ee9c976" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/a4588a5b-7464-483b-9997-f0194774ce74" />
+
+
