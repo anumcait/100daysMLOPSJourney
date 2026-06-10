@@ -1386,3 +1386,50 @@ Query the experiment again and print the metrics and tags to confirm the updates
 1. **Metric Keys**: Ensure the metric key (e.g., `f1_score`) matches exactly what was logged; it's case-sensitive.
 2. **Missing Metrics**: Always check if a metric exists (is not None) before performing comparisons to avoid errors.
 3. **Tracking URI**: Forgetting to set the tracking URI will lead to the client attempting to use the local `./mlruns` directory instead of the server.
+
+---
+
+## 📅 Day 24: Enable MLflow Autologging
+
+### Task Description
+Implement MLflow autologging to automatically capture training metadata without manual logging statements.
+
+### Concept Summary
+**MLflow Autologging** is a powerful feature that "hooks" into supported libraries (like sklearn, tensorflow, pytorch) to log parameters, metrics, and models automatically.
+- **`mlflow.[flavor].autolog()`**: Enables automatic logging for a specific library. It should be called *before* the training code starts.
+- **Constructor Capture**: Unlike manual logging, autologging captures the full set of hyperparameters, including default values that weren't explicitly passed to the constructor.
+- **Fit Instrumenting**: The logging happens behind the scenes during the `.fit()` (or equivalent) call.
+- **Workflow Efficiency**: Eliminates boilerplate code and ensures consistent logging across different projects.
+
+### Step-by-Step Execution
+
+**Step 1: Set Experiment and Enable Autolog**
+It's critical to enable autologging before initializing the model.
+```python
+import mlflow.sklearn
+mlflow.sklearn.autolog()
+mlflow.set_experiment("autolog-demo")
+```
+
+**Step 2: Train the Model**
+Simply run your standard scikit-learn training code. Autologging will detect the `.fit()` call.
+```python
+model = LogisticRegression(C=1.0)
+model.fit(X, y)
+```
+
+**Step 3: Verification in UI**
+Check the MLflow UI. The run will contain a comprehensive list of parameters, training metrics (like training loss if available), and the full model artifact package.
+
+### Key Concepts & Takeaways
+
+| Concept | Detail |
+|---------|--------|
+| **Flavor-Specific** | Each library (sklearn, xgboost, etc.) has its own autolog function. |
+| **Full Parameter Set** | Ensures you know exactly what defaults the model used, improving reproducibility. |
+| **Artifact Packaging** | Automatically creates the `model`, `conda.yaml`, and `requirements.txt` files. |
+
+### Common Pitfalls
+1. **Timing**: Calling `autolog()` *after* `.fit()` will result in no data being logged for that run.
+2. **Library Versions**: Autologging support varies by version; ensure your library version is compatible with your MLflow version.
+3. **Double Logging**: If you use both autologging and `mlflow.start_run()` with manual `log_param`, you might end up with duplicate entries or minor conflicts if the keys are the same.
