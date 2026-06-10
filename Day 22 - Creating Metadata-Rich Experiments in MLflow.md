@@ -45,5 +45,10 @@ The xFusionCorp Industries team needs to organize their experiments in MLflow wi
    - Expand the **Tags** section to verify `team: analytics`.
 
 ### Screenshots
-<img width="1600" height="800" alt="Creating Experiment in UI" src="https://github.com/user-attachments/assets/placeholder-ui-create" />
-<img width="1600" height="800" alt="Experiment Metadata in UI" src="https://github.com/user-attachments/assets/placeholder-ui-metadata" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/01facc17-c52a-474d-8d05-7d1660a275fa" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/b0530208-b2b2-48c2-87f7-e5a22c495ea6" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/d77c3850-9c50-4f33-ba5f-1c1d3462730d" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/1b5b519e-b2c5-4d3c-b9e3-ff6a2dc2787d" />
+
+
+
