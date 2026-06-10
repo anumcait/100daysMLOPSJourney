@@ -25,6 +25,8 @@ Tracking my 100-day journey into Machine Learning Operations.
 - [Day 19: Build Complete DVC ML Pipeline with Remote Storage and Experiments](./Day%2019%20-%20Build%20Complete%20DVC%20ML%20Pipeline%20with%20Remote%20Storage%20and%20Experiments.md)
 - [Day 20: Setting Up and Launching MLflow Tracking Server](./Day%2020%20-%20Setting%20Up%20and%20Launching%20MLflow%20Tracking%20Server.md)
 - [Day 21: Logging Your First MLflow Experiment](./Day%2021%20-%20Logging%20Your%20First%20MLflow%20Experiment.md)
+- [Day 22: Creating Metadata-Rich Experiments in MLflow](./Day%2022%20-%20Creating%20Metadata-Rich%20Experiments%20in%20MLflow.md)
+- [Day 23: Search and Query MLflow Runs](./Day%2023%20-%20Search%20and%20Query%20MLflow%20Runs.md)
 
 ---
 

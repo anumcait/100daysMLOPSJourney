@@ -1334,3 +1334,55 @@ In the creation form:
 
 **Step 3: Add Descriptions and Verify**
 After creation, click on the experiment to open its details page. You can add a text description or markdown notes in the "Notes" section. We added "Production fraud detection models" to provide clear context for stakeholders.
+
+---
+
+## 📅 Day 23: Search and Query MLflow Runs
+
+### Task Description
+Use the MLflow Python API to programmatically search through experiment runs and apply tags based on performance metrics (f1_score).
+
+### Concept Summary
+**MLflow Search & Querying** allows for automated management of experimental results.
+- **MlflowClient**: A low-level API to interact with the tracking server, offering more control than the high-level `mlflow.*` functions.
+- **search_runs()**: Returns a list of run objects that can be filtered or iterated upon.
+- **set_tag()**: Programmatically updates the metadata of an existing run without needing to re-run the code.
+- **Review Workflow**: Automating the "Shortlisting" or "Rejection" of models based on threshold metrics is a key step in MLOps pipelines.
+
+### Step-by-Step Execution
+
+**Step 1: Connect to Server and Search Runs**
+Use the `MlflowClient` to fetch runs from the `fraud-detection` experiment.
+```python
+mlflow.set_tracking_uri("http://localhost:5000")
+client = MlflowClient()
+exp = client.get_experiment_by_name("fraud-detection")
+runs = client.search_runs([exp.experiment_id])
+```
+
+**Step 2: Apply Conditional Tagging**
+Iterate through the runs and check the metrics stored in `r.data.metrics`. Apply the `review-status` tag using `client.set_tag`.
+```python
+for r in runs:
+    f1 = r.data.metrics.get("f1_score")
+    if f1 == 0.95:
+        client.set_tag(r.info.run_id, "review-status", "shortlisted")
+    elif f1 is not None and f1 < 0.75:
+        client.set_tag(r.info.run_id, "review-status", "rejected")
+```
+
+**Step 3: Verification**
+Query the experiment again and print the metrics and tags to confirm the updates. High-performing models are now marked as `shortlisted`, and low-performing ones as `rejected`, ready for the next stage of the pipeline.
+
+### Key Concepts & Takeaways
+
+| Concept | Detail |
+|---------|--------|
+| **`client.search_runs`** | Essential for batch processing and automated evaluation of experiments. |
+| **`client.set_tag`** | Allows adding new metadata layers (like human reviews or downstream status) post-training. |
+| **Automated Flagging** | Reduces manual overhead in comparing dozens or hundreds of runs in the UI. |
+
+### Common Pitfalls
+1. **Metric Keys**: Ensure the metric key (e.g., `f1_score`) matches exactly what was logged; it's case-sensitive.
+2. **Missing Metrics**: Always check if a metric exists (is not None) before performing comparisons to avoid errors.
+3. **Tracking URI**: Forgetting to set the tracking URI will lead to the client attempting to use the local `./mlruns` directory instead of the server.
