@@ -28,6 +28,7 @@ Tracking my 100-day journey into Machine Learning Operations.
 - [Day 22: Creating Metadata-Rich Experiments in MLflow](./Day%2022%20-%20Creating%20Metadata-Rich%20Experiments%20in%20MLflow.md)
 - [Day 23: Search and Query MLflow Runs](./Day%2023%20-%20Search%20and%20Query%20MLflow%20Runs.md)
 - [Day 24: Enable MLflow Autologging](./Day%2024%20-%20Enable%20MLflow%20Autologging.md)
+- [Day 25: MLflow Model Registry](./Day%2025%20-%20MLflow%20Model%20Registry.md)
 
 ---
 

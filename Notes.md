@@ -1433,3 +1433,40 @@ Check the MLflow UI. The run will contain a comprehensive list of parameters, tr
 1. **Timing**: Calling `autolog()` *after* `.fit()` will result in no data being logged for that run.
 2. **Library Versions**: Autologging support varies by version; ensure your library version is compatible with your MLflow version.
 3. **Double Logging**: If you use both autologging and `mlflow.start_run()` with manual `log_param`, you might end up with duplicate entries or minor conflicts if the keys are the same.
+
+---
+
+# Day 25: MLflow Model Registry
+
+The MLflow Model Registry is a centralized model store, set of APIs, and UI, to collaboratively manage the full lifecycle of an MLflow Model. It provides model lineage (which MLflow run produced the model), model versioning, stage transitions (e.g. from staging to production or archiving), and annotations.
+
+### Step-by-Step Execution
+
+**Step 1: Registering Versions**
+Registering a model adds it to the Registry. If the model name doesn't exist, it creates it (v1). Subsequent registrations for the same name increment the version (v2, v3, etc.).
+- **Baseline Run**: Registered as v1 of `fraud-detector`.
+- **Improved Run**: Registered as v2 of `fraud-detector`.
+
+**Step 2: Model Metadata**
+Descriptions can be added at the Model level (describing what the model does) or the Version level (describing what's specific about that iteration).
+- **Model Description**: "Fraud detection model for xFusionCorp transactions"
+
+**Step 3: Using Aliases**
+Aliases allow you to label specific versions for deployment or comparison without changing client code. For example, your app could always query the model with the `@champion` alias.
+- **v1 Alias**: `challenger`
+- **v2 Alias**: `champion`
+
+### Key Concepts & Takeaways
+
+| Concept | Detail |
+|---------|--------|
+| **Model Registry** | A central repository for managing models as identifiable entities. |
+| **Model Versioning** | Automatic tracking of model iterations produced from different runs. |
+| **Aliases** | Mutatable labels that point to specific versions (e.g., `champion`, `production`). |
+| **Model Lineage** | The link between a registered model version and its original experiment run. |
+
+### Common Pitfalls
+1. **Naming Conflicts**: Model names must be unique within the registry.
+2. **Missing Artifacts**: You cannot register a run that did not successfully log a model artifact.
+3. **Alias Confusion**: Ensure aliases are updated consistently; only one version can hold a specific alias at a time for a given model.
+
