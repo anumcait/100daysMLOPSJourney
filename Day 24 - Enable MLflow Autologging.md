@@ -75,5 +75,9 @@ python3 /root/code/autolog_experiment.py
    - Dependency files (`conda.yaml`, `requirements.txt`).
 
 ### Screenshots
-<img width="1603" height="781" alt="MLflow Autologged Parameters" src="https://github.com/user-attachments/assets/placeholder-autolog-params" />
-<img width="1603" height="781" alt="MLflow Autologged Artifacts" src="https://github.com/user-attachments/assets/placeholder-autolog-artifacts" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/1d8805a8-053a-4507-81a6-9ab5a4723b38" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/675401b8-9c6e-4656-b8a4-48655edfeb94" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/de77a531-c2d0-45f5-85b9-bf40a5bc9a69" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/901e8d5a-64ca-4222-8c79-524231134528" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/ec01067d-d6b9-4d3e-8638-2edb7b302c79" />
+
