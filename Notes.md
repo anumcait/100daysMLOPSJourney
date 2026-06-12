@@ -1470,3 +1470,35 @@ Aliases allow you to label specific versions for deployment or comparison withou
 2. **Missing Artifacts**: You cannot register a run that did not successfully log a model artifact.
 3. **Alias Confusion**: Ensure aliases are updated consistently; only one version can hold a specific alias at a time for a given model.
 
+---
+
+## 📅 Day 26: Compare Model Runs and Select the Best
+
+### Task Description
+Identify the best performing model from a set of experimental runs in MLflow and tag it as a production candidate to facilitate downstream automated deployment processes.
+
+### Concept Summary
+**Model Comparison** is the phase where different experiments (algorithms, hyperparameters, or data versions) are evaluated side-by-side. In a production MLOps workflow, identifying the "champion" model based on specific metrics (like F1-score) is critical. 
+
+**Run Tags** in MLflow provide a flexible way to add metadata to individual runs. Unlike metrics (which are numeric) or parameters (which are fixed at start), tags can be updated manually or by automated scripts to signal the status of a run (e.g., `production-candidate: true`).
+
+### Step-by-Step Execution
+
+**Step 1: Metric Evaluation**
+Review the logged metrics for all runs in the `model-comparison` experiment.
+*   **GradientBoosting**: `f1_score` = 0.91 (Winner)
+*   **RandomForest**: `f1_score` = 0.85
+*   **LogisticRegression**: `f1_score` = 0.78
+
+**Step 2: Accessing the Winning Run**
+Select the run with the highest value for the target metric (F1-score in this case). In our experiment, this is the **GradientBoosting** run.
+
+**Step 3: Applying Production-Candidate Tag**
+Navigate to the run detail page and add the metadata tag:
+*   **Key**: `production-candidate`
+*   **Value**: `true`
+
+**Step 4: Cleanup and Verification**
+Ensure no other competing runs in the same experiment carry the same tag, preventing ambiguity for deployment scripts.
+
+
