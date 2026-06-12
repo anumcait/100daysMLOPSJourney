@@ -75,4 +75,15 @@ Return to the **Model Registry** -> `fraud-detector` main page. You should see:
   - **v2**: Alias `champion`
 
 ## Screenshots
-<img width="1575" height="778" alt="image" src="https://github.com/user-attachments/assets/328b292b-da8a-47ae-b4c9-5180f9f60e9b" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/64ed4cce-914d-4b1a-9c82-e6d4d2d53149" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/962100d3-5fc1-4640-80ec-a32dc1cc7e57" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/0d426ca6-884f-48e4-88d4-56345e029da4" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/e1abe081-568c-48f9-922b-9b5b35eee2eb" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/1b4c626b-b020-4f8f-9517-46e78f80fda9" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/7dd00d71-5e5b-4dbf-a13e-cf0b09a05eaa" />
+
+
+
+
+
+
