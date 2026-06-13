@@ -54,4 +54,12 @@ A xFusionCorp Industries data scientist has trained three candidate models on th
 In the **model-comparison** experiment view, only the **GradientBoosting** run should show the `production-candidate` tag on its detail page.
 
 ### Screenshots
-<img width="1575" height="778" alt="MLflow Experiment View" src="https://github.com/user-attachments/assets/cd89aae3-9e5d-4322-a639-db43dc224a3" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/07d019ef-e37f-4c68-be91-2ad87a31d1f8" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/de356653-dba5-4cd3-bea8-2c62801a9b38" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/f6c32165-bba3-423c-be0a-3f3098c97da8" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/81f3f531-ae1f-44af-9674-fbf3d9546acd" />
+
+
+
+
+
