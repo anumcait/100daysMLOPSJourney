@@ -59,3 +59,13 @@ After execution, the following state should be achieved:
 | **Custom Wrappers** | Python classes that inherit from `mlflow.pyfunc.PythonModel` to encapsulate preprocessing/postprocessing. |
 | **Batch Prediction** | Processing a large set of inputs simultaneously rather than single point inference. |
 | **Registry Plumbing** | The programmatic interface to fetch and interact with models managed by the MLflow Registry. |
+
+###Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/604415ab-c978-4dbc-8c99-0dcce69aaadb" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/a57c469b-4578-461d-ae53-439f3dfe7286" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/379aa56c-0573-4b37-b4e1-132e93d147ca" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/df6f4d99-ce50-408a-93f5-6c5b851f718c" />
+
+
+
+
