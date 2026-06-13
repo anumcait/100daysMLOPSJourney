@@ -30,6 +30,7 @@ Tracking my 100-day journey into Machine Learning Operations.
 - [Day 24: Enable MLflow Autologging](./Day%2024%20-%20Enable%20MLflow%20Autologging.md)
 - [Day 25: MLflow Model Registry](./Day%2025%20-%20MLflow%20Model%20Registry.md)
 - [Day 26: Compare Model Runs and Select the Best](./Day%2026%20-%20Compare%20Model%20Runs%20and%20Select%20the%20Best.md)
+- [Day 27: Load Model from Registry with Custom Preprocessing](./Day%2027%20-%20Load%20Model%20from%20Registry%20with%20Custom%20Preprocessing.md)
 
 ---
 

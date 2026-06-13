@@ -1501,4 +1501,36 @@ Navigate to the run detail page and add the metadata tag:
 **Step 4: Cleanup and Verification**
 Ensure no other competing runs in the same experiment carry the same tag, preventing ambiguity for deployment scripts.
 
+---
 
+## 📅 Day 27: Load Model from Registry with Custom Preprocessing
+
+### Task Description
+Load a registered model with a specific alias from the MLflow Model Registry and use it in a script that includes custom preprocessing logic for batch predictions.
+
+### Concept Summary
+**Model Portability and Registry Access** allows teams to decouple model training from model consumption. By using stable URI aliases like `@champion`, the deployment environment doesn't need to know the specific version number.
+
+**Custom Preprocessing Wrappers** are often necessary when a model requires specific data transformations (like scaling or encoding) that aren't built directly into the raw model file. MLflow's `pyfunc` flavor is the primary way to package these as logic-rich models.
+
+### Step-by-Step Execution
+
+**Step 1: Connecting to the Registry**
+Identify the correct Model URI using the format `models:/<model_name>@<alias>`. This ensures the script always pulls the current designated champion.
+
+**Step 2: Loading via PyFunc**
+The `mlflow.pyfunc.load_model` function is used to load the model. This method is preferred for custom wrappers as it correctly instantiates the Python class containing the preprocessing logic.
+
+**Step 3: Building the Prediction Pipeline**
+The loaded model's `predict` method is called on the input data (usually a Pandas DataFrame). The results are then joined back to the original data for complete context.
+
+**Step 4: Output Generation**
+Saving the results to a CSV or a database for downstream systems to consume.
+
+### Key Takeaways
+
+| Tool/Feature | Utility |
+| :--- | :--- |
+| **mlflow.pyfunc** | The universal interface for loading any MLflow model as a Python function. |
+| **@champion Alias** | A mutable pointer to a specific model version, ideal for production automation. |
+| **Batch Inference** | Efficiently processing data in bulk for offline analysis. |
