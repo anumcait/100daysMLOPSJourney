@@ -1534,3 +1534,13 @@ Saving the results to a CSV or a database for downstream systems to consume.
 | **mlflow.pyfunc** | The universal interface for loading any MLflow model as a Python function. |
 | **@champion Alias** | A mutable pointer to a specific model version, ideal for production automation. |
 | **Batch Inference** | Efficiently processing data in bulk for offline analysis. |
+
+### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/dadcd962-c3e7-4be3-8489-f07e555ad633" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/c3558e1d-1b2e-48de-b852-65be987d0eb9" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/059152c0-ac88-4941-aee1-0bed23a502b1" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/bdb9b110-2090-4e52-9eec-7d0126c08e6e" />
+
+
+
+
