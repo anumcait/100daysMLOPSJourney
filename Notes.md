@@ -1535,11 +1535,53 @@ Saving the results to a CSV or a database for downstream systems to consume.
 | **@champion Alias** | A mutable pointer to a specific model version, ideal for production automation. |
 | **Batch Inference** | Efficiently processing data in bulk for offline analysis. |
 
-### Screenshots
-<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/dadcd962-c3e7-4be3-8489-f07e555ad633" />
-<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/c3558e1d-1b2e-48de-b852-65be987d0eb9" />
-<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/059152c0-ac88-4941-aee1-0bed23a502b1" />
-<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/bdb9b110-2090-4e52-9eec-7d0126c08e6e" />
+
+---
+
+## 📅 Day 28: Fix a Broken MLflow Project and Re-Run It
+
+### Task Description
+Identify and fix a command-line interface mismatch in a pre-staged MLflow Project. The goal is to repair the `MLproject` file so it correctly passes parameters to `train.py`, then execute the project twice to demonstrate full reproducibility.
+
+### Concept Summary
+**MLflow Projects** are a self-contained format for packaging data science code. An `MLproject` file acts as the manifest, defining how to run the code, what parameters it accepts, and what environment it needs. Reproducibility hinges on the **Command-Line Interface (CLI)** mapping—if the `MLproject` command string doesn't perfectly match the script's `argparse` requirements, the orchestration fails.
+
+### Step-by-Step Execution
+
+**Step 1: Diagnose the Failure**
+Run the project manually to see the error. The mismatch typically occurs because of incorrect flag names (e.g., using `--n-estimators` when the script expects `--n_estimators`).
+```bash
+cd /root/code/trainer
+mlflow run . -e train --env-manager=local
+```
+
+**Step 2: Correct the MLproject File**
+Update the `command` line in `MLproject` to ensure parameter placeholders and flag names match the `train.py` argument declarations exactly.
+```yaml
+# /root/code/trainer/MLproject (Corrected)
+name: trainer
+
+entry_points:
+  train:
+    parameters:
+      n_estimators: {type: int, default: 100}
+      max_depth: {type: int, default: 5}
+    command: "python train.py --n_estimators {n_estimators} --max_depth {max_depth}"
+```
+
+**Step 3: Execute the Fixed Project**
+Run the project twice to verify parameter propagation and default behavior.
+```bash
+# 1. Explicitly override parameters
+mlflow run . -e train -P n_estimators=200 -P max_depth=10 --env-manager=local
+
+# 2. Use default values defined in MLproject
+mlflow run . -e train --env-manager=local
+```
+
+**Step 4: Verify in MLflow UI**
+Check the tracking server. The `trainer` experiment should now contain one original failed run and two successful new runs with different parameter values.
+
 
 
 

@@ -31,11 +31,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 - [Day 25: MLflow Model Registry](./Day%2025%20-%20MLflow%20Model%20Registry.md)
 - [Day 26: Compare Model Runs and Select the Best](./Day%2026%20-%20Compare%20Model%20Runs%20and%20Select%20the%20Best.md)
 - [Day 27: Load Model from Registry with Custom Preprocessing](./Day%2027%20-%20Load%20Model%20from%20Registry%20with%20Custom%20Preprocessing.md)
+- [Day 28: Fix a Broken MLflow Project and Re-Run It](./Day%2028%20-%20Fix%20a%20Broken%20MLflow%20Project%20and%20Re-Run%20It.md)
 
 ---
-
-## 📘 Extra Resources
-
-- [Simple MLOps Guide (For Beginners)](./Simple_MLOps_Guide.md)
-- [Simple GenAI Guide (For Beginners)](./Simple_GenAI_Guide.md)
-- [Simple AI/ML Engineer Guide (For Beginners)](./Simple_ML_Engineer_Guide.md)
