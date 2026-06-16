@@ -32,5 +32,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 - [Day 26: Compare Model Runs and Select the Best](./Day%2026%20-%20Compare%20Model%20Runs%20and%20Select%20the%20Best.md)
 - [Day 27: Load Model from Registry with Custom Preprocessing](./Day%2027%20-%20Load%20Model%20from%20Registry%20with%20Custom%20Preprocessing.md)
 - [Day 28: Fix a Broken MLflow Project and Re-Run It](./Day%2028%20-%20Fix%20a%20Broken%20MLflow%20Project%20and%20Re-Run%20It.md)
+- [Day 29: Configure MLflow with Remote Tracking Server and Artifact Store](./Day%2029%20-%20Configure%20MLflow%20with%20Remote%20Tracking%20Server%20and%20Artifact%20Store.md)
 
 ---

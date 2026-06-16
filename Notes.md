@@ -1586,3 +1586,24 @@ Check the tracking server. The `trainer` experiment should now contain one origi
 
 
 
+
+## Day 29: Configure MLflow with Remote Tracking Server and Artifact Store
+
+**Goal:** Fix artifact upload failures by explicitly configuring the SeaweedFS S3 endpoint in the MLflow tracking server.
+
+**Step 1: Configure Environment Variables**
+Add the SeaweedFS endpoint to /root/code/start-mlflow.sh.
+`ash
+export MLFLOW_S3_ENDPOINT_URL=http://localhost:8333
+export AWS_ACCESS_KEY_ID=weedadmin
+export AWS_SECRET_ACCESS_KEY=weedadmin123
+`
+
+**Step 2: Restart and Test**
+`ash
+bash /root/code/restart-mlflow.sh
+python3 /root/code/log_test_run.py
+`
+
+**Step 3: Verification**
+Check SeaweedFS Filer or use curl to ensure artifacts are stored in s3://mlflow-artifacts.
