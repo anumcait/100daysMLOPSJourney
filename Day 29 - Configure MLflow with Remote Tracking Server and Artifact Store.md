@@ -93,4 +93,14 @@ Alternatively, browse the SeaweedFS Filer UI at `http://<host>:8888/buckets/mlfl
 The root cause was the missing `MLFLOW_S3_ENDPOINT_URL` environment variable. Without it, MLflow defaulted to the standard AWS S3 endpoint, which caused connection failures. Adding the explicit SeaweedFS endpoint ensures all artifact operations are routed to the local storage service.
 
 ### Screenshots
-<img width="1575" height="778" alt="image" src="https://github.com/user-attachments/assets/328b292b-da8a-47ae-b4c9-5180f9f60e9b" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/dac70972-eb92-42f6-8410-83f679834036" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/6b0152bc-ef5d-4137-b907-ed870428d994" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/1bf7c65e-db66-44d6-9b5f-1d00b291856b" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/4475c7b6-1b76-4160-a5a0-aa20841f44e8" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/ad12d7ad-e170-4098-9adb-1f0323c6c309" />
+
+
+
+
+
+
