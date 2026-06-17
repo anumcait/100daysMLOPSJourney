@@ -1607,3 +1607,53 @@ python3 /root/code/log_test_run.py
 
 **Step 3: Verification**
 Check SeaweedFS Filer or use curl to ensure artifacts are stored in s3://mlflow-artifacts.
+
+---
+
+## 📅 Day 30: Create a Health Monitor Script for an ML Application
+
+### Task Description
+Develop a custom health monitor script (monitor.sh) that checks both a local service endpoint and internal logic, and returns appropriate exit codes (0 for healthy, 1 for unhealthy).
+
+### Steps
+
+#### 1. Create a health endpoint in the application
+Assuming a simple Python/FastAPI app already exists on port 5001.
+```python
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
+```
+
+#### 2. Create the monitor script (/root/code/monitor.sh)
+```bash
+#!/bin/bash
+STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5001/health)
+
+if [ "$STATUS" -eq 200 ]; then
+  echo "healthy"
+  exit 0
+fi
+
+echo "unhealthy"
+exit 1
+```
+
+#### 3. Make it executable
+```bash
+chmod +x /root/code/monitor.sh
+```
+
+#### 4. Test the monitor
+```bash
+/root/code/monitor.sh
+echo $?
+```
+
+#### 5. Final verification
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:5001/health
+/root/code/monitor.sh
+echo $?
+```
+
