@@ -34,5 +34,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 - [Day 28: Fix a Broken MLflow Project and Re-Run It](./Day%2028%20-%20Fix%20a%20Broken%20MLflow%20Project%20and%20Re-Run%20It.md)
 - [Day 29: Configure MLflow with Remote Tracking Server and Artifact Store](./Day%2029%20-%20Configure%20MLflow%20with%20Remote%20Tracking%20Server%20and%20Artifact%20Store.md)
 - [Day 30: Create a Health Monitor Script for an ML Application](./Day%2030%20-%20Create%20a%20Health%20Monitor%20Script%20for%20an%20ML%20Application.md)
+- [Day 31: Train a Scikit-Learn Model with Reproducible Script](./Day%2031%20-%20Train%20a%20Scikit-Learn%20Model%20with%20Reproducible%20Script.md)
 
 ---

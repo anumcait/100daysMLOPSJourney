@@ -1,0 +1,427 @@
+﻿Day 31: Train a Scikit-Learn Model with Reproducible Script
+
+The xFusionCorp Industries ML platform team maintains a config-driven training pipeline so hyperparameters can be swapped without editing Python code. A training scaffold exists at /root/code/fraud-detection/ with the trainer already in place, but the YAML config has been left in a broken state and the pipeline will not run cleanly. Your task is to correct the config so one successful training run lands on the MLflow tracking server and the trained model ends up inside the project tree.
+
+
+The MLflow tracking server is already running on port 5000. The MLflow UI button at the top of the lab can be opened to confirmâ€”the dashboard loads with an empty fraud-detection experiment already in place.
+
+The project layout under /root/code/fraud-detection/:
+
+data/train.csv â€“ A pre-generated 200-row synthetic binary classification dataset (columns: amount, hour, num_tx_past_day, is_fraud).
+src/models/train.py â€“ The config-driven trainer. This file is correct and must not be modified.
+configs/train_config.yaml â€“ The project's training configuration. This file has bugs.
+models/ â€“ Where the serialised model must land.
+Running python3 /root/code/fraud-detection/src/models/train.py currently either fails with an estimator or column error, or succeeds while dropping the model file outside the project tree. Open configs/train_config.yaml in the VS Code editor, identify every setting that prevents a clean run, and correct it.
+
+The end state must include:
+
+A successful training run printed to stdout.
+Exactly one new MLflow run in the fraud-detection experiment, with the estimator's hyperparameters logged as run parameters.
+A serialised model at /root/code/fraud-detection/models/model.pkl (absolute path, inside the project tree).
+The trainer uses a small registry of supported estimatorsâ€”RandomForestClassifier, GradientBoostingClassifier, LogisticRegression. Only these exact class names resolve.
+##################################################################################################
+### this is how solved the task
+###################################################################################################
+
+
+
+Day 31: Train a Scikit-Learn Model with Reproducible Script The xFusionCorp Industries ML platform team maintains a config-driven training pipeline so hyperparameters can be swapped without editing Python code. A training scaffold exists at /root/code/fraud-detection/ with the trainer already in place, but the YAML config has been left in a broken state and the pipeline will not run cleanly. Your task is to correct the config so one successful training run lands on the MLflow tracking server and the trained model ends up inside the project tree.
+
+
+The MLflow tracking server is already running on port 5000. The MLflow UI button at the top of the lab can be opened to confirmâ€”the dashboard loads with an empty fraud-detection experiment already in place.
+
+The project layout under /root/code/fraud-detection/:
+
+data/train.csv â€“ A pre-generated 200-row synthetic binary classification dataset (columns: amount, hour, num_tx_past_day, is_fraud).
+src/models/train.py â€“ The config-driven trainer. This file is correct and must not be modified.
+configs/train_config.yaml â€“ The project's training configuration. This file has bugs.
+models/ â€“ Where the serialised model must land.
+Running python3 /root/code/fraud-detection/src/models/train.py currently either fails with an estimator or column error, or succeeds while dropping the model file outside the project tree. Open configs/train_config.yaml in the VS Code editor, identify every setting that prevents a clean run, and correct it.
+
+The end state must include:
+
+A successful training run printed to stdout.
+Exactly one new MLflow run in the fraud-detection experiment, with the estimator's hyperparameters logged as run parameters.
+A serialised model at /root/code/fraud-detection/models/model.pkl (absolute path, inside the project tree).
+The trainer uses a small registry of supported estimatorsâ€”RandomForestClassifier, GradientBoostingClassifier, LogisticRegression. Only these exact class names resolve.
+
+I can help fix it, but I need to see the actual configuration and (ideally) the trainer logic that consumes it.
+
+Please paste the contents of:
+
+configs/train_config.yaml
+
+src/models/train.py
+
+or upload those files.
+
+The failure description suggests the YAML likely contains one or more of:
+
+An unsupported estimator name (must be exactly RandomForestClassifier, GradientBoostingClassifier, or LogisticRegression)
+
+An incorrect target column name (should probably be is_fraud)
+
+Incorrect feature column names (dataset columns are amount, hour, num_tx_past_day)
+
+A bad model output path that writes outside the project tree instead of:
+/root/code/fraud-detection/models/model.pkl
+
+Hyperparameter keys that do not match the selected estimator
+
+Once I can see the YAML (and preferably the trainer), I can tell you the exact edits required so that:
+
+python3 /root/code/fraud-detection/src/models/train.py succeeds,
+
+a single MLflow run is logged to the existing fraud-detection experiment,
+
+estimator hyperparameters appear as MLflow parameters,
+
+the model is saved to /root/code/fraud-detection/models/model.pkl.
+
+
+image.png
+and this is train.py """Config-driven training script.
+
+Every parameter comes from /root/code/fraud-detection/configs/train_config.yaml.
+No values are hardcoded. The scaffold is authoritative â€” the lab's
+fix belongs in the YAML config, not in this file.
+
+The estimator is resolved through a small registry of supported
+classes; unknown class names fail fast with a clear diagnostic so the
+config bug surfaces before a confusing sklearn error.
+"""
+import os
+import sys
+import yaml
+import joblib
+import pandas as pd
+import mlflow
+import mlflow.sklearn
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, f1_score
+
+CONFIG_PATH = "/root/code/fraud-detection/configs/train_config.yaml"
+
+ESTIMATOR_REGISTRY = {
+    "RandomForestClassifier": RandomForestClassifier,
+    "GradientBoostingClassifier": GradientBoostingClassifier,
+    "LogisticRegression": LogisticRegression,
+}
+
+
+def load_config(path):
+    with open(path) as f:
+        return yaml.safe_load(f)
+
+
+def main():
+    config = load_config(CONFIG_PATH)
+
+    estimator_name = config["model"]["type"]
+    if estimator_name not in ESTIMATOR_REGISTRY:
+        print(
+            f"ERROR: unknown estimator type {estimator_name!r}. "
+            f"Supported: {sorted(ESTIMATOR_REGISTRY)}"
+        )
+        sys.exit(1)
+    estimator_cls = ESTIMATOR_REGISTRY[estimator_name]
+
+    train_path = config["data"]["train_path"]
+    target_column = config["data"]["target_column"]
+    model_path = config["output"]["model_path"]
+
+    df = pd.read_csv(train_path)
+    if target_column not in df.columns:
+        print(
+            f"ERROR: target column {target_column!r} not found in {train_path}. "
+            f"Available columns: {list(df.columns)}"
+        )
+        sys.exit(2)
+
+    X = df.drop(columns=[target_column])
+    y = df[target_column]
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y
+    )
+
+    estimator_kwargs = {k: v for k, v in config["model"].items() if k != "type"}
+    model = estimator_cls(**estimator_kwargs)
+
+    mlflow.set_tracking_uri(config["mlflow"]["tracking_uri"])
+    mlflow.set_experiment(config["mlflow"]["experiment_name"])
+
+    with mlflow.start_run():
+        model.fit(X_train, y_train)
+        preds = model.predict(X_test)
+        accuracy = accuracy_score(y_test, preds)
+        f1 = f1_score(y_test, preds)
+
+        mlflow.log_param("model_type", estimator_name)
+        mlflow.log_params(estimator_kwargs)
+        mlflow.log_metric("accuracy", accuracy)
+        mlflow.log_metric("f1_score", f1)
+
+        os.makedirs(os.path.dirname(model_path), exist_ok=True)
+        joblib.dump(model, model_path)
+        mlflow.sklearn.log_model(model, name="model")
+
+        print(f"accuracy={accuracy:.4f}, f1_score={f1:.4f}")
+        print(f"model saved to {model_path}")
+
+
+if __name__ == "__main__":
+    main()
+
+From the screenshot and train.py, I can determine the trainer expects the YAML to contain these sections:
+
+data:
+  train_path: ...
+  target_column: ...
+
+model:
+  type: ...
+  # hyperparameters
+
+mlflow:
+  tracking_uri: ...
+  experiment_name: ...
+
+output:
+  model_path: ...
+The trainer also enforces:
+
+model.type must be exactly one of:
+
+RandomForestClassifier
+
+GradientBoostingClassifier
+
+LogisticRegression
+
+target_column must exist in the CSV. The dataset columns are:
+
+amount
+
+hour
+
+num_tx_past_day
+
+is_fraud
+
+The model must be saved to:
+/root/code/fraud-detection/models/model.pkl
+
+A working configuration should look like:
+
+data:
+  train_path: /root/code/fraud-detection/data/train.csv
+  target_column: is_fraud
+
+model:
+  type: RandomForestClassifier
+  n_estimators: 100
+  max_depth: 5
+  random_state: 42
+
+mlflow:
+  tracking_uri: http://localhost:5000
+  experiment_name: fraud-detection
+
+output:
+  model_path: /root/code/fraud-detection/models/model.pkl
+However, to know exactly what is broken in your lab, I need the current contents of:
+
+/root/code/fraud-detection/configs/train_config.yaml
+
+Open that file and paste it here (or show a screenshot of its contents). Then I can tell you the precise edits needed and the command to verify the run.
+
+
+what to do for this task completion
+
+For task completion, you need to fix only configs/train_config.yaml, then run the trainer and verify MLflow.
+
+1. Open the config file
+cat /root/code/fraud-detection/configs/train_config.yaml
+or open it in VS Code.
+
+2. Correct the YAML
+The trainer requires:
+
+data:
+  train_path: /root/code/fraud-detection/data/train.csv
+  target_column: is_fraud
+
+model:
+  type: RandomForestClassifier
+  n_estimators: 100
+  random_state: 42
+
+mlflow:
+  tracking_uri: http://localhost:5000
+  experiment_name: fraud-detection
+
+output:
+  model_path: /root/code/fraud-detection/models/model.pkl
+If the existing file contains:
+
+a different target column â†’ change to is_fraud
+
+an unsupported model name â†’ change to RandomForestClassifier, GradientBoostingClassifier, or LogisticRegression
+
+a model path outside the project â†’ change to /root/code/fraud-detection/models/model.pkl
+
+3. Run the trainer
+python3 /root/code/fraud-detection/src/models/train.py
+Expected output:
+
+accuracy=...
+f1_score=...
+model saved to /root/code/fraud-detection/models/model.pkl
+4. Verify the model file exists
+ls -l /root/code/fraud-detection/models/model.pkl
+You should see the file listed.
+
+5. Verify MLflow run
+Open the MLflow UI button in the lab.
+
+You should see:
+
+Experiment: fraud-detection
+
+Exactly one new run
+
+Parameters such as:
+
+model_type
+
+n_estimators
+
+random_state
+
+Metrics:
+
+accuracy
+
+f1_score
+
+6. If it still fails
+Show the contents of:
+
+cat /root/code/fraud-detection/configs/train_config.yaml
+and the full error message from:
+
+python3 /root/code/fraud-detection/src/models/train.py
+and I can identify the exact incorrect fields.
+
+
+root@controlplane ~/code âœ– cat /root/code/fraud-detection/configs/train_config.yaml
+model:
+  type: RandomForest
+  n_estimators: 100
+  max_depth: 5
+  random_state: 42
+data:
+  train_path: /root/code/fraud-detection/data/train.csv
+  target_column: target
+output:
+  model_path: /root/code/model.pkl
+mlflow:
+  tracking_uri: http://localhost:5000
+  experiment_name: fraud-detection
+
+root@controlplane ~/code âžœ  
+
+You've found all three broken settings.
+
+Edit configs/train_config.yaml and change:
+
+1. Unsupported estimator name
+type: RandomForest
+to:
+
+type: RandomForestClassifier
+2. Wrong target column
+target_column: target
+to:
+
+target_column: is_fraud
+3. Wrong model output path
+model_path: /root/code/model.pkl
+to:
+
+model_path: /root/code/fraud-detection/models/model.pkl
+The final file should be:
+
+model:
+  type: RandomForestClassifier
+  n_estimators: 100
+  max_depth: 5
+  random_state: 42
+
+data:
+  train_path: /root/code/fraud-detection/data/train.csv
+  target_column: is_fraud
+
+output:
+  model_path: /root/code/fraud-detection/models/model.pkl
+
+mlflow:
+  tracking_uri: http://localhost:5000
+  experiment_name: fraud-detection
+Save the file, then run:
+
+python3 /root/code/fraud-detection/src/models/train.py
+You should get output similar to:
+
+accuracy=...
+f1_score=...
+model saved to /root/code/fraud-detection/models/model.pkl
+Verify the model exists:
+
+ls -l /root/code/fraud-detection/models/model.pkl
+If the training succeeds and the model file is present, open the MLflow UI and confirm there is one run under the fraud-detection experiment. That should satisfy the lab requirements.
+
+
+root@controlplane ~/code âžœ  python3 /root/code/fraud-detection/src/models/train.py
+2026/06/18 00:07:17 WARNING mlflow.sklearn: Saving scikit-learn models in the pickle or cloudpickle format requires exercising caution because these formats rely on Python's object serialization mechanism, which can execute arbitrary code during deserialization. The recommended safe alternative is the 'skops' format. For more information, see: https://scikit-learn.org/stable/model_persistence.html
+accuracy=0.8000, f1_score=0.8261
+model saved to /root/code/fraud-detection/models/model.pkl
+ðŸƒ View run puzzled-cub-515 at: http://localhost:5000/#/experiments/1/runs/461b2570214245b998be765e1c945976
+ðŸ§ª View experiment at: http://localhost:5000/#/experiments/1
+
+root@controlplane ~/code âžœ  ls -l /root/code/fraud-detection/models/model.pkl
+-rw-r--r-- 1 root root 318521 Jun 18 00:07 /root/code/fraud-detection/models/model.pkl
+
+root@controlplane ~/code âžœ  
+
+The task appears to be completed successfully.
+
+You have verified all required outcomes:
+
+âœ… Training completed successfully
+
+accuracy=0.8000, f1_score=0.8261
+model saved to /root/code/fraud-detection/models/model.pkl
+âœ… Model saved in the correct location
+
+/root/code/fraud-detection/models/model.pkl
+âœ… MLflow run was created
+
+View run puzzled-cub-515
+âœ… MLflow experiment is fraud-detection
+
+http://localhost:5000/#/experiments/1
+âœ… Hyperparameters were logged automatically via:
+
+mlflow.log_params(estimator_kwargs)
+The only remaining thing is to open the MLflow UI and confirm there is a run under the fraud-detection experiment. Since the trainer printed the run URL, the run was successfully logged.
+
+##############################################################################################
+
+"Create Day 31 documentation and update the repo. The task is: [Task Description]. Create a new markdown file named 'Day 31 - [Title].md', append the summary and steps to 'Notes.md', and add a link to 'README.md'. Follow the style and formatting below."
+
+"Create Day 31 documentation for the 100 Days of MLOps journey. The task and solution is mentioned above. and update 'Notes.md' and 'README.md' using the same layout as Day 1."
+
+as we created all day wise md files, see clearly prompt.md and create day31 md file as per instructions give at last

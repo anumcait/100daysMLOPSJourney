@@ -1657,3 +1657,68 @@ curl -s -o /dev/null -w "%{http_code}\n" http://localhost:5001/health
 echo $?
 ```
 
+---
+
+## 📅 Day 31: Train a Scikit-Learn Model with Reproducible Script
+
+### Task Description
+The xFusionCorp Industries ML platform team maintains a config-driven training pipeline so hyperparameters can be swapped without editing Python code. The training scaffold exists at `/root/code/fraud-detection/` with the trainer already in place, but `configs/train_config.yaml` has been left in a broken state. The task is to fix the YAML config so one successful training run lands on the MLflow tracking server and the trained model ends up inside the project tree.
+
+### Concept Summary
+**Config-Driven Training** decouples hyperparameter choices from implementation code. The trainer reads all settings (estimator type, hyperparameters, file paths, MLflow coordinates) from a YAML file. This pattern means:
+- Different runs can be compared by diffing config files, not code.
+- Every MLflow run is reproducible given its config snapshot.
+- An **Estimator Registry** (a Python dict mapping exact class-name strings to sklearn classes) makes config errors fail fast with a clear message instead of a confusing traceback.
+
+### Step-by-Step Execution
+
+**Step 1: Inspect the broken config**
+```bash
+cat /root/code/fraud-detection/configs/train_config.yaml
+```
+Three bugs were found:
+
+| # | Field | Broken | Correct |
+|---|-------|--------|---------|
+| 1 | `model.type` | `RandomForest` | `RandomForestClassifier` |
+| 2 | `data.target_column` | `target` | `is_fraud` |
+| 3 | `output.model_path` | `/root/code/model.pkl` | `/root/code/fraud-detection/models/model.pkl` |
+
+**Step 2: Fix `configs/train_config.yaml`**
+```yaml
+model:
+  type: RandomForestClassifier
+  n_estimators: 100
+  max_depth: 5
+  random_state: 42
+
+data:
+  train_path: /root/code/fraud-detection/data/train.csv
+  target_column: is_fraud
+
+output:
+  model_path: /root/code/fraud-detection/models/model.pkl
+
+mlflow:
+  tracking_uri: http://localhost:5000
+  experiment_name: fraud-detection
+```
+
+**Step 3: Run the trainer**
+```bash
+python3 /root/code/fraud-detection/src/models/train.py
+```
+Expected output:
+```
+accuracy=0.8000, f1_score=0.8261
+model saved to /root/code/fraud-detection/models/model.pkl
+```
+
+**Step 4: Verify the model file**
+```bash
+ls -l /root/code/fraud-detection/models/model.pkl
+```
+
+**Step 5: Verify the MLflow run**
+Open the MLflow UI and confirm one run exists under the `fraud-detection` experiment with parameters (`model_type`, `n_estimators`, `max_depth`, `random_state`) and metrics (`accuracy`, `f1_score`).
+
