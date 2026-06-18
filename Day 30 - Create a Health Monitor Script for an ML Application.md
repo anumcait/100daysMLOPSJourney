@@ -94,5 +94,9 @@ healthy
 Developing a custom health monitor script ensures that we can programmatically verify the health of our services. By checking specific endpoints and returning standard exit codes, this script can be easily integrated into automated monitoring systems or CI/CD pipelines to ensure service reliability.
 
 ### Screenshots
-<img width="1575" height="778" alt="image" src="https://github.com/user-attachments/assets/328b292b-da8a-47ae-b4c9-5180f9f60e9b" />
-<img width="1588" height="771" alt="image" src="https://github.com/user-attachments/assets/e01044f4-3094-46f5-be3a-a19addf7610d" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/5193f2a1-0ee1-4334-ae5a-33418be2291b" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/e191a3e7-d839-4b65-9a2d-86e71e0bce8d" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/6c0ed936-29d9-46fa-83a3-eeaa9eabc267" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/8af2b7d7-12f9-4ec5-8ff1-43157f2d3abf" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/507e5fd2-2054-4d59-912c-da132757cf85" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/6f1128e0-3038-4e82-81a2-a597ae7eea34" />
