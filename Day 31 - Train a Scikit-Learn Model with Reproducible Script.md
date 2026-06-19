@@ -18,7 +18,7 @@ A successful training run printed to stdout.
 Exactly one new MLflow run in the fraud-detection experiment, with the estimator's hyperparameters logged as run parameters.
 A serialised model at /root/code/fraud-detection/models/model.pkl (absolute path, inside the project tree).
 The trainer uses a small registry of supported estimators—RandomForestClassifier, GradientBoostingClassifier, LogisticRegression. Only these exact class names resolve.
-==============================================================================================
+**Task Summary**
 The xFusionCorp Industries ML platform team maintains a config-driven training pipeline so hyperparameters can be swapped without editing Python code. A training scaffold exists at `/root/code/fraud-detection/` with the trainer already in place, but the YAML config has been left in a broken state and the pipeline will not run cleanly. Your task is to correct the config so one successful training run lands on the MLflow tracking server and the trained model ends up inside the project tree.
 
 The MLflow tracking server is already running on port 5000. The MLflow UI button at the top of the lab can be opened to confirm — the dashboard loads with an empty `fraud-detection` experiment already in place.
