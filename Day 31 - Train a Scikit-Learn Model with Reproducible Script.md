@@ -162,4 +162,10 @@ If `model.type` doesn't match a key exactly, the script exits with a clear error
 This task reinforces the principle that ML training code and ML configuration should be completely separated. By keeping all hyperparameters and paths in a YAML file, the pipeline becomes reproducible and auditable — different team members can run different experiments by simply swapping config files, and every experiment is automatically logged to MLflow with its full parameter set.
 
 ### Screenshots
-<img width="1575" height="778" alt="MLflow run showing fraud-detection experiment with logged parameters" src="https://github.com/user-attachments/assets/328b292b-da8a-47ae-b4c9-5180f9f60e9b" />
+
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/bd9d88dc-b908-48a5-bc64-49b2b3ae4313" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/d4978eb3-6a33-44f7-84b3-2b3f9dd8394d" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/b0ce00ec-9cdd-4a5a-98e1-6de0d394ebb0" />
+
+
+
