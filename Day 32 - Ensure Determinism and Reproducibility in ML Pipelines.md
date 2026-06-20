@@ -68,3 +68,11 @@ OK: all three runs produced byte-identical metrics.
 
 ## Summary
 By explicitly seeding every component that introduces randomness — from data partitioning to model initialization — we transformed a stochastic training process into a fully deterministic one. This is a foundational MLOps requirement, ensuring that any result reported to MLflow can be perfectly recreated by any teammate using the same code and data version.
+
+### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/c6ebcaed-720c-4bbf-8aa0-9ac3002ab451" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/d93ddc7a-47ef-4b2d-9027-97cd7188f869" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/786d4981-03f4-4f93-9c4f-f60a1bc8ac8f" />
+
+
+
