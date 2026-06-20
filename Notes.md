@@ -1718,7 +1718,48 @@ model saved to /root/code/fraud-detection/models/model.pkl
 ```bash
 ls -l /root/code/fraud-detection/models/model.pkl
 ```
+---
 
-**Step 5: Verify the MLflow run**
-Open the MLflow UI and confirm one run exists under the `fraud-detection` experiment with parameters (`model_type`, `n_estimators`, `max_depth`, `random_state`) and metrics (`accuracy`, `f1_score`).
+## 📅 Day 32: Ensure Determinism and Reproducibility in ML Pipelines
 
+### Task Description
+Fix non-determinism in the model training script (`src/models/train.py`) to ensure that multiple training runs produce byte-identical metrics and feature importances. The success is measured by the `check_determinism.sh` script exiting with status 0.
+
+### Concept Summary
+**Determinism** in ML ensures that the same code and data always produce the same model and results. This is achieved by seeding **Pseudo-Random Number Generators (PRNGs)** at every stage where randomness is introduced, such as data shuffling, train-test splitting, and stochastic algorithm initialization (e.g., Random Forests).
+
+### Step-by-Step Execution
+
+**Step 1: Set a Global Seed**
+Define a constant for the random state to ensure consistency across all library calls.
+```python
+RANDOM_STATE = 42
+```
+
+**Step 2: Seed the Data Partitioning**
+Update the `train_test_split` function to use the fixed seed, preventing different data distributions across runs.
+```python
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, stratify=y, random_state=RANDOM_STATE
+)
+```
+
+**Step 3: Seed the Model Training**
+Pass the random state to the estimator constructor. This ensures that the random feature and sample selection during tree building is repeatable.
+```python
+model = RandomForestClassifier(
+    n_estimators=100, max_depth=5, random_state=RANDOM_STATE
+)
+```
+
+**Step 4: Verify Reproducibility**
+Run the determinism probe to confirm that three consecutive runs produce identical output metrics files.
+```bash
+./check_determinism.sh
+```
+
+**Step 5: Inspect Metrics**
+Optionally check the generated JSON reports to verify they are byte-identical.
+```bash
+cat reports/metrics_run_1.json reports/metrics_run_2.json
+## 📅 Day 28: Fix a Broken MLflow Project and Re-Run It
