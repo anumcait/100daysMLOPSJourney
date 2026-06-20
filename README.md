@@ -36,6 +36,7 @@ Tracking my 100-day journey into Machine Learning Operations.
 - [Day 30: Create a Health Monitor Script for an ML Application](./Day%2030%20-%20Create%20a%20Health%20Monitor%20Script%20for%20an%20ML%20Application.md)
 - [Day 31: Train a Scikit-Learn Model with Reproducible Script](./Day%2031%20-%20Train%20a%20Scikit-Learn%20Model%20with%20Reproducible%20Script.md)
 - [Day 32: Ensure Determinism and Reproducibility in ML Pipelines](./Day%2032%20-%20Ensure%20Determinism%20and%20Reproducibility%20in%20ML%20Pipelines.md)
+- [Day 33: Evaluate a Trained Model and Generate Classification Report](./Day%2033%20-%20Evaluate%20a%20Trained%20Model%20and%20Generate%20Classification%20Report.md)
 
 
 ---

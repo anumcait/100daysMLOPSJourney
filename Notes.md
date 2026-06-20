@@ -1763,3 +1763,47 @@ Optionally check the generated JSON reports to verify they are byte-identical.
 ```bash
 cat reports/metrics_run_1.json reports/metrics_run_2.json
 ## 📅 Day 28: Fix a Broken MLflow Project and Re-Run It
+
+---
+
+## 📅 Day 33: Evaluate a Trained Model and Generate Classification Report
+
+### Task Description
+The xFusionCorp Industries ML platform team's release checklist requires a five-metric evaluation report for every candidate model, plus a confusion-matrix image, published to the project's reports/ directory. The goal is to correct the evaluate.py script to generate these reports in the correct location and log them to MLflow.
+
+### Concept Summary
+**Model Evaluation** in production environments requires more than just high-level metrics. A standard **Classification Report** provides precision, recall, and F1-score to detect biases or performance gaps. **Artifact Tracking** ensures that visual diagnostics like a **Confusion Matrix** are permanently linked to the specific model version that produced them, enabling better auditability and comparison.
+
+### Step-by-Step Execution
+
+**Step 1: Define Standardized Output Paths**
+Ensure the script paths are configured to land in the project's internal reports/ directory rather than system temporary folders.
+```python
+REPORTS_DIR = "/root/code/fraud-detection/reports"
+METRICS_JSON = os.path.join(REPORTS_DIR, "metrics.json")
+CONFUSION_PNG = os.path.join(REPORTS_DIR, "confusion_matrix.png")
+```
+
+**Step 2: Expand the Metrics Dictionary**
+Update the evaluation logic to calculate the full suite of required metrics: Accuracy, Precision, Recall, F1-Score, and AUC-ROC.
+```python
+metrics = {
+    "accuracy": round(accuracy_score(y, preds), 6),
+    "precision": round(precision_score(y, preds), 6),
+    "recall": round(recall_score(y, preds), 6),
+    "f1_score": round(f1_score(y, preds), 6),
+    "auc_roc": round(roc_auc_score(y, proba), 6),
+}
+```
+
+**Step 3: Run the Evaluator**
+Execute the script to process the test set, generate local files, and log everything to the fraud-detection-eval MLflow experiment.
+```bash
+cd /root/code/fraud-detection
+python src/models/evaluate.py
+```
+
+**Step 4: Verify the Results**
+Confirm that the reports are created locally and visible in the MLflow UI.
+- Check reports/metrics.json
+- Check reports/confusion_matrix.png
