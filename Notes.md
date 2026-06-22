@@ -1807,3 +1807,45 @@ python src/models/evaluate.py
 Confirm that the reports are created locally and visible in the MLflow UI.
 - Check reports/metrics.json
 - Check reports/confusion_matrix.png
+
+---
+
+## 📅 Day 34: Implement Cross-Validation for Model Selection
+
+### Task Description
+Improve the reliability of model selection by implementing Stratified K-Fold Cross-Validation. This ensures that every fold maintains the class distribution of the original dataset and provides insights into the variance of model performance through standard deviation metrics.
+
+### Concept Summary
+**Stratified K-Fold Cross-Validation** is a robust evaluation technique where the dataset is split into *k* folds. Unlike standard K-Fold, it ensures each fold is representative of the whole by preserving the percentage of samples for each class. Adding **Standard Deviation** to the metrics allows us to detect if a model's performance is erratic or stable across different subsets of data.
+
+### Step-by-Step Execution
+**Step 1: Update the CV Splitter**
+Modify 'src/models/cross_validate.py' to use 'StratifiedKFold'.
+```python
+# Before:
+# cv = KFold(n_splits=5, shuffle=True, random_state=42)
+
+# After:
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+```
+
+**Step 2: Calculate Standard Deviation**
+Update the aggregate results to include 'np.std()' for all tracked metrics to satisfy the seven-key reporting schema.
+```python
+aggregate = {
+    "mean_accuracy": round(np.mean(acc_vals), 6),
+    "std_accuracy": round(np.std(acc_vals), 6),
+    "mean_f1": round(np.mean(f1_vals), 6),
+    "std_f1": round(np.std(f1_vals), 6),
+    "mean_roc_auc": round(np.mean(auc_vals), 6),
+    "std_roc_auc": round(np.std(auc_vals), 6),
+    "folds": fold_results,
+}
+```
+
+**Step 3: Run and Validate**
+Execute the script and verify that 'reports/cv_results.json' contains the new 'std_' keys and that MLflow logs five child runs under a single parent.
+```bash
+cd /root/code/fraud-detection
+python src/models/cross_validate.py
+```
