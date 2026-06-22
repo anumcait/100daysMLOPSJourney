@@ -54,3 +54,13 @@ python src/models/evaluate.py
 
 ## Summary
 By standardizing the evaluation output, we ensured that every model candidate is held to the same rigorous performance checklist. Logging these as artifacts in MLflow transforms individual one-off evaluations into a searchable, comparable, and permanent record of the project's progress.
+
+### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/8a5c973c-adfa-45c6-9111-67755d21d556" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/06c01d1c-f4a6-4a81-96d0-3d7385da9b3c" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/ca5fc58b-de2d-479a-8fdd-35d3970d62a3" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/ac55a5a0-e482-4bec-b2c4-54392f55c1e7" />
+
+
+
+
