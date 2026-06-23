@@ -73,3 +73,15 @@ cat reports/cv_results.json
 
 ## Summary
 By switching to Stratified K-Fold and logging standard deviation, we've made our model evaluation significantly more reliable. This approach ensures that our performance metrics are not just high on average, but consistent and representative of how the model will perform on real-world, imbalanced data.
+
+### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/2fdfbc23-68eb-42eb-bdbd-983f30bd63b7" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/ff2c8897-2c44-4741-a7d5-139b754aa0a4" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/43f7caff-79c4-4c53-b37f-51106ebef4d9" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/3c3ad2f0-9cc9-456a-a795-05542f1663af" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/e8130045-0ed1-44ed-9265-f0b2e1dbe2c5" />
+
+
+
+
+
