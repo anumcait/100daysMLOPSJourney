@@ -38,6 +38,8 @@ Tracking my 100-day journey into Machine Learning Operations.
 - [Day 32: Ensure Determinism and Reproducibility in ML Pipelines](./Day%2032%20-%20Ensure%20Determinism%20and%20Reproducibility%20in%20ML%20Pipelines.md)
 - [Day 33: Evaluate a Trained Model and Generate Classification Report](./Day%2033%20-%20Evaluate%20a%20Trained%20Model%20and%20Generate%20Classification%20Report.md)
 - [Day 34: Implement Cross-Validation for Model Selection](./Day%2034%20-%20Implement%20Cross-Validation%20for%20Model%20Selection.md)
+- [Day 35: Hyperparameter Tuning with Optuna](./Day%2035%20-%20Hyperparameter%20Tuning%20with%20Optuna.md)
+
 
 
 ---

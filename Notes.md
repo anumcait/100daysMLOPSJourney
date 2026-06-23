@@ -1762,7 +1762,6 @@ Run the determinism probe to confirm that three consecutive runs produce identic
 Optionally check the generated JSON reports to verify they are byte-identical.
 ```bash
 cat reports/metrics_run_1.json reports/metrics_run_2.json
-## 📅 Day 28: Fix a Broken MLflow Project and Re-Run It
 
 ---
 
@@ -1810,42 +1809,42 @@ Confirm that the reports are created locally and visible in the MLflow UI.
 
 ---
 
-## 📅 Day 34: Implement Cross-Validation for Model Selection
+## 📅 Day 35: Hyperparameter Tuning with Optuna
 
 ### Task Description
-Improve the reliability of model selection by implementing Stratified K-Fold Cross-Validation. This ensures that every fold maintains the class distribution of the original dataset and provides insights into the variance of model performance through standard deviation metrics.
+The xFusionCorp Industries ML platform team tunes fraud-detection hyperparameters with Optuna and inspects the full search in the MLflow Compare view. The goal is to correct the tuner so that each of the 20 trials is visible in MLflow and the best configuration saved corresponds to the highest-F1 candidate.
 
 ### Concept Summary
-**Stratified K-Fold Cross-Validation** is a robust evaluation technique where the dataset is split into *k* folds. Unlike standard K-Fold, it ensures each fold is representative of the whole by preserving the percentage of samples for each class. Adding **Standard Deviation** to the metrics allows us to detect if a model's performance is erratic or stable across different subsets of data.
+**Hyperparameter Tuning** with Optuna automates the search for optimal model parameters (like tree depth or number of estimators) using efficient sampling algorithms. By integrating it with **MLflow**, every trial in the search space can be tracked, visualized, and compared, ensuring that the model development process is transparent and reproducible.
 
 ### Step-by-Step Execution
-**Step 1: Update the CV Splitter**
-Modify 'src/models/cross_validate.py' to use 'StratifiedKFold'.
+**Step 1: Set Optimization Direction**
+We update the Optuna study creation to "maximize" because we are optimizing for the F1 score, where a higher value is better.
 ```python
-# Before:
-# cv = KFold(n_splits=5, shuffle=True, random_state=42)
-
-# After:
-cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+study = optuna.create_study(
+    direction="maximize", 
+    study_name=EXPERIMENT_NAME
+)
 ```
 
-**Step 2: Calculate Standard Deviation**
-Update the aggregate results to include 'np.std()' for all tracked metrics to satisfy the seven-key reporting schema.
+**Step 2: Enable Per-Trial MLflow Logging**
+We wrap the evaluation logic inside the `objective` function with an MLflow run block, ensuring every trial records its unique parameters and resulting score.
 ```python
-aggregate = {
-    "mean_accuracy": round(np.mean(acc_vals), 6),
-    "std_accuracy": round(np.std(acc_vals), 6),
-    "mean_f1": round(np.mean(f1_vals), 6),
-    "std_f1": round(np.std(f1_vals), 6),
-    "mean_roc_auc": round(np.mean(auc_vals), 6),
-    "std_roc_auc": round(np.std(auc_vals), 6),
-    "folds": fold_results,
-}
+with mlflow.start_run():
+    mlflow.log_param("n_estimators", n_estimators)
+    mlflow.log_param("max_depth", max_depth)
+    mlflow.log_metric("f1_score", score)
 ```
 
-**Step 3: Run and Validate**
-Execute the script and verify that 'reports/cv_results.json' contains the new 'std_' keys and that MLflow logs five child runs under a single parent.
+**Step 3: Execute the Search**
+Run the tuner script to perform 20 trials and identify the best hyperparameters.
 ```bash
-cd /root/code/fraud-detection
-python src/models/cross_validate.py
+python src/models/tune.py
 ```
+
+**Step 4: Verify Best Parameters**
+Check the output YAML file to ensure the best configuration has been persisted.
+```bash
+cat configs/best_params.yaml
+```
+
