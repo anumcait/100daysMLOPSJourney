@@ -70,3 +70,14 @@ cat configs/best_params.yaml
 
 ## Summary
 By correcting the optimization direction and implementing per-trial logging, we've transformed a silent, incorrect search into a robust, observable hyperparameter tuning pipeline. This setup allows the team to visually compare the performance of different parameter combinations in MLflow and guarantees that the best configuration is saved for production use.
+
+### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/83dbb17c-1880-4c82-a059-ce0fec45968f" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/c50bb8c0-8607-4b38-90e8-90aff68af37a" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/cb54adcc-0f63-4e68-93f3-bacb1f2be189" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/c82cf7f4-112b-494d-85b6-02fa93d19fb2" />
+
+
+
+
+
