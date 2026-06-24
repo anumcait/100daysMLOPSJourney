@@ -1847,4 +1847,49 @@ Check the output YAML file to ensure the best configuration has been persisted.
 ```bash
 cat configs/best_params.yaml
 ```
+---
 
+## 📅 Day 36: Automated Model Selection with MLflow
+
+### Task Description
+The team needs to automate the selection of the best model from a competitive bake-off experiment. The goal is to fix two bugs in the orchestrator script: one that sorts models incorrectly (picking the worst instead of the best) and another that omits necessary model family metadata from the final JSON report.
+
+### Concept Summary
+**Automated Model Selection** is the process of programmatically comparing multiple trained models and selecting the optimal one based on predefined metrics. By using MLflow's search capabilities, we can ignore the noise of dozens of experiments and instantly identify the candidate with the highest performance (e.g., F1 score), ensuring that only the most accurate model is promoted to the next stage of the pipeline.
+
+### Step-by-Step Execution
+**Step 1: Execute Training Scripts**
+Generate the candidate runs by executing the independent training scripts for Random Forest, Gradient Boosting, and Logistic Regression.
+```bash
+cd /root/code/fraud-detection
+python src/models/train_rf.py
+python src/models/train_gb.py
+python src/models/train_lr.py
+```
+
+**Step 2: Correct Search Sorting**
+Update the `mlflow.search_runs` call in `src/models/bakeoff.py` to sort by `f1_score DESC`. This ensures that the first row of the resulting dataframe is indeed the winner.
+```python
+runs = mlflow.search_runs(
+    experiment_ids=[exp.experiment_id],
+    order_by=["metrics.f1_score DESC"],
+    max_results=10,
+)
+```
+
+**Step 3: Enrich the Winner Report**
+Modify the report dictionary to include the `model_type` key, mapped from `winner["tags.candidate"]`, providing downstream systems with the model family information.
+```python
+report = {
+    "model_type": winner["tags.candidate"],
+    "run_id": winner["run_id"],
+    "f1_score": float(winner["metrics.f1_score"]),
+}
+```
+
+**Step 4: Verify the Selection**
+Run the orchestrator and inspect the generated JSON file to confirm the correct model was selected.
+```bash
+python src/models/bakeoff.py
+cat reports/winner.json
+```
