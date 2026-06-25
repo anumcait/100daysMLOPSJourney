@@ -51,3 +51,11 @@ cat reports/winner.json
 
 ## Summary
 By fixing the sorting direction and enriching the metadata in the final report, we have successfully automated the "Model Selection" phase of our MLOps pipeline. The system now reliably identifies the top-performing candidate from an experiment and provides a clear, machine-readable report that can be used by automated deployment scripts to promote the best model to production.
+
+### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/3a026d82-f722-4ea2-b69f-3cbbb385215c" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/3cdfa179-9286-4fef-963d-37821abcbebd" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/26b66d1e-a043-4324-af31-6e9c9b7b3b51" />
+
+
+
