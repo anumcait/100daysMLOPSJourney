@@ -1,12 +1,23 @@
 # Day 37 - Promote the Winning Model to MLflow Model Registry
 
-The xFusionCorp Industries ML platform team has a `reports/winner.json` from the Day 36 bake-off that identifies the best fraud-detection candidate. The next step in the pipeline is to register that winning model in the MLflow Model Registry so it can be versioned, annotated, and promoted through the staging → production lifecycle. A registration script exists at `/root/code/fraud-detection/src/models/register.py`, but it reads the wrong key from the report and does not set a model alias after registration. Your task is to fix the script so the correct run is registered under the `fraud-detector` model name and the new version is assigned the `champion` alias.
+The xFusionCorp Industries ML platform team runs fraud-detection training as a four-stage pipeline—preprocess, featurize, train, evaluate—orchestrated by a single script that logs the end-to-end run to MLflow. A pre-staged pipeline is already in place, but the stage-chain invariant is broken: the pipeline currently produces a feature matrix that does not reflect the upstream drop-and-clean work. Your task is to correct the stage wiring so every stage reads from its immediate predecessor and one MLflow run captures the full pipeline.
 
-The MLflow tracking server is already running on port 5000. The `reports/winner.json` produced in Day 36 contains the keys `model_type`, `run_id`, and `f1_score`.
 
-The project layout under `/root/code/fraud-detection/`:
-- `reports/winner.json` – Output of the Day 36 bake-off containing the winning run's metadata.
-- `src/models/register.py` – The registration script. Loading and alias-assignment logic is scaffolded but contains two bugs.
+The MLflow tracking server is already running on port 5000. The MLflow UI button at the top of the lab can be opened to confirm—the dashboard loads with an empty training-pipeline experiment.
+
+The project layout under /root/code/fraud-detection/:
+
+data/raw/train.csv – The same 200-row synthetic binary-classification dataset the rest of the Training section uses (imbalanced roughly 70 / 30).
+configs/pipeline_config.yaml – Declares the data paths, model hyperparameters, output paths, and MLflow settings every stage consumes. Correct and must remain intact.
+src/preprocess.py, src/featurize.py, src/train.py, src/evaluate.py – The four pipeline stages. preprocess.py drops negligible-amount rows (amount < 50) and duplicates before writing the processed CSV. The four stages are wired through the config's data: paths.
+run_pipeline.py – The orchestrator that executes the four stages in order and logs one MLflow run with the config-driven parameters and the final evaluation metrics. Correct and requires no edits.
+Identify the stage whose input path breaks the chain, correct the wiring in the VS Code editor, save, and run python3 run_pipeline.py once from the project root.
+
+The end state must include:
+
+The row count of data/features/features.csv equals the row count of data/processed/train_clean.csv and is strictly less than the 200-row raw CSV.
+models/model.pkl and reports/evaluation.json are written and the report carries accuracy, f1, and roc_auc as numeric values.
+Exactly one MLflow run exists in the training-pipeline experiment, carrying params.model_type, params.n_estimators, params.max_depth, and the three evaluation metrics.
 
 ## Objective
 Register the winning model artifact from the bake-off experiment into the MLflow Model Registry and assign it a production-ready alias (`champion`) so downstream deployment pipelines can reference a stable, named pointer instead of a raw `run_id`.
