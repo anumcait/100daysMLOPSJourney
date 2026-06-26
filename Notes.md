@@ -1893,3 +1893,58 @@ Run the orchestrator and inspect the generated JSON file to confirm the correct 
 python src/models/bakeoff.py
 cat reports/winner.json
 ```
+
+---
+
+## 📅 Day 37: Promote the Winning Model to MLflow Model Registry
+
+### Task Description
+The team has a `reports/winner.json` from the bake-off experiment that identifies the best fraud-detection candidate. The goal is to fix a registration script at `src/models/register.py` — it reads the wrong key from the JSON report and calls a tag method instead of an alias method — so that the winning run is correctly registered under the `fraud-detector` model name and the new version is assigned the `champion` alias for use by downstream deployment pipelines.
+
+### Concept Summary
+The **MLflow Model Registry** is a centralized, versioned store for ML models that decouples a model's identity from a raw `run_id`. Every call to `register_model` creates an immutable **Model Version** snapshot. A **Model Alias** (e.g., `champion`) is a mutable, human-readable pointer that can be re-assigned to any version, allowing deployment scripts to always resolve the latest best model by a stable name (`models:/fraud-detector@champion`) rather than a hard-coded version number.
+
+### Step-by-Step Execution
+**Step 1: Fix the Report Key Lookup**
+Correct the script to read the `run_id` key from `winner.json` (was incorrectly reading `winner["model"]`).
+```python
+with open("reports/winner.json") as f:
+    winner = json.load(f)
+
+run_id = winner["run_id"]   # Fixed: was winner["model"]
+model_name = "fraud-detector"
+```
+
+**Step 2: Register the Model Version**
+Use `mlflow.register_model` with a `runs:/` URI to link the new Registry entry to the logged artifact.
+```python
+model_uri = f"runs:/{run_id}/model"
+
+mv = mlflow.register_model(
+    model_uri=model_uri,
+    name=model_name,
+)
+```
+
+**Step 3: Assign the Champion Alias**
+Replace the incorrect `set_model_version_tag` call with `set_registered_model_alias` so deployment systems can reference the model by alias.
+```python
+client = MlflowClient()
+
+client.set_registered_model_alias(
+    name=model_name,
+    alias="champion",
+    version=mv.version,
+)
+```
+
+**Step 4: Run and Verify**
+Execute the script and confirm registration via the MLflow client.
+```bash
+cd /root/code/fraud-detection
+python src/models/register.py
+```
+```python
+champion_mv = client.get_model_version_by_alias("fraud-detector", "champion")
+print(champion_mv.version, champion_mv.run_id)
+```
