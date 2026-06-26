@@ -1948,3 +1948,63 @@ python src/models/register.py
 champion_mv = client.get_model_version_by_alias("fraud-detector", "champion")
 print(champion_mv.version, champion_mv.run_id)
 ```
+
+---
+
+## 📅 Day 38: Serve a Registered MLflow Model as a REST API
+
+### Task Description
+The team has a registered `fraud-detector` model with a `champion` alias in the MLflow Model Registry (from Day 37). A serving script at `src/serve/predict.py` is broken — it loads the model using a hard-coded `run_id` URI instead of the stable `models:/fraud-detector@champion` alias URI, and the Flask route returns raw NumPy types that are not JSON-serializable. The goal is to correct both defects so the endpoint accepts a JSON feature payload and returns a valid prediction response.
+
+### Concept Summary
+The **`models:/` URI scheme** allows MLflow to resolve a model directly from the Registry using its registered name and either a version number or an alias (e.g., `models:/fraud-detector@champion`). This decouples the serving layer from raw `run_id` values — when the champion is re-promoted to a new version, the alias is simply reassigned and no serving code changes are required. Additionally, NumPy scalar types (such as `int64`) are not natively JSON-serializable; predictions must be cast to native Python builtins before being returned via Flask's `jsonify`.
+
+### Step-by-Step Execution
+**Step 1: Fix the Model Loading URI**
+Replace the hard-coded `run_id` URI with the stable Registry alias URI so the server always loads the current champion.
+```python
+# Before (broken):
+# model = mlflow.sklearn.load_model("runs:/abc123def456/model")
+
+# After (correct):
+model = mlflow.sklearn.load_model("models:/fraud-detector@champion")
+```
+
+**Step 2: Fix the Flask Prediction Route**
+Cast the NumPy prediction result to a native Python `int` to ensure JSON serializability.
+```python
+from flask import Flask, request, jsonify
+import pandas as pd
+import mlflow.sklearn
+
+app = Flask(__name__)
+model = mlflow.sklearn.load_model("models:/fraud-detector@champion")
+
+@app.route("/predict", methods=["POST"])
+def predict():
+    data = request.get_json(force=True)
+    features = pd.DataFrame([data["features"]])
+    prediction = model.predict(features)
+    return jsonify({"prediction": int(prediction[0])})  # Fixed: cast to int
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8080)
+```
+
+**Step 3: Start the Server and Verify**
+Launch the Flask application and test it with a `curl` request.
+```bash
+cd /root/code/fraud-detection
+python src/serve/predict.py &
+
+curl -s -X POST http://localhost:8080/predict \
+  -H "Content-Type: application/json" \
+  -d '{"features": [1200.50, 1, 0, 3, 0.85, 22, 1, 0, 1, 0]}' | python3 -m json.tool
+```
+
+Expected response:
+```json
+{
+    "prediction": 0
+}
+```

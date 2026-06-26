@@ -41,6 +41,7 @@ Tracking my 100-day journey into Machine Learning Operations.
 - [Day 35: Hyperparameter Tuning with Optuna](./Day%2035%20-%20Hyperparameter%20Tuning%20with%20Optuna.md)
 - [Day 36: Automated Model Selection with MLflow](./Day%2036%20-%20Automated%20Model%20Selection%20with%20MLflow.md)
 - [Day 37: Promote the Winning Model to MLflow Model Registry](./Day%2037%20-%20Promote%20the%20Winning%20Model%20to%20MLflow%20Model%20Registry.md)
+- [Day 38: Serve a Registered MLflow Model as a REST API](./Day%2038%20-%20Serve%20a%20Registered%20MLflow%20Model%20as%20a%20REST%20API.md)
 
 
 
