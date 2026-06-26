@@ -96,3 +96,7 @@ print(champion_mv.version, champion_mv.run_id)
 
 ## Summary
 By correcting the key lookup and switching from a tag to an alias, the registration pipeline now reliably promotes the bake-off winner into the MLflow Model Registry with a `champion` alias. Downstream deployment automation (CI/CD pipelines, batch scoring jobs, or REST serving endpoints) can always load the current best model using `models:/fraud-detector@champion` without ever needing to know a numeric version or a raw `run_id`. This is the foundational step toward a fully automated MLOps promotion workflow.
+
+### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/8cf218f9-9d3a-451b-9bf6-c23488793830" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/53d40416-0327-4775-a558-7f0991294e1b" />

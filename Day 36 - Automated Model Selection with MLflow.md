@@ -18,7 +18,7 @@ A JSON file at /root/code/fraud-detection/reports/winner.json with exactly three
 The model_type, run_id, and f1_score stored in winner.json correspond to the candidate with the highest f1_score in the bakeoff experiment.
 The MLflow Compare view—select all three runs in the experiment's run list and click Compare—is the fastest way to eyeball which candidate won and spot-check the report.
 
-## Objective
+## Task in brief
 
 The xFusionCorp Industries ML platform team runs a "bake-off" experiment between multiple model candidates (Random Forest, Gradient Boosting, and Logistic Regression) to detect fraud. An orchestrator script at `src/models/bakeoff.py` is intended to query the MLflow tracking server, identify the candidate with the highest F1 score, and persist the results. However, the script currently selects the worst-performing model due to an incorrect sorting order and generates an incomplete report missing the model family. Your task is to fix these bugs so the production pipeline identifies the true winner.
 
