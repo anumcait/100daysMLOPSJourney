@@ -170,5 +170,12 @@ Expected output confirms the saved model has `n_jobs=-1`.
 By replacing the hardcoded string `"all"` with the actual integer `n_jobs` variable in every `mlflow.log_param` call, and by explicitly passing `n_jobs=-1` to the second `RandomForestClassifier`, the bake-off script now produces two genuinely distinct runs in the `parallel-training` experiment. The MLflow Compare view can differentiate the configurations by their `params.n_jobs` values (`1` vs. `-1`), and the `metrics.training_time_seconds` delta confirms the real-world speedup from multi-core training. This pattern — running controlled configuration variants and tracking every hyperparameter and metric in MLflow — is the foundation of reproducible, auditable model development in an MLOps pipeline.
 
 ### Screenshots
-<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/placeholder-day39-01" />
-<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/placeholder-day39-02" />
+<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/1d1ffc58-f764-4f1b-be05-7a853553e645" />
+<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/70bd040a-01f1-48fa-a848-c763a3a2edd2" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/4564ce36-88c0-4155-bf1f-4d5588beec9c" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/4fb64df2-c8bd-491f-ad33-1044b3833b8d" />
+
+
+
+
+
