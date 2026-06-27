@@ -2008,3 +2008,74 @@ Expected response:
     "prediction": 0
 }
 ```
+
+---
+
+## 📅 Day 39: Parallelize Model Training and Compare Runs in MLflow
+
+### Task Description
+The xFusionCorp Industries ML platform team runs a parallel-training bake-off on the fraud-detection model. A draft script at `src/models/train_parallel.py` trains the same `RandomForestClassifier` twice — once serially and once in parallel — but both runs log near-identical wall times, and the MLflow Compare view cannot distinguish the two configurations because `n_jobs` is logged as a hardcoded string `"all"` instead of the actual integer, and the parallel run never actually sets `n_jobs=-1` on the classifier. The goal is to fix both defects so the bake-off produces genuinely distinct, measurable runs in the `parallel-training` experiment.
+
+### Concept Summary
+**`n_jobs=-1`** in scikit-learn instructs the estimator to use all available CPU cores. Each decision tree in a `RandomForestClassifier` is independent, making the ensemble trivially parallelizable via `joblib`. Setting `n_jobs=1` forces the serial baseline. **Wall-time measurement** (using `time.time()` before and after `fit()`) captures real-world training duration. In MLflow, `log_param` records the configuration value (an integer like `1` or `-1`) while `log_metric` records the numerical measurement (`training_time_seconds`). The **MLflow Compare view** renders a side-by-side table of all logged params and metrics across selected runs, making the configuration difference and performance delta immediately visible.
+
+### Step-by-Step Execution
+**Step 1: Identify the Two Defects in the Script**
+The broken script logs a hardcoded string for `n_jobs` and fails to pass `n_jobs=-1` to the second classifier.
+```python
+# Defect 1 — wrong param value logged:
+mlflow.log_param("n_jobs", "all")           # should be the integer variable
+
+# Defect 2 — parallel classifier still single-threaded:
+clf = RandomForestClassifier(n_estimators=500, random_state=42)  # missing n_jobs=-1
+```
+
+**Step 2: Fix the Serial Run Block**
+Declare `n_jobs = 1`, pass it to the classifier, and log the integer.
+```python
+with mlflow.start_run(run_name="serial"):
+    n_jobs = 1
+    clf = RandomForestClassifier(n_estimators=500, random_state=42, n_jobs=n_jobs)
+    start = time.time()
+    clf.fit(X_train, y_train)
+    elapsed = time.time() - start
+    mlflow.log_param("n_jobs", n_jobs)           # logs integer 1
+    mlflow.log_metric("training_time_seconds", elapsed)
+```
+
+**Step 3: Fix the Parallel Run Block**
+Declare `n_jobs = -1`, pass it to the classifier, and log the integer.
+```python
+with mlflow.start_run(run_name="parallel"):
+    n_jobs = -1
+    clf = RandomForestClassifier(n_estimators=500, random_state=42, n_jobs=n_jobs)
+    start = time.time()
+    clf.fit(X_train, y_train)
+    elapsed = time.time() - start
+    mlflow.log_param("n_jobs", n_jobs)           # logs integer -1
+    mlflow.log_metric("training_time_seconds", elapsed)
+    with open("models/model.pkl", "wb") as f:
+        pickle.dump(clf, f)
+```
+
+**Step 4: Run the Script**
+```bash
+cd /root/code/fraud-detection
+export MLFLOW_TRACKING_URI=http://localhost:5000
+python src/models/train_parallel.py
+```
+
+**Step 5: Verify in the MLflow Compare View**
+Open the MLflow UI, navigate to the `parallel-training` experiment, select both runs, and click **Compare**. Confirm `params.n_jobs` shows `1` and `-1`, and that `metrics.training_time_seconds` for the parallel run is at least 10% lower than for the serial run.
+
+**Step 6: Verify the Saved Model**
+```bash
+python3 -c "
+import pickle
+with open('models/model.pkl', 'rb') as f:
+    model = pickle.load(f)
+print('n_jobs:', model.n_jobs)
+"
+```
+
+---
