@@ -125,5 +125,12 @@ print(f"Serving model version {mv.version} from run {mv.run_id}")
 By switching from a raw `run_id` URI to the `models:/fraud-detector@champion` alias URI and casting the NumPy prediction to a native Python `int`, the serving script now correctly loads the current production champion from the MLflow Registry and returns well-formed JSON responses. This pattern fully decouples the deployment layer from specific run or version identifiers — future promotions only require reassigning the `champion` alias, with no code changes to the serving infrastructure. This is the natural next step after model registration: moving from a named artifact in the Registry to a live, queryable prediction service.
 
 ### Screenshots
-<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/placeholder-day38-01" />
-<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/placeholder-day38-02" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/8b283161-bf07-4b91-a617-1afd806b57ae" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/b3dde43d-8c9b-4b1b-ab90-1724a5030f56" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/8a0abd38-c48f-4040-b639-e7c57c7be43c" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/9d78a615-c91e-4383-a4bf-12b05a2d6de0" />
+
+
+
+
+
