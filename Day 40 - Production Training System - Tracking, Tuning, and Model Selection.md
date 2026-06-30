@@ -230,5 +230,14 @@ Three minimal edits were required to bring the five-stage production training pi
 After all three fixes, `make train-pipeline` completes successfully, producing all three report files and registering `fraud-detector` in the MLflow Model Registry with only the `staging` alias — fulfilling the full production training system requirement: tracking, tuning, and model selection.
 
 ### Screenshots
-<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/placeholder-day40-01" />
-<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/placeholder-day40-02" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/e0c56db8-e81f-4902-863b-ee215d5192a4" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/5e737f95-edd6-41bd-aff5-55cf98603321" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/2cdf2a78-139a-4fb1-847c-9d9010104f07" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/6985e298-7302-43f7-9f1c-733d37dd919e" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/42208a0a-f72b-4581-b74d-501630541cc1" />
+
+
+
+
+
+
