@@ -43,6 +43,7 @@ Tracking my 100-day journey into Machine Learning Operations.
 - [Day 37: Promote the Winning Model to MLflow Model Registry](./Day%2037%20-%20Promote%20the%20Winning%20Model%20to%20MLflow%20Model%20Registry.md)
 - [Day 38: Serve a Registered MLflow Model as a REST API](./Day%2038%20-%20Serve%20a%20Registered%20MLflow%20Model%20as%20a%20REST%20API.md)
 - [Day 39: Parallelize Model Training and Compare Runs in MLflow](./Day%2039%20-%20Parallelize%20Model%20Training%20and%20Compare%20Runs%20in%20MLflow.md)
+- [Day 40: Production Training System: Tracking, Tuning, and Model Selection](./Day%2040%20-%20Production%20Training%20System%20-%20Tracking,%20Tuning,%20and%20Model%20Selection.md)
 
 
 

@@ -2079,3 +2079,113 @@ print('n_jobs:', model.n_jobs)
 ```
 
 ---
+
+## 📅 Day 40: Production Training System: Tracking, Tuning, and Model Selection
+
+### Task Description
+The xFusionCorp Industries ML platform team has a five-stage production training pipeline (`validate_data → tune → select_model → register → report`) orchestrated by a `Makefile`. Running `make train-pipeline` surfaces three wiring bugs: the stages execute in the wrong order, the model-selection stage searches for a metric that the tuner never logs, and the registration stage assigns the wrong alias and fails to clean up stale aliases. The task is to identify each defect in turn, fix it with a one-line edit, and re-run until the full pipeline completes without a non-zero exit.
+
+### Concept Summary
+**Pipeline Stage Ordering** is the most fundamental concern in any multi-stage ML workflow. In a Makefile `train-pipeline` target, each shell command runs sequentially top to bottom. If `select_model` runs before `tune`, it queries an empty MLflow experiment and crashes — the fix is simply reordering the lines.
+
+**Metric Consistency** across pipeline stages is equally critical. The tuning stage and the selection stage must agree on the exact MLflow metric key. If `tune.py` logs `metrics.f1_score` but `select_model.py` queries `metrics.accuracy`, the `search_runs` call returns an empty list and the pipeline fails silently.
+
+**MLflow Model Aliases** (`staging`, `champion`, `production`) are mutable pointers that persist across pipeline runs. If a previous run left a `production` alias on the model, the next run sees it even after re-registering. Always explicitly delete stale aliases before assigning new ones.
+
+### Step-by-Step Execution
+
+**Step 1: Run the Pipeline to Surface the First Bug**
+```bash
+cd /root/code/fraud-detection
+make train-pipeline
+```
+The pipeline exits non-zero because `select_model.py` ran before `tune.py` — no MLflow runs exist yet.
+
+**Step 2: Fix the Makefile — Stage Execution Order**
+
+Before (broken):
+```makefile
+train-pipeline:
+python src/validate_data.py
+python src/select_model.py
+python src/tune.py
+python src/register.py
+python src/report.py
+```
+
+After (correct):
+```makefile
+train-pipeline:
+python src/validate_data.py
+python src/tune.py
+python src/select_model.py
+python src/register.py
+python src/report.py
+```
+
+**Step 3: Re-Run and Fix `select_model.py` — Wrong Sort Metric**
+
+Before (broken):
+```python
+runs = client.search_runs(
+    experiment_ids=[exp.experiment_id],
+    order_by=["metrics.accuracy DESC"]
+)
+best_score = best.data.metrics["metrics.accuracy"]
+```
+
+After (correct):
+```python
+runs = client.search_runs(
+    experiment_ids=[exp.experiment_id],
+    order_by=["metrics.f1_score DESC"]
+)
+best_score = best.data.metrics["f1_score"]
+```
+
+**Step 4: Re-Run and Fix `register.py` — Wrong Alias and No Cleanup**
+
+Before (broken):
+```python
+RELEASE_ALIAS = "production"
+client.set_registered_model_alias(REGISTERED_MODEL_NAME, RELEASE_ALIAS, version.version)
+```
+
+After (correct):
+```python
+RELEASE_ALIAS = "staging"
+
+for alias in ["production", "staging"]:
+    try:
+        client.delete_registered_model_alias(REGISTERED_MODEL_NAME, alias)
+    except Exception:
+        pass
+
+client.set_registered_model_alias(REGISTERED_MODEL_NAME, RELEASE_ALIAS, version.version)
+```
+
+**Step 5: Final Clean Run and Verify**
+```bash
+make train-pipeline
+```
+
+Verify report files:
+```bash
+cat reports/training_report.json
+```
+
+Expected keys: `best_model`, `best_params`, `metrics`, `total_trials` (>= 5), `validation_status` ("ok").
+
+Verify MLflow Registry alias:
+```bash
+python3 -c "
+from mlflow import MlflowClient
+client = MlflowClient()
+aliases = client.get_registered_model('fraud-detector').aliases
+print('Aliases:', aliases)
+"
+```
+
+Expected: `Aliases: {'staging': '1'}` — no `production` key.
+
+---
