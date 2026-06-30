@@ -44,6 +44,8 @@ Tracking my 100-day journey into Machine Learning Operations.
 - [Day 38: Serve a Registered MLflow Model as a REST API](./Day%2038%20-%20Serve%20a%20Registered%20MLflow%20Model%20as%20a%20REST%20API.md)
 - [Day 39: Parallelize Model Training and Compare Runs in MLflow](./Day%2039%20-%20Parallelize%20Model%20Training%20and%20Compare%20Runs%20in%20MLflow.md)
 - [Day 40: Production Training System: Tracking, Tuning, and Model Selection](./Day%2040%20-%20Production%20Training%20System%20-%20Tracking,%20Tuning,%20and%20Model%20Selection.md)
+- [Day 41: Install and Initialize a Feast Feature Store](./Day%2041%20-%20Install%20and%20Initialize%20a%20Feast%20Feature%20Store.md)
+
 
 
 
