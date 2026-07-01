@@ -124,6 +124,13 @@ Open a browser or click the Feast UI button in the workspace interface to view t
 By running `feast init feature_repo` under `/root/code`, the team successfully scaffolded a structured Feast feature repository. Using `feast apply` within the inner directory compiled the starter feature definitions, registering entities and feature views in a local SQLite database (`data/registry.db`). Finally, launching `feast ui &` exposed a local web interface that reads this registry, establishing Feast as the operational telemetry layer for managing fraud detection features.
 
 ### Screenshots
-<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/placeholder-day41-01" />
-<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/placeholder-day41-02" />
-<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/placeholder-day41-03" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/de3c6362-dd95-4910-91ae-6d490e118544" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/6304d260-cff8-4283-8797-353e7af265b3" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/3638185c-fed1-4aec-9e86-4957b48aa818" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/b85fa47d-e17b-4ccc-9f77-0588dda55094" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/7452b571-94fe-4c2f-adad-89d139c78162" />
+
+
+
+
+
