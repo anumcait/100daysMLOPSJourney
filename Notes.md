@@ -2234,3 +2234,29 @@ The server binds to port 8888 by default. You can open `http://127.0.0.1:8888` o
 
 ---
 
+## 📅 Day 42: Define Feature Views in Feast
+
+### Task Description
+The team keeps the fraud-detection feature definitions in a Feast repository at `/root/code/fraud-detection/feature_repo/`. The schema stored in the metadata registry is inconsistent with the source parquet file at `data/transactions.parquet`. The task is to correct `features.py` to match the schema (set entity join key to `customer_id` and the `amount` feature dtype to `Float32`), re-apply the registry using `feast apply`, and check the entities and feature views in the Feast UI.
+
+### Concept Summary
+In **Feast**, an **Entity** acts as a primary or join key to associate features with specific records (like a customer ID). A **Feature View** coordinates feature declarations, data sources, schemas, and time-to-live settings. Mismatches between declared metadata types (such as `Float64`) and actual source datatypes (like `Float32`) result in validation or inference errors, requiring strict alignment in Feast's python specifications.
+
+### Step-by-Step Execution
+
+**Step 1: Open and Edit features.py**
+Open `/root/code/fraud-detection/feature_repo/features.py` and modify the customer entity definition's `join_keys` and the amount field `dtype` in the feature view schema.
+- Set `join_keys=["customer_id"]`
+- Set `Field(name="amount", dtype=Float32)`
+
+**Step 2: Apply the Updated Schema Registry**
+Navigate to the directory and run `feast apply` to rebuild/update the SQLite registry database (`data/registry.db`).
+```bash
+cd /root/code/fraud-detection/feature_repo/
+feast apply
+```
+
+**Step 3: Verify via Feast UI**
+Launch or navigate to the running Feast UI (port `8888`) and confirm that the customer entity lists `customer_id` as the join key and the `customer_transaction_features` view lists `amount` with type `Float32`.
+
+---
