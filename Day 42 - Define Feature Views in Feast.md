@@ -118,3 +118,10 @@ Open the Feast UI (normally running on port `8888`) or click the Feast UI button
 
 ## Summary
 To resolve schema mismatches between Feast metadata and the underlying source `transactions.parquet`, `features.py` was corrected in two ways: updating the customer Entity join key to `customer_id` and setting the `amount` feature data type to `Float32`. Running `feast apply` re-populated the local SQLite registry database `data/registry.db` and updated the online tables, ensuring Feast has consistent feature/schema references that are correctly exposed in the Feast UI.
+
+### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/48a6ce72-d2ac-4c95-890b-07bedaca15cc" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/4003b712-cd2b-4e83-bcf6-f1b85e91b55d" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/5dc3f4a4-b53f-40eb-b808-5ef3077d159d" />
+
+
