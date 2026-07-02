@@ -2260,3 +2260,42 @@ feast apply
 Launch or navigate to the running Feast UI (port `8888`) and confirm that the customer entity lists `customer_id` as the join key and the `customer_transaction_features` view lists `amount` with type `Float32`.
 
 ---
+
+## 📅 Day 43: Materialize Features to the Online Store
+
+### Task Description
+The team stages a materialization script (`materialize.sh`) under `/root/code/fraud-detection/feature_repo/` to populate the Feast online store. Since the parquet source files start in 2024, the script's raw `END_DATE` setting of `1970` writes zero rows. The task is to set a correct `END_DATE` to a date on or after the last event in parquet (such as `2025-12-31T23:59:59`), run the materialization script to populate `data/online_store.db`, and query Feast's client SDK to confirm non-null amount features are returned.
+
+### Concept Summary
+**Materialization** transfers data from the offline raw sources (parquet/databases) to the online low-latency key-value store (SQLite/Redis) so real-time production engines can query features using entity keys. The command `feast materialize-incremental` target windows with watermarks using the entity view's TTL back from the provided end-date parameter, preventing redundant updates.
+
+### Step-by-Step Execution
+
+**Step 1: Correct materialize.sh**
+Open `/root/code/fraud-detection/feature_repo/materialize.sh` and set the target date window to include 2024 data:
+- Set `END_DATE="2025-12-31T23:59:59"`
+
+**Step 2: Run Materialization**
+Make the shell script executable and run it to populate the SQLite database:
+```bash
+cd /root/code/fraud-detection/feature_repo
+chmod +x materialize.sh
+./materialize.sh
+```
+
+**Step 3: Verification online querying**
+Run Python interactive commands to query the Feast SDK:
+```bash
+python3
+```
+```python
+from feast import FeatureStore
+store = FeatureStore(repo_path=".")
+print(store.get_online_features(
+    features=["customer_transaction_features:amount"],
+    entity_rows=[{"customer_id": 1}],
+).to_dict())
+```
+Ensure retrieval displays the correct actual attribute value instead of `None`.
+
+---
