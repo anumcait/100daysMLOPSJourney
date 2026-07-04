@@ -93,3 +93,16 @@ HTTP/1.1 200 OK
 
 ## Summary
 The MLflow boot wrapper was failing to launch because its restricted access token `/root/code/vault-token` had write/update permissions rather than read permissions mapped to the Vault credential store path. By logging into the Vault UI using the privileged root token `/root/code/vault-root-token` and editing the `mlflow-reader` policy to grant the `read` capability on `secret/data/mlflow`, authorization was established. The daemon successfully queried the admin password on its next polling window and bootstrapped the MLflow tracker server on port `5000`.
+
+### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/9bcdff75-f7ec-4f3a-ac72-dc9b99a7f188" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/3343e7da-aa3b-4682-aa55-6f266f361c0c" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/22775047-00cd-4632-88b4-e1ca7780fcf2" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/dcde98df-9491-47f0-a956-d9c85245fc88" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/ffc21039-f933-4696-80cd-c7811828fbe4" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/f27d6ec9-f319-46a5-b9a7-7ba1cf0707e6" />
+
+
+
+
+
