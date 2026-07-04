@@ -112,3 +112,9 @@ Expected output:
 
 ## Summary
 By adjusting the `END_DATE` in the project's staging `materialize.sh` script to `2025-12-31T23:59:59`, Feast was able to successfully identify offline parquet records starting in 2024. Running the script triggered the incremental MLOps pipeline, updating `/root/code/fraud-detection/feature_repo/data/online_store.db` with the newly populated tables. The verification step confirmed the successful write operations, allowing developers to query non-null customer transaction amounts in real-time.
+
+### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/4c16426c-a3b0-426a-9d5b-705863fa3fd2" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/b53918fc-d032-48ad-8651-ab271c1d6c3b" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/aff311f5-e64b-40eb-940d-4b53bc6122f5" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/5d753c8c-fb51-4187-bd51-32bbea7c10c8" />
