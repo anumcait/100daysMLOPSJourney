@@ -48,5 +48,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 - [Day 42: Define Feature Views in Feast](./Day%2042%20-%20Define%20Feature%20Views%20in%20Feast.md)
 - [Day 43: Materialize Features to the Online Store](./Day%2043%20-%20Materialize%20Features%20to%20the%20Online%20Store.md)
 - [Day 44: Store MLflow's Admin Password in HashiCorp Vault](./Day%2044%20-%20Store%20MLflow's%20Admin%20Password%20in%20HashiCorp%20Vault.md)
+- [Day 45: Fix a Broken Vault KV Policy](./Day%2045%20-%20Fix%20a%20Broken%20Vault%20KV%20Policy.md)
 
 ---

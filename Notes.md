@@ -2337,3 +2337,38 @@ curl -I http://127.0.0.1:5000/
 Verify that the server returns HTTP/1.1 200 OK.
 
 ---
+
+## 📅 Day 45: Fix a Broken Vault KV Policy
+
+### Task Description
+The team switched the MLflow boot wrapper from a root token to a narrow `mlflow-reader` application token. However, the associated policy was compiled with write/update permissions instead of read capabilities on the credentials vault path. The task is to access Vault on port `8200` using the root credentials, edit the `mlflow-reader` policy rules to grant the `read` capability on `secret/data/mlflow`, and confirm that the boot wrapper successfully launches MLflow on port `5000`.
+
+### Concept Summary
+Vault enforces access controls using **ACL Policies** written in HCL. Tokens are issued with specific policies attached to authorize capabilities. The key-value v2 engine routes data requests via a `/data/` infix (e.g. `secret/data/mlflow` for secret `secret/mlflow`). A read operations requires the `read` capability, and a mismatch results in permission denied errors.
+
+### Step-by-Step Execution
+
+**Step 1: Authenticate with Vault UI**
+Access the Vault UI (port `8200`) using the root token from `/root/code/vault-root-token`.
+
+**Step 2: Modify mlflow-reader Policy**
+Locate the `mlflow-reader` configuration under the **Policies** tab and edit it to change capabilities:
+- Replace `capabilities = ["create", "update"]` with `capabilities = ["read"]` on path `secret/data/mlflow`.
+- Click **Save**.
+
+**Step 3: Verify Connection**
+Verify that the narrow database token (`/root/code/vault-token`) can retrieve the configuration:
+```bash
+export VAULT_ADDR="http://127.0.0.1:8200"
+export VAULT_TOKEN=$(cat /root/code/vault-token)
+vault kv get secret/mlflow
+```
+
+**Step 4: Check MLflow Server**
+Wait 5 seconds and verification connection using HTTP checking:
+```bash
+curl -I http://127.0.0.1:5000/
+```
+Output must return HTTP/1.1 200 OK.
+
+---
