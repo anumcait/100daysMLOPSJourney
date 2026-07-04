@@ -2299,3 +2299,41 @@ print(store.get_online_features(
 Ensure retrieval displays the correct actual attribute value instead of `None`.
 
 ---
+
+## 📅 Day 44: Store MLflow's Admin Password in HashiCorp Vault
+
+### Task Description
+The team wants credentials retrieved dynamically from Vault rather than being hardcoded. An MLflow boot wrapper polls Vault for the secret `secret/mlflow.admin_password` every 5 seconds to launch the server once it exists. The task is to log into Vault (port `8200`) using the root token from `/root/code/vault-token`, enable the KV v2 engine at `secret/`, create the `admin_password` key under path `secret/mlflow`, and confirm MLflow launches successfully on port `5000`.
+
+### Concept Summary
+**HashiCorp Vault** is a secure engine for storing secrets and credentials. Spawning containers or microservices using a **Vault-First Pattern** (where a startup wrapper extracts secrets from Vault in real-time) eliminates plaintext secrets inside configurations or docker commits.
+
+### Step-by-Step Execution
+
+**Step 1: Configure Vault Authentication**
+Set environmental target variables and retrieve the dev root token:
+```bash
+export VAULT_ADDR="http://127.0.0.1:8200"
+export VAULT_TOKEN=$(cat /root/code/vault-token)
+```
+
+**Step 2: Enable Key-Value Version 2 Engine**
+Mount the v2 Key-Value secrets capability at path `secret/`:
+```bash
+vault secrets enable -path=secret -version=2 kv
+```
+
+**Step 3: Save MLflow Administrator Secret**
+Populate the engine with the required key-value pair under path `secret/mlflow`:
+```bash
+vault kv put secret/mlflow admin_password='Admin@123'
+```
+
+**Step 4: Verify Server Boot**
+Allow 5–10 seconds for the polling script wrapper to detect the secret. Perform an HTTP check to verify the live MLflow service:
+```bash
+curl -I http://127.0.0.1:5000/
+```
+Verify that the server returns HTTP/1.1 200 OK.
+
+---
