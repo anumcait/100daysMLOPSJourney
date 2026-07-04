@@ -106,3 +106,16 @@ HTTP/1.1 200 OK
 
 ## Summary
 To remove hardcoded admin credentials from the MLflow startup scripts, a HashiCorp Vault KV version 2 secrets engine was enabled at the `secret/` path. The administrator password (`Admin@123`) was registered under `secret/mlflow`. The local server boot wrapper detected this new KV entry during its polling cycle, retrieved the credential, and securely initiated the MLflow tracking service on port `5000`, validating a decoupled, Vault-first secret configuration pattern.
+
+### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/9d24be49-bb54-4d36-9de4-564a63ee02b2" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/5a660497-2f77-4d09-9aea-d943648e7d7d" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/93298c58-825b-42f4-bc8b-726d6e4fa77f" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/e6a44728-08ad-4067-89ec-302b50268162" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/d49892fb-4520-4aa0-be91-b76a8bea7731" />
+
+
+
+
+
+
