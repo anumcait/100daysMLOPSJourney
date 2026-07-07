@@ -88,3 +88,11 @@ Declare database validation contracts using Great Expectations to capture data s
 
 ## Summary
 The xFusionCorp Industries team required schema-level constraints on incoming transaction streams before feeding them to downstream models. By editing `/root/code/dataquality/author_expectations.py` to declare a Great Expectations `fraud_schema` suite, parameters were validated for the columns set (`amount`, `hour`, `num_tx_past_day`, and `is_fraud`), transaction bounds (amount $\ge$ 0), hour limits (0–23), and classification domains. Running the configuration script registered the rules, validated `data/transactions.csv`, and rendered the validation results to the Data Docs site on port `8081` as successful.
+
+### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/18615848-b0c1-463c-8ea4-a217cfc17238" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/6ac8214d-fd3f-4e4d-9775-3ed8b94e2157" />
+<img width="50" height="300" alt="image" src="https://github.com/user-attachments/assets/d4e25455-82cb-425d-b194-43ba6458d0cf" />
+
+
+
