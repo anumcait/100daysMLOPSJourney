@@ -2372,3 +2372,69 @@ curl -I http://127.0.0.1:5000/
 Output must return HTTP/1.1 200 OK.
 
 ---
+
+## 📅 Day 46: Author Data-Quality Expectations with Great Expectations
+
+### Task Description
+The team at xFusionCorp Industries wants data-schema contracts on every batch that feeds the fraud-detector model to catch malformed rows upstream of training. The task is to author a Great Expectations expectation suite (`fraud_schema`) by configuring four predefined assertions inside `/root/code/dataquality/author_expectations.py` and run the default checkpoint to validate client transaction logs and update Data Docs.
+
+### Concept Summary
+Great Expectations (GX) is an open-source library that treats data quality as code. Users configure validation rules (called **Expectations**) grouped into **Expectation Suites** that define inputs and validation settings. By version-controlling these schemas alongside normal source packages and executing them in orchestration workflows, systems establish an automated gate to intercept corrupted schema changes beforehand. Validation outputs are persisted inside machine-readable JSON logs and rendered to human-navigable HTML web portals called **Data Docs**.
+
+### Step-by-Step Execution
+
+**Step 1: Open the Script**
+Open the expectations authoring script `/root/code/dataquality/author_expectations.py` inside the VS Code editor.
+
+**Step 2: Declare Expected Column Schema**
+Add an expectation to verify that the table has the required set of matching columns:
+```python
+suite.add_expectation(
+    ge.ExpectTableColumnsToMatchSet(
+        column_set=["amount", "hour", "num_tx_past_day", "is_fraud"]
+    )
+)
+```
+
+**Step 3: Guard transaction amount**
+Declare that transaction amount must not be negative:
+```python
+suite.add_expectation(
+    ge.ExpectColumnValuesToBeBetween(
+        column="amount",
+        min_value=0,
+    )
+)
+```
+
+**Step 4: Guard hour Range**
+Constrain hour values to a valid 24-hour window (0 to 23):
+```python
+suite.add_expectation(
+    ge.ExpectColumnValuesToBeBetween(
+        column="hour",
+        min_value=0,
+        max_value=23,
+    )
+)
+```
+
+**Step 5: Guard is_fraud Variable Domain**
+Restrict the target flag schema to binary classification classes (0 and 1):
+```python
+suite.add_expectation(
+    ge.ExpectColumnValuesToBeInSet(
+        column="is_fraud",
+        value_set=[0, 1],
+    )
+)
+```
+
+**Step 6: Run the Expectations Authoring Pipeline**
+Execute the script to serialize expectations to disk and run the checkpoint to validate raw client transaction logs against the schema rules:
+```bash
+python3 /root/code/dataquality/author_expectations.py
+```
+This updates `gx/expectations/fraud_schema.json`, triggers validation, and generates updated logs under `gx/uncommitted/validations/` with `success: true`.
+
+---
