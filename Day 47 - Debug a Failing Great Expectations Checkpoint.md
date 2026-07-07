@@ -78,3 +78,23 @@ Identify and resolve data quality anomalies caused by data drift in production d
 
 ## Summary
 The Great Expectations `drift_check` checkpoint was failing when validating `data/transactions_drifted.csv` because the transaction `amount` column dataset contained negative parameters down to `-347.22`, violating the existing $\ge 0$ schema constraint. By diagnosing the error through Data Docs on port `8081` and editing `/root/code/dataquality/fix_drift.py` to change the `min_value` to `-400` (widening the threshold with adequate headroom), the validation parameters were realigned. Running the script saved the new rules to `gx/expectations/fraud_schema.json`, ran the validation check successfully, and transitioned the Data Docs status to Success.
+
+### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/005a018b-a8ec-4667-868a-f18bc2d71fd2" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/223b4d61-a233-44a7-8ec4-343ddead11d4" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/a4251a98-e19b-4a0e-a48b-9b7ec50ee089" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/91e8995b-1eb1-424c-b7b4-def5b0d5823a" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/51aad729-deac-4e96-8c8a-997c298d2d16" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/6bf93ce0-b783-4be0-97fa-da0c1fa95237" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/fc849e0c-487d-4b7c-904f-6ab598f1699a" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/390223a8-306d-41bc-92d1-5dc51fdd02c7" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/9b357eb3-7026-43ee-ad27-44f8986a0e53" />
+
+
+
+
+
+
+
+
+
