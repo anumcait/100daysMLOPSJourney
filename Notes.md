@@ -2438,3 +2438,40 @@ python3 /root/code/dataquality/author_expectations.py
 This updates `gx/expectations/fraud_schema.json`, triggers validation, and generates updated logs under `gx/uncommitted/validations/` with `success: true`.
 
 ---
+
+## 📅 Day 47: Debug a Failing Great Expectations Checkpoint
+
+### Task Description
+The team at xFusionCorp Industries extended the validation checks to a second batch of transaction records containing negative values (`data/transactions_drifted.csv`). The new `drift_check` checkpoint runs the existing `fraud_schema` suite but fails due to out-of-bounds observations. The task is to inspect Data Docs on port `8081` to pinpoint the failing schema expectation, modify `/root/code/dataquality/fix_drift.py` to widen the constraint to support drifted values down to `-400` with safe margins, and execute the configuration to restore successful validation runs.
+
+### Concept Summary
+Data drift represents alterations in the statistical properties and distribution boundaries of incoming files over time. In Great Expectations, when production data falls outside declared rules, check runs flag a Failure on the dashboard. In response, teams must evaluate whether the data quality is compromised, or whether boundaries must be expanded (known as **Bound Widening**) to support real-life drift without completely deleting the underlying rules/assertions.
+
+### Step-by-Step Execution
+
+**Step 1: Inspect validation reports in Data Docs**
+Access the web dashboard on port `8081` and review the failing `drift_check` checkpoint run.
+* **Observe the failing details**: Column `amount` fails because values fall below `0`. The minimum observed value is reported as `-347.22`.
+
+**Step 2: Widen bounds in the fix script**
+Open the fix script at `/root/code/dataquality/fix_drift.py` and modify the range expectation for the `amount` column from `min_value=0` to `min_value=-400`:
+```python
+suite.add_expectation(
+    ge.ExpectColumnValuesToBeBetween(
+        column="amount",
+        min_value=-400,
+    )
+)
+```
+
+**Step 3: Run the check script**
+Execute the configuration setup to update `gx/expectations/fraud_schema.json` and validate transaction logs:
+```bash
+python3 /root/code/dataquality/fix_drift.py
+```
+After execution, the checkpoint reports success with `success=True`.
+
+**Step 4: Check index in Data Docs**
+Refresh your browser index on port `8081` and verify that the newest validation run for `drift_check` is shown in green as Successful.
+
+---

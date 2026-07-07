@@ -50,5 +50,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 - [Day 44: Store MLflow's Admin Password in HashiCorp Vault](./Day%2044%20-%20Store%20MLflow's%20Admin%20Password%20in%20HashiCorp%20Vault.md)
 - [Day 45: Fix a Broken Vault KV Policy](./Day%2045%20-%20Fix%20a%20Broken%20Vault%20KV%20Policy.md)
 - [Day 46: Author Data-Quality Expectations with Great Expectations](./Day%2046%20-%20Author%20Data-Quality%20Expectations%20with%20Great%20Expectations.md)
+- [Day 47: Debug a Failing Great Expectations Checkpoint](./Day%2047%20-%20Debug%20a%20Failing%20Great%20Expectations%20Checkpoint.md)
 
 ---
