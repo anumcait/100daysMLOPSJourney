@@ -246,3 +246,21 @@ jobs:
 - Verified the Pull Request passed all checks.
 - Verified the workflow successfully uploaded the **data-docs** artifact.
 - Ensured reviewers can download and inspect the generated Great Expectations Data Docs after every CI run.
+
+### Screenshots
+<img width="1012" height="474" alt="image" src="https://github.com/user-attachments/assets/dbec8d11-a074-42e9-9c9e-f3765de8ed2f" />
+<img width="1010" height="436" alt="image" src="https://github.com/user-attachments/assets/f4acc167-0140-4825-9b88-562bc99ffd19" />
+<img width="1026" height="452" alt="image" src="https://github.com/user-attachments/assets/6525fc6e-40ae-4393-9f18-3f1cd34f8106" />
+<img width="1039" height="422" alt="image" src="https://github.com/user-attachments/assets/64f2421a-64c1-4fb0-8003-f1ca2b0d8f4e" />
+<img width="1026" height="493" alt="image" src="https://github.com/user-attachments/assets/e407cee6-7341-4e3f-96ca-fa7af902916f" />
+<img width="1026" height="471" alt="image" src="https://github.com/user-attachments/assets/ac9f06f9-fcd5-4068-bea0-48e35513bfec" />
+<img width="1024" height="479" alt="image" src="https://github.com/user-attachments/assets/e8bd9fea-3ca8-45fb-8cae-ad637f8473e0" />
+<img width="1000" height="452" alt="image" src="https://github.com/user-attachments/assets/e6c29267-7c35-40e2-931f-f440281c1809" />
+
+
+
+
+
+
+
+
