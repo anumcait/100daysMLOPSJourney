@@ -52,4 +52,7 @@ Tracking my 100-day journey into Machine Learning Operations.
 - [Day 46: Author Data-Quality Expectations with Great Expectations](./Day%2046%20-%20Author%20Data-Quality%20Expectations%20with%20Great%20Expectations.md)
 - [Day 47: Debug a Failing Great Expectations Checkpoint](./Day%2047%20-%20Debug%20a%20Failing%20Great%20Expectations%20Checkpoint.md)
 
+- [Day 48: Publish Great Expectations Data Docs as a CI Artifact](./Day%2048%20-%20Publish%20Great%20Expectations%20Data%20Docs%20as%20a%20CI%20Artifact.md)
+
+
 ---
