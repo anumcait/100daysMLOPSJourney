@@ -3069,5 +3069,638 @@ Uploading Data Docs as an artifact makes these reports available long after the 
 - Uploading the entire `gx/uncommitted/data_docs/` directory preserves the complete Data Docs site.
 - Reviewers can download the `data-docs` artifact from the workflow run to inspect validation results.
 
+# Task Description
+
+Day 49 focused on building a complete **end-to-end MLOps release pipeline** by integrating four different platforms—**HashiCorp Vault**, **Gitea Actions**, **Great Expectations**, and **MLflow**. Unlike previous labs where each tool was used independently, this capstone demonstrated how multiple enterprise tools work together during a real production deployment.
+
+The workflow represented a common scenario in modern organizations. A developer completes a feature, raises a Pull Request, and an automated pipeline validates every requirement before allowing the code to be merged. Instead of only testing source code, the pipeline also validates dataset quality, securely retrieves application secrets, registers a machine learning model, and finally promotes the model for production use.
+
+The entire workflow was designed to fail immediately if any prerequisite was missing. For example, if the MLflow password was not stored inside Vault, the first job would fail, preventing the remaining jobs from executing. This demonstrates an important DevOps principle: **fail fast to prevent faulty deployments from reaching production.**
+
+---
+
+# Concept Summary
+
+## Why was this lab called a Capstone?
+
+A capstone project combines everything learned throughout a course into one practical implementation.
+
+Earlier labs introduced tools individually:
+
+- HashiCorp Vault for secrets management
+- Gitea for Git repository management
+- Great Expectations for data validation
+- MLflow for experiment tracking and model registry
+
+In this lab, all of those tools worked together inside one automated CI/CD workflow.
+
+Instead of learning individual commands, we learned **how enterprise systems communicate with one another.**
+
+---
+
+# Understanding the Complete Workflow
+
+The production release pipeline consisted of three dependent jobs.
+
+```
+fetch-secret
+      │
+      ▼
+data-quality
+      │
+      ▼
+register-model
+```
+
+Notice that each job depends on the previous one.
+
+If the first job fails, the second job never starts.
+
+If the second job fails, the third job never starts.
+
+This dependency chain guarantees that production releases occur only after every validation succeeds.
+
+---
+
+# Job 1 – fetch-secret
+
+The first job is responsible for securely obtaining the MLflow credential.
+
+Many beginners wonder:
+
+> Why not simply store the password inside the workflow?
+
+That would be extremely insecure.
+
+Imagine pushing this workflow to GitHub.
+
+If the password were written directly inside the YAML file,
+
+```
+password = my-secret-password
+```
+
+every developer could see it.
+
+Even worse, Git permanently stores commit history.
+
+Deleting the password later does not remove it from Git history.
+
+For this reason, production environments never store secrets inside repositories.
+
+Instead,
+
+```
+Application
+      │
+      ▼
+Vault
+      │
+      ▼
+Returns Secret
+```
+
+The application asks Vault for the password during execution.
+
+The password never becomes part of the source code.
+
+---
+
+# HashiCorp Vault
+
+HashiCorp Vault is a centralized secrets management platform.
+
+Instead of storing credentials in configuration files, applications request them only when required.
+
+Vault commonly stores
+
+- Database passwords
+- Cloud credentials
+- API Keys
+- SSH Keys
+- Certificates
+- OAuth Tokens
+- Encryption Keys
+
+A company may have thousands of applications.
+
+Without Vault,
+
+every application stores its own passwords.
+
+With Vault,
+
+every application requests credentials from one secure location.
+
+---
+
+# KV Version 2
+
+Vault supports multiple storage engines.
+
+This lab used
+
+```
+KV Version 2
+```
+
+One of the most confusing concepts for beginners is the difference between
+
+```
+CLI Path
+
+secret/mlflow
+```
+
+and
+
+```
+REST API Path
+
+secret/data/mlflow
+```
+
+Why are they different?
+
+The Vault CLI automatically inserts
+
+```
+data/
+```
+
+behind the scenes.
+
+When we call the REST API ourselves,
+
+we must specify the complete endpoint.
+
+Therefore,
+
+```
+vault kv get secret/mlflow
+```
+
+internally becomes
+
+```
+GET
+
+/v1/secret/data/mlflow
+```
+
+This is why the workflow accessed
+
+```
+secret/data/mlflow
+```
+
+instead of
+
+```
+secret/mlflow
+```
+
+---
+
+# Why did we use curl?
+
+The instructions specifically asked us to perform
+
+```
+GET $VAULT_ADDR/v1/secret/data/mlflow
+```
+
+Instead of using
+
+```
+vault kv get
+```
+
+This teaches an important concept.
+
+Almost every DevOps tool exposes a REST API.
+
+The CLI is simply another client built on top of that API.
+
+Learning the REST API allows automation from
+
+- Bash
+- Python
+- Go
+- Java
+- Jenkins
+- GitHub Actions
+- GitLab CI
+
+without installing the official CLI.
+
+---
+
+# Understanding the JSON Response
+
+Vault returns JSON.
+
+Example
+
+```json
+{
+  "data": {
+    "data": {
+      "mlflow_password": "my-secret-password"
+    }
+  }
+}
+```
+
+Many students ask,
+
+> Why are there two "data" objects?
+
+The outer `data` contains metadata about the secret.
+
+The inner `data` contains the actual secret values.
+
+Therefore the workflow extracted
+
+```
+.data.data.mlflow_password
+```
+
+If the password was empty,
+
+the workflow executed
+
+```bash
+echo "::error::mlflow_password not found"
+exit 1
+```
+
+which immediately stopped the release.
+
+---
+
+# Job 2 – Data Quality
+
+After retrieving the secret successfully,
+
+the workflow executed
+
+```
+schema_check
+```
+
+using Great Expectations.
+
+Many people think testing only applies to source code.
+
+Machine Learning introduces another problem.
+
+Even if the Python code is perfect,
+
+the dataset itself may contain problems.
+
+For example,
+
+```
+Age
+
+20
+25
+NULL
+18
+```
+
+or
+
+```
+Income
+
+1000
+2500
+text
+4500
+```
+
+The model may train incorrectly or fail entirely.
+
+Great Expectations detects these issues before training begins.
+
+Typical validations include
+
+- Required columns exist
+- Correct data types
+- Missing value detection
+- Schema validation
+- Range validation
+- Null percentage
+- Duplicate rows
+
+Instead of debugging after deployment,
+
+the pipeline stops before a bad dataset reaches production.
+
+---
+
+# Data Docs
+
+One useful feature of Great Expectations is
+
+```
+Data Docs
+```
+
+Instead of printing logs,
+
+it generates an HTML report.
+
+This report explains
+
+- Which expectations passed
+- Which expectations failed
+- Dataset statistics
+- Validation history
+
+Data engineers usually review this report before approving production releases.
+
+---
+
+# Job 3 – Register Model
+
+After data validation,
+
+the workflow registered the trained model inside MLflow.
+
+Model Registry acts similarly to Git,
+
+except instead of storing source code,
+
+it stores machine learning models.
+
+Example
+
+```
+fraud-detector
+
+Version 1
+
+Version 2
+
+Version 3
+```
+
+Each registration creates another version.
+
+Older versions remain available for rollback.
+
+---
+
+# Why use Model Versions?
+
+Imagine Version 5 performs poorly after deployment.
+
+Instead of retraining,
+
+we can simply return to
+
+```
+Version 4
+```
+
+This makes rollback fast and reliable.
+
+Versioning is one of the biggest advantages of MLflow.
+
+---
+
+# Production Alias
+
+The workflow ultimately produced
+
+```
+fraud-detector
+
+Version 1
+
+Alias
+
+@production
+```
+
+Many beginners ask,
+
+> Why not simply use Version 1 everywhere?
+
+Suppose Version 2 becomes better.
+
+Without aliases,
+
+every application must change
+
+```
+Version 1
+```
+
+to
+
+```
+Version 2
+```
+
+across multiple services.
+
+Instead,
+
+applications simply load
+
+```
+@production
+```
+
+Today
+
+```
+@production
+
+↓
+
+Version 1
+```
+
+Tomorrow
+
+```
+@production
+
+↓
+
+Version 2
+```
+
+Applications never change.
+
+Only the alias changes.
+
+This makes deployments significantly easier.
+
+---
+
+# Pull Request Based Deployment
+
+One of the most important DevOps concepts demonstrated in this lab is
+
+```
+Feature Branch
+
+↓
+
+Pull Request
+
+↓
+
+Automated Checks
+
+↓
+
+Merge
+
+↓
+
+Production
+```
+
+No developer can merge code directly into the main branch.
+
+Every Pull Request must pass automated validation.
+
+Those validations may include
+
+- Unit tests
+- Integration tests
+- Security scans
+- Secret verification
+- Data quality checks
+- Model registration
+
+Only after all checks pass can the Pull Request be merged.
+
+This protects production from broken releases.
+
+---
+
+# Overall Architecture
+
+```
+Developer
+
+      │
+
+      ▼
+
+Push Feature Branch
+
+      │
+
+      ▼
+
+Create Pull Request
+
+      │
+
+      ▼
+
+Gitea Actions
+
+      │
+
+      ▼
+
+Read Secret From Vault
+
+      │
+
+      ▼
+
+Validate Dataset
+
+      │
+
+      ▼
+
+Register Model
+
+      │
+
+      ▼
+
+Merge Pull Request
+
+      │
+
+      ▼
+
+Production Model
+```
+
+Every stage performs one responsibility.
+
+Each stage must succeed before the next stage begins.
+
+This layered validation greatly improves production reliability.
+
+---
+
+# Interview Questions
+
+### Why should secrets never be stored inside Git?
+
+Because Git history is permanent. Even if the password is deleted later, it can still be recovered from previous commits. Secret management tools like Vault prevent sensitive information from being stored in repositories.
+
+---
+
+### What is the difference between `secret/mlflow` and `secret/data/mlflow`?
+
+`secret/mlflow` is the Vault CLI path.
+
+`secret/data/mlflow` is the REST API endpoint used by KV Version 2.
+
+---
+
+### Why did the workflow use the Vault REST API instead of the Vault CLI?
+
+The lab was designed to demonstrate direct API usage. Most automation tools interact with services through REST APIs, making this approach more portable and suitable for CI/CD environments.
+
+---
+
+### Why is data validation performed before model registration?
+
+A model trained on poor-quality data may produce inaccurate predictions. Validating datasets before training ensures that only reliable data is used.
+
+---
+
+### What is the purpose of MLflow aliases?
+
+Aliases provide stable names such as `production` or `staging` that always point to the desired model version. Applications reference the alias instead of hardcoding version numbers.
+
+---
+
+### What was the most important lesson from this capstone?
+
+A production release is much more than deploying code. Modern MLOps pipelines combine **security, automated testing, data validation, version control, and model lifecycle management** to ensure every deployment is reliable, secure, and production-ready.
+
+---
+
+# Step-by-Step Execution
+
+1. Configured the Vault environment variables.
+2. Stored the `mlflow_password` secret inside `secret/mlflow`.
+3. Edited `production.yml` and implemented the Vault secret retrieval logic.
+4. Committed and pushed the changes to the `production-release` branch.
+5. Created a Pull Request from `production-release` to `main`.
+6. Verified successful execution of `fetch-secret`, `data-quality`, and `register-model`.
+7. Confirmed that Great Expectations generated the Data Docs report.
+8. Merged the Pull Request after all checks passed.
+9. Verified that the `fraud-detector` model was registered in MLflow.
+10. Confirmed that the `@production` alias pointed to Version 1 of the model.
+
 ---
 
