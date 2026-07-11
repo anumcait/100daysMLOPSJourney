@@ -100,10 +100,10 @@ Successfully created the Docker image **ml-trainer:v1** with:
 
 ### Screenshots
 
-<img width="1012" height="459" alt="image" src="https://github.com/user-attachments/assets/cbb0b380-2c88-4628-958b-5b037ad3da61" />
-<img width="1017" height="462" alt="image" src="https://github.com/user-attachments/assets/42d261b5-e56b-497e-b720-5280543751d1" />
-<img width="1009" height="462" alt="image" src="https://github.com/user-attachments/assets/092caf9c-def5-401c-baff-055a56a38618" />
-<img width="1117" height="564" alt="image" src="https://github.com/user-attachments/assets/2e1f87e7-c532-4355-af5a-762c0683c21f" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/cbb0b380-2c88-4628-958b-5b037ad3da61" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/42d261b5-e56b-497e-b720-5280543751d1" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/092caf9c-def5-401c-baff-055a56a38618" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/2e1f87e7-c532-4355-af5a-762c0683c21f" />
 
 
 
