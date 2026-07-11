@@ -55,4 +55,7 @@ Tracking my 100-day journey into Machine Learning Operations.
 - [Day 48: Publish Great Expectations Data Docs as a CI Artifact](./Day%2048%20-%20Publish%20Great%20Expectations%20Data%20Docs%20as%20a%20CI%20Artifact.md)
 
 - [Day 49: Secrets + Data Quality Integration Capstone](./Day%2049%20-%20Secrets%20%2B%20Data%20Quality%20Integration%20Capstone.md)
+
+- [Day 50: Create Docker Image for ML Training Environment](./Day%2050%20-%20Create%20Docker%20Image%20for%20ML%20Training%20Environment.md)
+
 ---

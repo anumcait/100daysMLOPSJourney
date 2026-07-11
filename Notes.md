@@ -3702,5 +3702,267 @@ A production release is much more than deploying code. Modern MLOps pipelines co
 9. Verified that the `fraud-detector` model was registered in MLflow.
 10. Confirmed that the `@production` alias pointed to Version 1 of the model.
 
+# Day 50 Notes – Docker Image for ML Training Environment
+
+## Introduction
+
+In machine learning projects, different developers often use different operating systems, Python versions, or package versions. These differences can cause the same code to behave differently.
+
+Docker solves this problem by packaging the application, Python runtime, libraries, and dependencies into a single portable image. Anyone running the image gets the same environment and therefore the same results.
+
+---
+
+# What is a Docker Image?
+
+A Docker image is a blueprint for creating containers.
+
+It contains:
+
+- Operating system libraries
+- Programming language runtime
+- Required packages
+- Application source code
+- Default startup command
+
+Once an image is built, it can be shared and executed on any machine with Docker installed.
+
+---
+
+# Dockerfile
+
+A **Dockerfile** is a text file that contains instructions Docker follows to build an image.
+
+Each instruction creates a separate layer, allowing Docker to cache unchanged layers and speed up future builds.
+
+Example:
+
+```dockerfile
+FROM python:3.11-slim
+WORKDIR /app
+RUN pip install ...
+COPY train.py /app/train.py
+CMD ["python3", "train.py"]
+```
+
+---
+
+# FROM
+
+```dockerfile
+FROM python:3.11-slim
+```
+
+This specifies the base image.
+
+We use **python:3.11-slim** because:
+
+- Official Python image
+- Lightweight
+- Compatible with scikit-learn
+- Faster downloads
+- Smaller image size
+
+Avoid Alpine Linux for this project because many ML libraries do not provide compatible wheels and may require slow source compilation.
+
+---
+
+# WORKDIR
+
+```dockerfile
+WORKDIR /app
+```
+
+Sets the working directory inside the container.
+
+Every subsequent instruction executes relative to this directory.
+
+Instead of repeatedly writing:
+
+```
+/app/train.py
+```
+
+Docker automatically works inside `/app`.
+
+---
+
+# Installing Dependencies
+
+```dockerfile
+RUN pip install --no-cache-dir \
+    scikit-learn \
+    pandas \
+    numpy \
+    joblib
+```
+
+The `RUN` instruction executes commands while building the image.
+
+The `--no-cache-dir` option prevents pip from storing package caches, reducing image size.
+
+Installed packages:
+
+| Package | Purpose |
+|----------|---------|
+| numpy | Numerical computations |
+| pandas | Data manipulation |
+| scikit-learn | Machine learning algorithms |
+| joblib | Saving trained models |
+
+---
+
+# COPY
+
+```dockerfile
+COPY train.py /app/train.py
+```
+
+Copies files from the host machine into the Docker image.
+
+Source:
+
+```
+train.py
+```
+
+Destination:
+
+```
+/app/train.py
+```
+
+Without this instruction, the container would not contain the training script.
+
+---
+
+# CMD
+
+```dockerfile
+CMD ["python3", "train.py"]
+```
+
+Defines the default command executed when the container starts.
+
+Running:
+
+```bash
+docker run ml-trainer:v1
+```
+
+automatically executes:
+
+```bash
+python3 train.py
+```
+
+---
+
+# Building the Image
+
+```bash
+docker build -t ml-trainer:v1 .
+```
+
+Explanation:
+
+| Option | Meaning |
+|---------|----------|
+| docker build | Builds an image |
+| -t | Assigns a tag |
+| ml-trainer:v1 | Image name and version |
+| . | Current directory as build context |
+
+---
+
+# Viewing Images
+
+```bash
+docker images
+```
+
+Displays all Docker images available on the local system.
+
+To check only this image:
+
+```bash
+docker images ml-trainer:v1
+```
+
+---
+
+# Running the Container
+
+Execute the training script:
+
+```bash
+docker run --rm ml-trainer:v1
+```
+
+`--rm` removes the container after it exits, keeping the system clean.
+
+---
+
+# Testing Installed Libraries
+
+Verify that all required libraries are available:
+
+```bash
+docker run --rm ml-trainer:v1 python3 -c "import sklearn, pandas, numpy, joblib; print('OK')"
+```
+
+Expected output:
+
+```
+OK
+```
+
+This confirms that every required Python package is installed correctly.
+
+---
+
+# Docker Build Cache
+
+Docker caches each instruction as a separate layer.
+
+For example:
+
+```
+FROM
+↓
+WORKDIR
+↓
+RUN pip install
+↓
+COPY
+↓
+CMD
+```
+
+If only `train.py` changes, Docker reuses the cached layers (`FROM`, `WORKDIR`, and `RUN pip install`) and rebuilds only the `COPY` and `CMD` steps, making subsequent builds much faster.
+
+---
+
+# Benefits of Using Docker for Machine Learning
+
+- Consistent development environments
+- Easy deployment across systems
+- Dependency isolation
+- Reproducible experiments
+- Faster onboarding for new team members
+- Simplified collaboration
+
+---
+
+# Key Takeaways
+
+- Docker packages applications with all required dependencies.
+- A Dockerfile defines how an image is built.
+- `FROM` selects the base image.
+- `WORKDIR` sets the working directory.
+- `RUN` installs dependencies.
+- `COPY` adds application files to the image.
+- `CMD` specifies the default command executed when the container starts.
+- Docker layer caching speeds up repeated builds by reusing unchanged instructions.
+
 ---
 
