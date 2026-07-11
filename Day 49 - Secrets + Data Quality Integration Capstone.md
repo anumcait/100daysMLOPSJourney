@@ -190,3 +190,20 @@ git push origin production-release
 This capstone integrated HashiCorp Vault, Gitea Actions, Great Expectations, and MLflow into a single automated release pipeline. The workflow securely retrieved credentials, validated dataset quality, registered the machine learning model, and promoted it to production through a Pull Request-based CI/CD process.
 
 ### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/f994126c-5a5f-426d-ae4b-d3620baf4cb9" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/3fb79e06-b5c4-4fc2-85cc-6793a56a8f19" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/37c88398-c782-4bdd-b899-03f037d68727" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/967f8671-578c-41b2-8c48-81e7a770670a" />
+<img width="50" height="300" alt="image" src="https://github.com/user-attachments/assets/f91e02f7-5441-4e07-9286-b6e2e7690fdc" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/be7ce556-a97c-42f2-bca7-6d37747e4ce4" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/c1bc17c4-0a15-469a-b12d-7002ea274695" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/09b75b0a-8bc0-492a-ac74-85cee23daf55" />
+
+
+
+
+
+
+
+
+
