@@ -231,3 +231,13 @@ docker stop <container_id>
 Successfully converted the ML serving application from a single-stage Docker build to a multi-stage build. The final runtime image contains only the serving application, the trained model, and the minimal dependencies required for inference, resulting in a cleaner and more production-ready container.
 
 ### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/1d6e0b9f-5d6e-4210-add4-334bf94550e5" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/b96ae32d-a40e-4ca3-bf14-54278996949e" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/bb0f5a16-4644-46d2-b3fd-979e595dd765" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/f7cb25b2-07c3-426e-8010-62368404a82c" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/d9937509-e3ce-401f-a3b5-f860dde3a05d" />
+
+
+
+
+
