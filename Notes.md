@@ -3964,5 +3964,1088 @@ If only `train.py` changes, Docker reuses the cached layers (`FROM`, `WORKDIR`, 
 - `CMD` specifies the default command executed when the container starts.
 - Docker layer caching speeds up repeated builds by reusing unchanged instructions.
 
+# Day 51 Notes: Multi-Stage Docker Builds for Machine Learning Model Serving
+
+# Introduction
+
+One of the biggest mistakes developers make while containerizing Machine Learning applications is shipping everything into the production image.
+
+A typical ML project contains two completely different phases:
+
+1. **Training Phase**
+2. **Serving (Inference) Phase**
+
+These phases have different requirements.
+
+During training we may require:
+
+- pandas
+- matplotlib
+- seaborn
+- jupyter
+- xgboost
+- tensorflow
+- pytorch
+- datasets
+- training scripts
+- notebooks
+
+But after the model is trained, none of these are needed to make predictions.
+
+The serving application only needs:
+
+- the trained model
+- the web server
+- minimum runtime libraries
+
+This is exactly why Docker provides **Multi-Stage Builds**.
+
+---
+
+# Understanding the Project
+
+The project contains three files.
+
+```
+ml-serve/
+│
+├── Dockerfile
+├── train_model.py
+└── serve.py
+```
+
+Each file has a different responsibility.
+
+---
+
+# train_model.py
+
+This file is responsible for **training** the Machine Learning model.
+
+Its job is:
+
+```
+Dataset
+      │
+      ▼
+Train RandomForest
+      │
+      ▼
+Save model.pkl
+```
+
+It does **NOT** serve HTTP requests.
+
+It only creates the trained model.
+
+Internally it performs something similar to:
+
+```python
+model = RandomForestClassifier(n_estimators=10)
+
+model.fit(X, y)
+
+joblib.dump(model, "model.pkl")
+```
+
+Notice the important part:
+
+```
+joblib.dump(...)
+```
+
+This serializes (saves) the trained model into a file.
+
+That file is
+
+```
+model.pkl
+```
+
+This file becomes the most important artifact.
+
+---
+
+# What is model.pkl?
+
+Machine Learning models exist only in RAM while training.
+
+For example
+
+```
+model.fit(...)
+```
+
+creates a trained model inside memory.
+
+If the program exits
+
+everything disappears.
+
+So we serialize the model.
+
+```
+RAM
+ │
+ ▼
+joblib.dump()
+ │
+ ▼
+model.pkl
+```
+
+Now the trained model can be loaded later without training again.
+
+---
+
+# Why use Joblib?
+
+Machine learning models can contain
+
+- thousands
+- millions
+- even billions
+
+of parameters.
+
+Python's default pickle works.
+
+But Joblib is optimized for large NumPy arrays.
+
+Therefore Scikit-Learn officially recommends Joblib.
+
+Saving
+
+```python
+joblib.dump(model, "model.pkl")
+```
+
+Loading
+
+```python
+model = joblib.load("model.pkl")
+```
+
+---
+
+# serve.py
+
+This is completely different.
+
+It does **NOT** train anything.
+
+Instead it loads the already trained model.
+
+```
+model.pkl
+      │
+      ▼
+joblib.load()
+      │
+      ▼
+Prediction API
+```
+
+It starts a Flask server.
+
+The endpoints are
+
+```
+GET /health
+
+POST /predict
+```
+
+---
+
+# Health Endpoint
+
+```
+GET /health
+```
+
+returns
+
+```json
+{
+  "status":"ok"
+}
+```
+
+Why?
+
+Container orchestrators like
+
+- Kubernetes
+- Docker Swarm
+- ECS
+
+need a quick way to know
+
+"Is the application alive?"
+
+They continuously call
+
+```
+GET /health
+```
+
+If the response is
+
+```
+200 OK
+```
+
+the container is healthy.
+
+---
+
+# Predict Endpoint
+
+```
+POST /predict
+```
+
+accepts JSON.
+
+Example
+
+```json
+{
+  "amount":250,
+  "merchant":"Amazon",
+  "country":"US"
+}
+```
+
+The server loads
+
+```
+model.pkl
+```
+
+and returns
+
+```
+Fraud
+
+or
+
+Not Fraud
+```
+
+depending on prediction.
+
+---
+
+# Original Dockerfile
+
+The original Dockerfile was
+
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir scikit-learn pandas numpy joblib flask
+
+COPY train_model.py /app/train_model.py
+COPY serve.py /app/serve.py
+
+RUN python3 /app/train_model.py
+
+EXPOSE 8080
+
+CMD ["python3", "/app/serve.py"]
+```
+
+This works.
+
+But it is not efficient.
+
+---
+
+# Problems with Single Stage Build
+
+Everything ends up inside one image.
+
+```
+Image
+│
+├── train_model.py
+├── serve.py
+├── pandas
+├── flask
+├── numpy
+├── scikit-learn
+├── joblib
+└── model.pkl
+```
+
+Production only needs
+
+```
+serve.py
+
+model.pkl
+
+runtime libraries
+```
+
+Everything else is unnecessary.
+
+---
+
+# Why is this bad?
+
+Imagine
+
+Training dependencies
+
+```
+3 GB
+```
+
+Runtime dependencies
+
+```
+300 MB
+```
+
+Single-stage image
+
+```
+3.3 GB
+```
+
+Multi-stage image
+
+```
+300 MB
+```
+
+Huge difference.
+
+---
+
+# What is a Docker Stage?
+
+Every
+
+```dockerfile
+FROM
+```
+
+creates a completely new image layer.
+
+Example
+
+```dockerfile
+FROM ubuntu
+```
+
+One stage.
+
+Another
+
+```dockerfile
+FROM python
+```
+
+Second stage.
+
+Stages are isolated.
+
+Nothing is automatically shared.
+
+---
+
+# Builder Stage
+
+Builder stage exists only during build.
+
+```
+Builder
+│
+├── install packages
+├── compile code
+├── build binary
+├── train model
+└── create artifacts
+```
+
+After build finishes
+
+Docker throws away the builder image.
+
+Only selected files are copied.
+
+---
+
+# Runtime Stage
+
+Runtime stage is the final image.
+
+```
+Runtime
+│
+├── model.pkl
+├── serve.py
+└── runtime libraries
+```
+
+No training code.
+
+No unnecessary packages.
+
+---
+
+# Understanding the Builder Stage
+
+```dockerfile
+FROM python:3.11-slim AS builder
+```
+
+The keyword
+
+```
+AS builder
+```
+
+creates a name.
+
+Later we can reference it.
+
+```
+builder
+```
+
+acts like a label.
+
+---
+
+# Working Directory
+
+```dockerfile
+WORKDIR /app
+```
+
+Every command executes inside
+
+```
+/app
+```
+
+Equivalent to
+
+```
+cd /app
+```
+
+before every command.
+
+---
+
+# Copy Training Script
+
+```dockerfile
+COPY train_model.py .
+```
+
+Copies
+
+```
+host
+
+↓
+
+container
+```
+
+Result
+
+```
+/app/train_model.py
+```
+
+---
+
+# Install Training Dependencies
+
+```dockerfile
+RUN pip install \
+scikit-learn \
+pandas \
+numpy \
+joblib
+```
+
+Notice
+
+Flask is NOT installed here.
+
+Because
+
+Flask isn't needed during training.
+
+---
+
+# Train Model
+
+```dockerfile
+RUN python3 train_model.py
+```
+
+Runs
+
+```
+train_model.py
+```
+
+during image build.
+
+The output is
+
+```
+model.pkl
+```
+
+Now builder contains
+
+```
+/app/model.pkl
+```
+
+---
+
+# Runtime Stage
+
+Starts from scratch.
+
+```dockerfile
+FROM python:3.11-slim
+```
+
+This is an entirely new image.
+
+Nothing from builder exists here.
+
+---
+
+# Runtime Dependencies
+
+```dockerfile
+RUN pip install
+
+flask
+
+joblib
+
+numpy
+
+scikit-learn
+```
+
+Notice
+
+```
+pandas
+```
+
+is intentionally missing.
+
+Why?
+
+Because
+
+```
+serve.py
+```
+
+never imports pandas.
+
+Installing unused packages only increases image size.
+
+---
+
+# Copy Serving Script
+
+```dockerfile
+COPY serve.py .
+```
+
+Only
+
+```
+serve.py
+```
+
+is needed.
+
+Not
+
+```
+train_model.py
+```
+
+---
+
+# Copy Model from Builder
+
+This is the most important command.
+
+```dockerfile
+COPY --from=builder /app/model.pkl .
+```
+
+Meaning
+
+```
+Take
+
+/app/model.pkl
+
+from builder stage
+
+↓
+
+copy
+
+↓
+
+current runtime stage
+```
+
+Result
+
+```
+Runtime
+
+│
+
+├── serve.py
+
+└── model.pkl
+```
+
+---
+
+# Expose Port
+
+```dockerfile
+EXPOSE 8080
+```
+
+This documents
+
+```
+8080
+```
+
+as the application port.
+
+It does **not** publish the port.
+
+Publishing happens during
+
+```
+docker run
+```
+
+---
+
+# CMD
+
+```dockerfile
+CMD ["python3","serve.py"]
+```
+
+Runs
+
+```
+python3 serve.py
+```
+
+when the container starts.
+
+---
+
+# Build Process
+
+```
+docker build
+```
+
+Step 1
+
+```
+Builder Stage
+```
+
+↓
+
+Install packages
+
+↓
+
+Copy train_model.py
+
+↓
+
+Train model
+
+↓
+
+Generate model.pkl
+
+↓
+
+Stage finished
+
+↓
+
+Runtime Stage
+
+↓
+
+Install runtime packages
+
+↓
+
+Copy serve.py
+
+↓
+
+Copy model.pkl
+
+↓
+
+Create final image
+```
+
+---
+
+# Why Doesn't Runtime Need train_model.py?
+
+Because
+
+Training is already finished.
+
+The output
+
+```
+model.pkl
+```
+
+contains everything necessary.
+
+It is exactly like
+
+```
+C Program
+
+↓
+
+gcc
+
+↓
+
+Executable
+
+↓
+
+Delete source code
+
+↓
+
+Run executable
+```
+
+The executable doesn't need
+
+```
+main.c
+```
+
+Similarly
+
+```
+serve.py
+
+needs
+
+model.pkl
+
+not
+
+train_model.py
+```
+
+---
+
+# Docker Build Command
+
+```
+docker build -t ml-serve:v1 .
+```
+
+Meaning
+
+```
+build
+
+↓
+
+Dockerfile
+
+↓
+
+Current directory
+
+↓
+
+Tag image
+
+↓
+
+ml-serve:v1
+```
+
+---
+
+# Docker Images
+
+```
+docker images
+```
+
+Shows
+
+- Repository
+- Tag
+- Image ID
+- Size
+
+---
+
+# Running the Container
+
+```
+docker run --rm -p 8090:8080 ml-serve:v1
+```
+
+Breakdown
+
+```
+docker run
+
+Start container
+```
+
+```
+--rm
+
+Delete container after exit
+```
+
+```
+-p
+
+Port mapping
+```
+
+```
+8090:8080
+```
+
+Means
+
+```
+Host
+
+8090
+
+↓
+
+Container
+
+8080
+```
+
+---
+
+# Health Check
+
+```
+curl http://localhost:8090/health
+```
+
+Returns
+
+```json
+{
+    "status":"ok"
+}
+```
+
+Meaning
+
+The server is working.
+
+---
+
+# Common Mistakes
+
+## 1. Forgetting Builder Name
+
+Wrong
+
+```dockerfile
+FROM python:3.11-slim
+```
+
+Correct
+
+```dockerfile
+FROM python:3.11-slim AS builder
+```
+
+---
+
+## 2. Copying Wrong File
+
+Wrong
+
+```dockerfile
+COPY train_model.py .
+```
+
+inside runtime.
+
+Correct
+
+Only copy
+
+```
+serve.py
+```
+
+---
+
+## 3. Installing pandas in Runtime
+
+Wrong
+
+```dockerfile
+RUN pip install pandas
+```
+
+The runtime doesn't need it.
+
+---
+
+## 4. Forgetting model.pkl
+
+If
+
+```dockerfile
+COPY --from=builder
+```
+
+is missing
+
+then
+
+```
+serve.py
+```
+
+fails because
+
+```
+model.pkl
+```
+
+doesn't exist.
+
+---
+
+## 5. Running Container During Lab Validation
+
+If you already have
+
+```
+docker run -p 8090:8080
+```
+
+running,
+
+the lab validator cannot start another container on the same port.
+
+You'll get
+
+```
+Bind for 8090 failed
+
+Port already allocated
+```
+
+Stop your container first:
+
+```bash
+docker stop <container-id>
+```
+
+---
+
+# Interview Questions
+
+### Why use multi-stage Docker builds?
+
+To separate build-time dependencies from runtime dependencies, producing smaller, cleaner, and more secure images.
+
+---
+
+### Why train in the builder stage?
+
+Training is only required during image creation. The final application only needs the trained model.
+
+---
+
+### Why is pandas excluded from the runtime image?
+
+Because `serve.py` does not use it. Only packages required for inference should be included.
+
+---
+
+### What does `COPY --from=builder` do?
+
+It copies files generated in one build stage into another stage.
+
+---
+
+### What is `model.pkl`?
+
+A serialized Machine Learning model created using Joblib after training.
+
+---
+
+### What is the purpose of `EXPOSE 8080`?
+
+It documents the application's listening port inside the container.
+
+---
+
+# Key Takeaways
+
+- Multi-stage builds create smaller production images.
+- Builder stages are temporary and discarded after the build.
+- Runtime stages should contain only what the application needs.
+- `model.pkl` is the artifact produced by training.
+- `serve.py` performs inference by loading the trained model.
+- `COPY --from=builder` transfers artifacts between stages.
+- Reducing unnecessary dependencies improves security, image size, and deployment speed.
+- Multi-stage builds are considered a Docker best practice for production applications, especially in Machine Learning workflows.
+
 ---
 

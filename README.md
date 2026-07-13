@@ -58,4 +58,5 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 50: Create Docker Image for ML Training Environment](./Day%2050%20-%20Create%20Docker%20Image%20for%20ML%20Training%20Environment.md)
 
+- [Day 51: Create Multi-Stage Docker Build for ML Serving](./Day%2051%20-%20Create%20Multi-Stage%20Docker%20Build%20for%20ML%20Serving.md)
 ---
