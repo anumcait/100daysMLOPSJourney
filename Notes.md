@@ -5702,6 +5702,407 @@ curl -I http://localhost:9001
 
 This lab demonstrated how a few small configuration errors in a Docker Compose file can prevent services from being accessible. The main fixes included correcting the SeaweedFS port mappings and configuring Jupyter to start without token-based authentication for local development. It also reinforced core Docker Compose concepts such as service definitions, port mappings, volume persistence, container naming, command overrides, and verification using `docker compose ps` and `curl`. Understanding these fundamentals is essential for deploying, troubleshooting, and maintaining multi-container applications.
 
+# Day 53 Notes: Understanding CPU vs GPU PyTorch Docker Images
+
+## Introduction
+
+When creating Docker images for Machine Learning workloads, it is important to install the correct version of PyTorch based on the hardware where the container will run.
+
+PyTorch provides different wheel packages for:
+
+- CPU-only systems
+- NVIDIA GPU (CUDA) systems
+
+If the wrong package is installed, the image may fail to build or the application may fail during runtime.
+
+---
+
+# What is a Dockerfile?
+
+A Dockerfile is a text file containing instructions that Docker follows to build an image.
+
+Example:
+
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN pip install torch
+
+CMD ["python3"]
+```
+
+Each instruction creates a new image layer.
+
+---
+
+# Understanding the Instructions
+
+## FROM
+
+```dockerfile
+FROM python:3.11-slim
+```
+
+This specifies the base image.
+
+Here we start from a lightweight Python 3.11 image.
+
+---
+
+## WORKDIR
+
+```dockerfile
+WORKDIR /app
+```
+
+Sets the working directory inside the container.
+
+Equivalent to:
+
+```bash
+cd /app
+```
+
+Every following command runs from this directory.
+
+---
+
+## RUN
+
+```dockerfile
+RUN pip install torch
+```
+
+`RUN` executes commands while building the image.
+
+The installed software becomes part of the final Docker image.
+
+---
+
+## CMD
+
+```dockerfile
+CMD ["python3"]
+```
+
+`CMD` specifies the default command executed when the container starts.
+
+Unlike `RUN`, `CMD` is **not executed during image build**.
+
+It runs only when someone executes:
+
+```bash
+docker run image-name
+```
+
+---
+
+# Why Did the Original Dockerfile Fail?
+
+The original Dockerfile contained:
+
+```dockerfile
+RUN pip install \
+    --index-url https://download.pytorch.org/whl/gpu \
+    torch
+```
+
+The lab machine had **no GPU**.
+
+PyTorch provides different package repositories depending on the hardware.
+
+Trying to use the GPU package repository in a CPU-only environment causes installation problems.
+
+---
+
+# CPU Wheel vs GPU Wheel
+
+CPU installation:
+
+```text
+https://download.pytorch.org/whl/cpu
+```
+
+GPU installation:
+
+```text
+https://download.pytorch.org/whl/cu124
+```
+
+or another CUDA version.
+
+Choose the wheel based on the machine where the container will run.
+
+---
+
+# Why Use the CPU Wheel?
+
+CPU wheels
+
+- work on any machine
+- require no NVIDIA drivers
+- require no CUDA libraries
+
+GPU wheels
+
+- require NVIDIA drivers
+- require CUDA runtime
+- are larger
+- only work correctly on supported GPU systems
+
+---
+
+# What is torch.cuda?
+
+PyTorch includes the module:
+
+```python
+torch.cuda
+```
+
+This module provides CUDA-related functionality.
+
+Example:
+
+```python
+import torch
+
+print(torch.cuda.is_available())
+```
+
+Possible output:
+
+```text
+True
+```
+
+or
+
+```text
+False
+```
+
+---
+
+# What Does torch.cuda.is_available() Do?
+
+It checks whether PyTorch can access a CUDA-enabled GPU.
+
+Example:
+
+```python
+import torch
+
+if torch.cuda.is_available():
+    print("GPU Available")
+else:
+    print("CPU Only")
+```
+
+Output on the lab machine:
+
+```text
+CPU Only
+```
+
+---
+
+# Why Did the Container Crash?
+
+The original Dockerfile contained:
+
+```python
+assert torch.cuda.is_available(), "CUDA required"
+```
+
+`assert` checks whether a condition is True.
+
+If the condition is False:
+
+```python
+AssertionError: CUDA required
+```
+
+The Python program exits immediately.
+
+Since the lab machine has no GPU,
+
+```python
+torch.cuda.is_available()
+```
+
+returns
+
+```python
+False
+```
+
+Therefore the container exits with an error.
+
+---
+
+# Better Approach
+
+Instead of requiring CUDA, simply display its status.
+
+Example:
+
+```python
+import torch
+
+print(torch.__version__)
+print(torch.cuda.is_available())
+```
+
+Output:
+
+```text
+2.5.0+cpu
+False
+```
+
+---
+
+# Understanding torch.__version__
+
+```python
+import torch
+
+print(torch.__version__)
+```
+
+Example output:
+
+```text
+2.5.0+cpu
+```
+
+The suffix
+
+```text
++cpu
+```
+
+indicates that the CPU version of PyTorch is installed.
+
+---
+
+# Understanding pip --index-url
+
+Normally pip downloads packages from:
+
+```text
+https://pypi.org/simple
+```
+
+You can override this using
+
+```bash
+pip install \
+--index-url URL
+```
+
+For PyTorch:
+
+```bash
+pip install torch \
+--index-url https://download.pytorch.org/whl/cpu
+```
+
+This tells pip to download PyTorch wheels from the official CPU package repository.
+
+---
+
+# Building the Docker Image
+
+Command:
+
+```bash
+docker build -t dl-trainer:v1 .
+```
+
+Explanation:
+
+- `docker build` builds the image
+- `-t` assigns a tag
+- `dl-trainer:v1` is the image name and version
+- `.` means use the current directory
+
+---
+
+# Listing Images
+
+```bash
+docker images
+```
+
+Example:
+
+```text
+REPOSITORY    TAG
+dl-trainer    v1
+```
+
+This confirms the image was built successfully.
+
+---
+
+# Running the Container
+
+```bash
+docker run --rm dl-trainer:v1
+```
+
+Explanation:
+
+- creates a new container
+- executes the default CMD
+- removes the container after it exits because of `--rm`
+
+---
+
+# Expected Output
+
+Example:
+
+```text
+2.5.0+cpu cuda? False
+```
+
+This shows:
+
+- PyTorch is installed successfully.
+- CPU version is being used.
+- CUDA is unavailable, which is expected.
+
+---
+
+# Best Practices
+
+- Always install the correct package for the target hardware.
+- Avoid hardcoding GPU requirements unless they are mandatory.
+- Keep Docker images lightweight.
+- Verify software installation during container startup.
+- Use CPU wheels for CPU-only servers and CI/CD environments.
+- Use GPU wheels only on systems with NVIDIA GPUs and compatible CUDA drivers.
+
+---
+
+# Summary
+
+In this lab, we learned how to:
+
+- Understand the purpose of a Dockerfile.
+- Differentiate between `RUN` and `CMD`.
+- Install the correct PyTorch package for CPU-only environments.
+- Use the official CPU wheel repository.
+- Check CUDA availability using `torch.cuda.is_available()`.
+- Avoid runtime failures caused by unnecessary CUDA assertions.
+- Build, verify, and run a Docker image successfully.
+
+This is a common task in DevOps and MLOps workflows, where container images must be tailored to the hardware available in production environments.
 
 ---
 

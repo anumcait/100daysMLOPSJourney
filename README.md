@@ -62,4 +62,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 52: Fix a Broken Jupyter + MLflow + SeaweedFS Compose Stack](./Day%2052%20-%20Fix%20a%20Broken%20Jupyter%20%2B%20MLflow%20%2B%20SeaweedFS%20Compose%20Stack.md)
 
+- [Day 53: Fix a Broken PyTorch Dockerfile (CPU-Wheel URL)](./Day%2053%20-%20Fix%20a%20Broken%20PyTorch%20Dockerfile%20(CPU-Wheel%20URL).md)
+
 ---
