@@ -131,3 +131,19 @@ curl -I http://localhost:9001/
 - A small port mapping mistake can make services appear unavailable.
 - Jupyter Notebook images require explicit configuration to disable token authentication.
 - `docker compose ps` and `curl` are quick ways to verify that services are running and reachable.
+
+### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/99403b7d-2387-4a6a-8ac9-3e2810f0a639" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/85a19139-072d-4138-a7c3-e257320dc66e" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/9ddd6a60-f066-4529-a822-560f70e46668" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/b9bc9555-6535-4827-9d2f-cd5a7d1d3a35" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/2ccefa7f-1658-4d4d-a369-45ad2d0bab4e" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/fadd2d77-2b0f-45ca-89ab-ff28dcd9b631" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/b76f6066-e185-4d77-976c-e67c11508e0e" />
+
+
+
+
+
+
+
