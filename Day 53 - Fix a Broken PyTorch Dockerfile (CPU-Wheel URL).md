@@ -117,3 +117,13 @@ docker run --rm dl-trainer:v1
 - ✅ Output displayed the installed PyTorch version and `cuda? False`.
 
 ### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/2ee9c34d-61db-412b-9cbc-8f601767211a" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/d5c64b9e-f23b-426c-b759-f243f3da667d" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/8644f1a9-3ac3-49d3-86a6-0ecebc2955ea" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/9f625111-3ab6-4a8e-a593-9fd091187d15" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/d57fb2ca-0c26-4e46-9a3c-400bdef5eedb" />
+
+
+
+
+
