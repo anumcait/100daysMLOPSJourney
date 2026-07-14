@@ -5047,5 +5047,661 @@ It documents the application's listening port inside the container.
 - Reducing unnecessary dependencies improves security, image size, and deployment speed.
 - Multi-stage builds are considered a Docker best practice for production applications, especially in Machine Learning workflows.
 
+# Day 52 Notes: Understanding and Fixing a Docker Compose Stack (Jupyter + MLflow + SeaweedFS)
+
+# Introduction
+
+Modern Machine Learning (ML) development environments often consist of multiple services working together. Instead of installing each application individually, Docker Compose allows us to define and run all services from a single configuration file.
+
+In this lab, the stack consists of three services:
+
+1. **Jupyter Lab** – Interactive notebook environment.
+2. **MLflow** – Machine learning experiment tracking server.
+3. **SeaweedFS** – Object storage that provides an S3-compatible API and a web-based Filer UI.
+
+The objective was to identify and fix configuration errors inside the `docker-compose.yml` file so that all services become accessible on their expected ports.
+
+---
+
+# What is Docker Compose?
+
+Docker Compose is a tool for defining and running multiple Docker containers using a YAML configuration file.
+
+Instead of running several long `docker run` commands, everything can be described inside one file.
+
+Example:
+
+```yaml
+services:
+  web:
+    image: nginx
+  db:
+    image: mysql
+```
+
+Then simply run:
+
+```bash
+docker compose up -d
+```
+
+Docker Compose automatically:
+
+- Pulls images (if necessary)
+- Creates containers
+- Creates networks
+- Creates volumes
+- Starts services
+
+---
+
+# Anatomy of docker-compose.yml
+
+A Compose file generally contains:
+
+```yaml
+services:
+volumes:
+networks:
+```
+
+Example:
+
+```yaml
+services:
+  jupyter:
+    image: jupyter/base-notebook
+
+volumes:
+  data:
+```
+
+---
+
+# Understanding the Three Services
+
+## 1. Jupyter Lab
+
+Image:
+
+```
+jupyter/base-notebook:python-3.11
+```
+
+Purpose:
+
+- Write Python notebooks
+- Run ML experiments
+- Data analysis
+- Visualization
+
+Default Port:
+
+```
+8888
+```
+
+Normally when Jupyter starts, it generates a security token.
+
+Example:
+
+```
+http://localhost:8888/?token=abc123...
+```
+
+Without the token, users cannot access the notebook.
+
+For local development labs, authentication is often disabled.
+
+---
+
+## 2. MLflow
+
+Image:
+
+```
+ghcr.io/mlflow/mlflow:v3.14.0
+```
+
+Purpose:
+
+- Track experiments
+- Log metrics
+- Log parameters
+- Save artifacts
+- Compare model runs
+
+Default Port:
+
+```
+5000
+```
+
+MLflow server command:
+
+```bash
+mlflow server
+```
+
+Example options:
+
+```bash
+--host 0.0.0.0
+```
+
+Accepts requests from outside the container.
+
+```bash
+--port 5000
+```
+
+Runs MLflow on port 5000.
+
+```bash
+--backend-store-uri
+```
+
+Database location.
+
+```bash
+--default-artifact-root
+```
+
+Artifact storage location.
+
+---
+
+## 3. SeaweedFS
+
+SeaweedFS is a distributed file system.
+
+It provides multiple services:
+
+- File storage
+- Object storage
+- S3-compatible API
+- Web UI (Filer)
+
+In this lab it provides two important ports.
+
+Container ports:
+
+```
+8333
+```
+
+S3 API
+
+```
+8888
+```
+
+Filer UI
+
+---
+
+# Docker Port Mapping
+
+One of the most important Docker concepts is port mapping.
+
+Syntax:
+
+```
+HOST_PORT:CONTAINER_PORT
+```
+
+Example:
+
+```yaml
+ports:
+  - "5000:5000"
+```
+
+Meaning:
+
+```
+Browser
+↓
+
+localhost:5000
+
+↓
+
+Host Machine Port 5000
+
+↓
+
+Container Port 5000
+
+↓
+
+Application
+```
+
+---
+
+# Common Mistake
+
+Suppose the application runs inside the container on port 8888.
+
+Incorrect:
+
+```yaml
+ports:
+  - "8888:5000"
+```
+
+Correct:
+
+```yaml
+ports:
+  - "8888:8888"
+```
+
+Always verify the application's internal listening port before exposing it.
+
+---
+
+# Understanding SeaweedFS Ports
+
+Container exposes:
+
+```
+8333
+```
+
+S3 API
+
+```
+8888
+```
+
+Filer UI
+
+Lab requirement:
+
+Host
+
+```
+9000
+```
+
+↓
+
+Container
+
+```
+8333
+```
+
+Host
+
+```
+9001
+```
+
+↓
+
+Container
+
+```
+8888
+```
+
+Correct mapping:
+
+```yaml
+ports:
+  - "9000:8333"
+  - "9001:8888"
+```
+
+Incorrect mapping:
+
+```yaml
+ports:
+  - "9001:8333"
+  - "9000:8888"
+```
+
+Swapping these ports causes the browser UI and S3 API to appear on the wrong ports.
+
+---
+
+# Understanding Jupyter Authentication
+
+By default Jupyter launches with:
+
+- Token authentication
+- Password support
+
+Example URL:
+
+```
+http://localhost:8888/?token=...
+```
+
+This prevents unauthorized access.
+
+For local development environments, authentication may be disabled.
+
+Configuration:
+
+```yaml
+command:
+  - start-notebook.sh
+  - --ServerApp.token=
+  - --ServerApp.password=
+```
+
+This sets:
+
+```
+token = ""
+password = ""
+```
+
+No login prompt appears.
+
+---
+
+# Understanding command in Docker Compose
+
+Compose normally starts the container using its default command.
+
+Example:
+
+```yaml
+image: nginx
+```
+
+Internally executes:
+
+```
+nginx
+```
+
+We can override it.
+
+Example:
+
+```yaml
+command:
+  - python
+  - app.py
+```
+
+In this lab:
+
+```yaml
+command:
+  - start-notebook.sh
+  - --ServerApp.token=
+  - --ServerApp.password=
+```
+
+Compose replaces the default startup command.
+
+---
+
+# Volumes
+
+Volumes store persistent data.
+
+Example:
+
+```yaml
+volumes:
+  - mlflow-data:/mlflow
+```
+
+Anything inside:
+
+```
+/mlflow
+```
+
+is preserved even if the container is removed.
+
+Similarly:
+
+```yaml
+volumes:
+  - seaweedfs-data:/data
+```
+
+stores SeaweedFS data.
+
+---
+
+# Container Names
+
+Instead of random names like:
+
+```
+crazy_einstein
+```
+
+Compose specifies:
+
+```yaml
+container_name:
+```
+
+Example:
+
+```yaml
+container_name: ml-jupyter
+```
+
+Useful for:
+
+```bash
+docker logs ml-jupyter
+```
+
+instead of finding container IDs.
+
+---
+
+# Bringing Up the Stack
+
+Start services:
+
+```bash
+docker compose -f docker-compose.yml up -d
+```
+
+Options:
+
+```
+up
+```
+
+Creates and starts containers.
+
+```
+-d
+```
+
+Detached mode.
+
+Runs in the background.
+
+---
+
+# Viewing Running Containers
+
+Command:
+
+```bash
+docker compose ps
+```
+
+Shows:
+
+- Container name
+- Status
+- Ports
+- Health
+
+Example:
+
+```
+NAME            STATUS
+
+ml-jupyter      Up
+ml-mlflow       Up
+ml-seaweedfs    Up
+```
+
+---
+
+# Verifying Services with curl
+
+Instead of opening a browser, use:
+
+```bash
+curl -I http://localhost:8888
+```
+
+The `-I` option fetches only HTTP headers.
+
+Expected:
+
+```
+HTTP/1.1 200 OK
+```
+
+or
+
+```
+HTTP/1.1 302 Found
+```
+
+A `302` response indicates the application is redirecting the browser, which is still considered reachable.
+
+---
+
+# Why 200 and 302 Are Acceptable
+
+**200 OK**
+
+The requested page is returned successfully.
+
+**302 Found**
+
+The application redirects to another page (for example, `/tree`, `/lab`, or `/login`).
+
+Both indicate that the service is running and responding.
+
+---
+
+# Debugging Steps
+
+When a service is not accessible:
+
+1. Check container status.
+
+```bash
+docker compose ps
+```
+
+2. Inspect logs.
+
+```bash
+docker logs <container-name>
+```
+
+Example:
+
+```bash
+docker logs ml-jupyter
+```
+
+3. Verify exposed ports.
+
+```bash
+docker port ml-seaweedfs
+```
+
+4. Test endpoints.
+
+```bash
+curl http://localhost:5000
+```
+
+---
+
+# Best Practices
+
+- Keep one service per container.
+- Use named volumes for persistent data.
+- Always expose the correct container port.
+- Use meaningful container names.
+- Verify services using `curl` after deployment.
+- Check logs when troubleshooting.
+- Store configuration in version control.
+- Avoid disabling authentication in production environments.
+
+---
+
+# Key Commands Used
+
+Start containers:
+
+```bash
+docker compose up -d
+```
+
+Stop containers:
+
+```bash
+docker compose down
+```
+
+Restart containers:
+
+```bash
+docker compose restart
+```
+
+View running containers:
+
+```bash
+docker compose ps
+```
+
+View logs:
+
+```bash
+docker logs ml-jupyter
+```
+
+Verify Jupyter:
+
+```bash
+curl -I http://localhost:8888
+```
+
+Verify MLflow:
+
+```bash
+curl -I http://localhost:5000
+```
+
+Verify SeaweedFS Filer:
+
+```bash
+curl -I http://localhost:9001
+```
+
+---
+
+# Summary
+
+This lab demonstrated how a few small configuration errors in a Docker Compose file can prevent services from being accessible. The main fixes included correcting the SeaweedFS port mappings and configuring Jupyter to start without token-based authentication for local development. It also reinforced core Docker Compose concepts such as service definitions, port mappings, volume persistence, container naming, command overrides, and verification using `docker compose ps` and `curl`. Understanding these fundamentals is essential for deploying, troubleshooting, and maintaining multi-container applications.
+
+
 ---
 

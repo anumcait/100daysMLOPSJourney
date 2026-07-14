@@ -59,4 +59,7 @@ Tracking my 100-day journey into Machine Learning Operations.
 - [Day 50: Create Docker Image for ML Training Environment](./Day%2050%20-%20Create%20Docker%20Image%20for%20ML%20Training%20Environment.md)
 
 - [Day 51: Create Multi-Stage Docker Build for ML Serving](./Day%2051%20-%20Create%20Multi-Stage%20Docker%20Build%20for%20ML%20Serving.md)
+
+- [Day 52: Fix a Broken Jupyter + MLflow + SeaweedFS Compose Stack](./Day%2052%20-%20Fix%20a%20Broken%20Jupyter%20%2B%20MLflow%20%2B%20SeaweedFS%20Compose%20Stack.md)
+
 ---
