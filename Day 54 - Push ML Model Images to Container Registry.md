@@ -167,3 +167,12 @@ curl http://localhost:5555/v2/fraud-detector/tags/list
 ✅ Verified the repository and tag using the Docker Registry HTTP API.
 
 ### Screenshots
+
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/fd38f2f5-3396-488e-9a41-955938b888a2" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/20925520-33ef-4995-864b-4ff85a2755f4" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/cb0324f7-93c5-4fa7-af68-8b7abbbad838" />
+
+
+
+
+
