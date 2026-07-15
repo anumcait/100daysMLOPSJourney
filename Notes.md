@@ -6104,5 +6104,854 @@ In this lab, we learned how to:
 
 This is a common task in DevOps and MLOps workflows, where container images must be tailored to the hardware available in production environments.
 
+# Docker Private Registry - Complete Notes (Day 54)
+
+# Introduction
+
+In modern software development, applications are usually packaged as **Docker Images**. These images contain everything required to run an application:
+
+- Application source code
+- Runtime
+- Libraries
+- Dependencies
+- Configuration
+
+Instead of rebuilding applications on every server, we simply build an image once and distribute it wherever needed.
+
+But how do other servers obtain this image?
+
+The answer is through a **Docker Registry**.
+
+---
+
+# What is a Docker Registry?
+
+A Docker Registry is a storage service that stores Docker images.
+
+Think of it as GitHub, but instead of storing source code, it stores Docker images.
+
+Examples:
+
+- Docker Hub
+- Amazon ECR
+- Google Artifact Registry
+- Azure Container Registry
+- Harbor
+- Private Docker Registry (registry:2)
+
+Whenever you execute
+
+```bash
+docker pull nginx
+```
+
+Docker contacts Docker Hub and downloads the image.
+
+Similarly, if you execute
+
+```bash
+docker push my-image
+```
+
+Docker uploads the image to a registry.
+
+---
+
+# Public vs Private Registry
+
+## Public Registry
+
+Accessible by anyone.
+
+Example:
+
+Docker Hub
+
+```
+docker pull nginx
+```
+
+Anyone can pull it.
+
+---
+
+## Private Registry
+
+Only authorized users or systems can access it.
+
+Organizations prefer private registries because
+
+- Images contain company code
+- Images may contain ML models
+- Internal services should not be public
+- Better security
+- Better performance
+
+---
+
+# Docker Registry Architecture
+
+```
+                Developer
+
+                    |
+                    |
+             docker push
+                    |
+                    V
+
+        ------------------------
+        |   Docker Registry    |
+        | Stores Docker Images |
+        ------------------------
+
+                    ^
+                    |
+             docker pull
+                    |
+                    |
+
+             Kubernetes Cluster
+```
+
+The registry acts as a centralized image repository.
+
+---
+
+# The Registry Used in This Lab
+
+The registry already exists.
+
+Container:
+
+```
+registry:2
+```
+
+Running as
+
+```
+local-registry
+```
+
+Port Mapping
+
+```
+Host
+5555
+
+↓
+
+Container
+5000
+```
+
+Meaning
+
+```
+localhost:5555
+```
+
+actually forwards requests to
+
+```
+registry container :5000
+```
+
+---
+
+# Understanding Port Mapping
+
+Docker command generally looks like
+
+```
+-p HOST_PORT:CONTAINER_PORT
+```
+
+Example
+
+```
+-p 5555:5000
+```
+
+Means
+
+```
+localhost:5555
+
+↓
+
+registry container
+
+↓
+
+5000
+```
+
+So when we visit
+
+```
+http://localhost:5555
+```
+
+Docker redirects traffic into the registry container.
+
+---
+
+# Project Structure
+
+```
+ml-registry/
+
+│
+├── Dockerfile
+├── train.py
+└── push.sh
+```
+
+---
+
+# train.py
+
+This file trains a small machine learning model.
+
+Example workflow
+
+```
+Load Dataset
+
+↓
+
+Train RandomForest
+
+↓
+
+Save model.pkl
+```
+
+The generated model is stored as
+
+```
+/app/model.pkl
+```
+
+---
+
+# Dockerfile
+
+The Dockerfile creates the image.
+
+Typical flow
+
+```
+FROM python:3.11-slim
+
+↓
+
+Install sklearn
+
+↓
+
+Install numpy
+
+↓
+
+Install joblib
+
+↓
+
+Copy train.py
+
+↓
+
+Run train.py
+
+↓
+
+model.pkl created
+
+↓
+
+Image completed
+```
+
+Notice
+
+The ML model is baked into the image during build.
+
+That means every container created from this image already contains the trained model.
+
+---
+
+# push.sh
+
+Initially
+
+```
+docker build
+```
+
+was implemented.
+
+Publishing to registry was missing.
+
+---
+
+# Docker Build
+
+Command
+
+```bash
+docker build -t fraud-detector:v1 .
+```
+
+Let's understand every part.
+
+---
+
+## docker
+
+Docker CLI
+
+---
+
+## build
+
+Create image
+
+---
+
+## -t
+
+Assign tag
+
+---
+
+## fraud-detector
+
+Repository name
+
+---
+
+## v1
+
+Version tag
+
+---
+
+## .
+
+Current directory
+
+Docker searches here for Dockerfile.
+
+---
+
+Image Naming Convention
+
+```
+repository:tag
+```
+
+Example
+
+```
+ubuntu:22.04
+
+nginx:latest
+
+fraud-detector:v1
+```
+
+---
+
+# What Happens During Build?
+
+```
+Dockerfile
+
+↓
+
+Download Base Image
+
+↓
+
+Install Packages
+
+↓
+
+Copy Files
+
+↓
+
+Run train.py
+
+↓
+
+Generate model.pkl
+
+↓
+
+Create Image
+```
+
+The image now exists only on your local Docker engine.
+
+Nothing has been uploaded anywhere.
+
+---
+
+# Local Docker Images
+
+View them
+
+```bash
+docker images
+```
+
+Example
+
+```
+REPOSITORY
+
+fraud-detector
+
+TAG
+
+v1
+```
+
+Still not uploaded.
+
+---
+
+# Why docker tag?
+
+Suppose image exists
+
+```
+fraud-detector:v1
+```
+
+Registry requires
+
+```
+localhost:5555/fraud-detector:v1
+```
+
+These are different names.
+
+Docker identifies registry destination from image name.
+
+---
+
+Without registry
+
+```
+fraud-detector:v1
+```
+
+With registry
+
+```
+localhost:5555/fraud-detector:v1
+```
+
+Docker now knows where to push.
+
+---
+
+# docker tag
+
+Syntax
+
+```bash
+docker tag SOURCE TARGET
+```
+
+Example
+
+```bash
+docker tag fraud-detector:v1 localhost:5555/fraud-detector:v1
+```
+
+Nothing gets uploaded.
+
+Docker only creates another reference.
+
+---
+
+Visualization
+
+Before
+
+```
+fraud-detector:v1
+```
+
+After
+
+```
+fraud-detector:v1
+
+localhost:5555/fraud-detector:v1
+```
+
+Both point to exactly the same image ID.
+
+No duplicate image is created.
+
+Only metadata changes.
+
+---
+
+# Why docker push?
+
+Tagging only creates another image name.
+
+Registry still doesn't know anything.
+
+Need
+
+```bash
+docker push localhost:5555/fraud-detector:v1
+```
+
+Docker now
+
+```
+Compresses Layers
+
+↓
+
+Connects Registry
+
+↓
+
+Uploads Missing Layers
+
+↓
+
+Uploads Manifest
+
+↓
+
+Registry Stores Image
+```
+
+Only after this step does the image exist in registry.
+
+---
+
+# Complete Flow
+
+```
+Dockerfile
+
+↓
+
+docker build
+
+↓
+
+fraud-detector:v1
+
+↓
+
+docker tag
+
+↓
+
+localhost:5555/fraud-detector:v1
+
+↓
+
+docker push
+
+↓
+
+Registry Stores Image
+```
+
+---
+
+# Final push.sh
+
+```bash
+#!/bin/bash
+set -euo pipefail
+
+cd "$(dirname "$0")"
+
+IMAGE="fraud-detector:v1"
+
+docker build -t "$IMAGE" .
+
+docker tag "$IMAGE" localhost:5555/fraud-detector:v1
+
+docker push localhost:5555/fraud-detector:v1
+```
+
+---
+
+# Registry API
+
+Docker Registry exposes HTTP APIs.
+
+---
+
+## List repositories
+
+```
+GET
+
+/v2/_catalog
+```
+
+Command
+
+```bash
+curl http://localhost:5555/v2/_catalog
+```
+
+Response
+
+```json
+{
+  "repositories":[
+      "fraud-detector"
+  ]
+}
+```
+
+Meaning
+
+Registry currently stores
+
+```
+fraud-detector
+```
+
+---
+
+# List Tags
+
+API
+
+```
+GET
+
+/v2/<repository>/tags/list
+```
+
+Example
+
+```bash
+curl http://localhost:5555/v2/fraud-detector/tags/list
+```
+
+Response
+
+```json
+{
+    "name":"fraud-detector",
+    "tags":[
+        "v1"
+    ]
+}
+```
+
+Meaning
+
+Repository
+
+```
+fraud-detector
+```
+
+contains version
+
+```
+v1
+```
+
+---
+
+# Why Version Tags?
+
+Instead of rebuilding over same name
+
+We create
+
+```
+v1
+
+v2
+
+v3
+
+latest
+```
+
+Example
+
+```
+fraud-detector:v1
+
+fraud-detector:v2
+
+fraud-detector:latest
+```
+
+Kubernetes can decide which version to deploy.
+
+---
+
+# Image Lifecycle
+
+```
+Developer writes code
+
+↓
+
+Docker Build
+
+↓
+
+Docker Image
+
+↓
+
+Docker Tag
+
+↓
+
+Docker Push
+
+↓
+
+Private Registry
+
+↓
+
+Kubernetes Pull
+
+↓
+
+Containers Start
+```
+
+---
+
+# Common Interview Questions
+
+## Difference between build and push
+
+Build creates image locally.
+
+Push uploads image to registry.
+
+---
+
+## Difference between tag and push
+
+Tag changes image name.
+
+Push uploads image.
+
+---
+
+## Can docker tag upload image?
+
+No.
+
+It only creates another local reference.
+
+---
+
+## Why registry prefix is needed?
+
+Docker identifies destination registry using image name.
+
+Example
+
+```
+localhost:5555/image:v1
+```
+
+---
+
+## Does docker push upload everything every time?
+
+No.
+
+Docker uploads only missing layers.
+
+Already existing layers are skipped.
+
+---
+
+## Why use Private Registry?
+
+- Faster deployment
+- Secure images
+- Company internal software
+- ML models
+- Version management
+- Kubernetes integration
+
+---
+
+# Commands Used
+
+Build image
+
+```bash
+docker build -t fraud-detector:v1 .
+```
+
+Tag image
+
+```bash
+docker tag fraud-detector:v1 localhost:5555/fraud-detector:v1
+```
+
+Push image
+
+```bash
+docker push localhost:5555/fraud-detector:v1
+```
+
+List images
+
+```bash
+docker images
+```
+
+List repositories
+
+```bash
+curl http://localhost:5555/v2/_catalog
+```
+
+List tags
+
+```bash
+curl http://localhost:5555/v2/fraud-detector/tags/list
+```
+
+---
+
+# Summary
+
+- A Docker image is built locally using `docker build`.
+- A Docker Registry stores Docker images for distribution.
+- `docker tag` creates a registry-qualified name for an image.
+- `docker push` uploads the image to the registry.
+- The image becomes available to other systems only after it is pushed.
+- The Docker Registry HTTP API can verify stored repositories and tags.
+- In this lab, the image `fraud-detector:v1` was tagged as `localhost:5555/fraud-detector:v1` and pushed to the private registry running on port **5555**.
+- Verification was done using the registry endpoints `/v2/_catalog` and `/v2/fraud-detector/tags/list`.
+
 ---
 

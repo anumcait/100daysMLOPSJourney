@@ -64,4 +64,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 53: Fix a Broken PyTorch Dockerfile (CPU-Wheel URL)](./Day%2053%20-%20Fix%20a%20Broken%20PyTorch%20Dockerfile%20(CPU-Wheel%20URL).md)
 
+- [Day 54: Push ML Model Images to Container Registry](./Day%2054%20-%20Push%20ML%20Model%20Images%20to%20Container%20Registry.md)
+
 ---
