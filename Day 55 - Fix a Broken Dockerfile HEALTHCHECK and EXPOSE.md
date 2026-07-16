@@ -224,3 +224,9 @@ docker run -p 8085:8085 image-name
 ✅ Flask health endpoint returns HTTP 200
 
 ### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/811feef2-7ea1-4cdd-8caf-575beffe03fb" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/fde76dea-84a0-4d4f-b060-04316d983806" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/e13d79a4-ae31-4444-95b2-e565840bb0f1" />
+
+
+
