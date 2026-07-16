@@ -66,4 +66,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 54: Push ML Model Images to Container Registry](./Day%2054%20-%20Push%20ML%20Model%20Images%20to%20Container%20Registry.md)
 
+- [Day 55: Fix a Broken Dockerfile HEALTHCHECK and EXPOSE](./Day%2055%20-%20Fix%20a%20Broken%20Dockerfile%20HEALTHCHECK%20and%20EXPOSE.md)
+
 ---
