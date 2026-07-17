@@ -200,5 +200,9 @@ The Git SHA returned by this command should match the tag shown in the registry.
 - Tagging Docker images with Git SHAs improves traceability in CI/CD pipelines.
 
 ### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/abc69684-4c59-4a9d-beff-e7d4654547aa" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/93c459dc-1061-4fd2-9f14-93ea941c27d0" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/306ada00-7a17-4471-957a-b7dbc2fa40b3" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/25495427-7bff-46fb-b3c9-afc5bfe879c6" />
 
 ---
