@@ -68,4 +68,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 55: Fix a Broken Dockerfile HEALTHCHECK and EXPOSE](./Day%2055%20-%20Fix%20a%20Broken%20Dockerfile%20HEALTHCHECK%20and%20EXPOSE.md)
 
+- [Day 56: Fix a Docker CI Pipeline with Git-SHA Tagging](./Day%2056%20-%20Fix%20a%20Docker%20CI%20Pipeline%20with%20Git-SHA%20Tagging.md)
+
 ---

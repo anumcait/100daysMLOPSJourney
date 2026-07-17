@@ -7162,5 +7162,990 @@ docker run -p 8085:8085 image-name
 ✅ Rebuilt Docker image  
 ✅ Container reports healthy  
 ✅ Flask health endpoint returns HTTP 200
+
+
+# Docker CI Pipeline with Git SHA Tagging - Complete Notes
+
+# Day 56 Notes
+
+---
+
+# Introduction
+
+In modern DevOps practices, applications are rarely built manually.
+
+Instead, every code change goes through an automated **Continuous Integration (CI)** pipeline.
+
+A CI pipeline performs tasks such as:
+
+- Running tests
+- Building artifacts
+- Packaging applications
+- Creating Docker images
+- Tagging images
+- Uploading images to registries
+- Preparing software for deployment
+
+In this lab we worked with a **Shell-Based Docker CI Pipeline**.
+
+Unlike Jenkins, GitHub Actions, GitLab CI or Azure Pipelines, this pipeline is written completely in Bash.
+
+Although simple, it demonstrates the exact sequence followed by enterprise CI systems.
+
+---
+
+# Pipeline Flow
+
+```
+Developer
+      │
+      ▼
+ Git Repository
+      │
+      ▼
+Run Tests
+      │
+      ▼
+Build Docker Image
+      │
+      ▼
+Tag Image
+      │
+      ▼
+Push to Registry
+      │
+      ▼
+Deployment
+```
+
+---
+
+# Directory Structure
+
+```
+ci/
+│
+├── app/
+│   ├── app.py
+│   ├── Dockerfile
+│   ├── test_app.py
+│   └── .git/
+│
+└── build.sh
+```
+
+Each file has a purpose.
+
+---
+
+# app.py
+
+Contains the Flask application.
+
+Endpoints
+
+```
+/health
+
+/predict
+```
+
+Runs on
+
+```
+8086
+```
+
+This file was already correct.
+
+---
+
+# test_app.py
+
+Contains automated tests.
+
+There were three tests.
+
+```
+Health Endpoint
+
+Fraud Detection Endpoint
+
+Pass-through Endpoint
+```
+
+Pytest executes these tests.
+
+No modification required.
+
+---
+
+# Dockerfile
+
+Responsible for creating Docker image.
+
+Typical flow
+
+```
+FROM python:3.11-slim
+
+Install Flask
+
+Copy app.py
+
+Expose 8086
+
+Run Flask application
+```
+
+Already correct.
+
+---
+
+# Local Git Repository
+
+Inside
+
+```
+app/.git
+```
+
+Git repository already existed.
+
+Current commit SHA was used for Docker image tagging.
+
+Example
+
+```
+git -C app rev-parse --short HEAD
+```
+
+Output
+
+```
+d39b0ab
+```
+
+That value becomes Docker tag.
+
+---
+
+# Docker Registry
+
+Instead of Docker Hub we used a local registry.
+
+Container already running.
+
+```
+registry:2
+```
+
+Container name
+
+```
+local-registry
+```
+
+Port
+
+```
+5555
+```
+
+Registry URL
+
+```
+localhost:5555
+```
+
+---
+
+# Understanding build.sh
+
+Pipeline consisted of four stages.
+
+```
+Stage 1
+
+Testing
+
+↓
+
+Stage 2
+
+Building
+
+↓
+
+Stage 3
+
+Tagging
+
+↓
+
+Stage 4
+
+Pushing
+```
+
+---
+
+# Script Header
+
+```bash
+#!/bin/bash
+```
+
+Specifies Bash interpreter.
+
+---
+
+# Error Handling
+
+```bash
+set -euo pipefail
+```
+
+This is considered best practice.
+
+Let's understand every option.
+
+---
+
+## -e
+
+```
+Exit immediately if any command fails.
+```
+
+Without it
+
+```
+Command fails
+
+↓
+
+Script continues
+
+↓
+
+Unexpected behaviour
+```
+
+With it
+
+```
+Command fails
+
+↓
+
+Script stops immediately
+```
+
+---
+
+## -u
+
+Treat undefined variables as errors.
+
+Example
+
+```bash
+echo $NAME
+```
+
+If NAME does not exist
+
+Without
+
+```
+Nothing printed.
+```
+
+With
+
+```
+Undefined variable error
+```
+
+Very useful for catching typos.
+
+---
+
+## pipefail
+
+Normally
+
+```
+A | B | C
+```
+
+Only last command determines success.
+
+With pipefail
+
+Entire pipeline fails if any command fails.
+
+---
+
+# Change Directory
+
+```bash
+cd "$(dirname "$0")"
+```
+
+Very important.
+
+Suppose script exists
+
+```
+/root/code/ci/build.sh
+```
+
+Running
+
+```
+./build.sh
+```
+
+works.
+
+But
+
+```
+/root/code/ci/build.sh
+```
+
+from another directory may fail.
+
+This line ensures script always executes from its own directory.
+
+---
+
+# Variables
+
+```bash
+IMAGE="ml-ci-app"
+```
+
+Stores Docker image name.
+
+Later reused as
+
+```
+ml-ci-app:latest
+```
+
+---
+
+```bash
+REGISTRY="localhost:5555"
+```
+
+Stores Docker registry.
+
+Using variables makes scripts reusable.
+
+Instead of changing multiple lines
+
+Only one variable changes.
+
+---
+
+# Stage 1
+
+Testing
+
+Original
+
+```bash
+python3 -m pytest app/tests/
+```
+
+Problem
+
+Directory
+
+```
+tests/
+```
+
+did not exist.
+
+Actual file
+
+```
+test_app.py
+```
+
+Correct
+
+```bash
+python3 -m pytest app/test_app.py
+```
+
+---
+
+# Why Testing First?
+
+CI pipelines always execute tests before building.
+
+Reason
+
+No point creating Docker images if application is already broken.
+
+Correct order
+
+```
+Run Tests
+
+↓
+
+Pass
+
+↓
+
+Build Image
+```
+
+Incorrect order
+
+```
+Build Image
+
+↓
+
+Run Tests
+
+↓
+
+Fail
+
+↓
+
+Wasted build time
+```
+
+---
+
+# Stage 2
+
+Building Docker Image
+
+Command
+
+```bash
+docker build -t ml-ci-app:latest app/
+```
+
+Let's understand every part.
+
+```
+docker build
+```
+
+Starts Docker build.
+
+```
+-t
+```
+
+Assigns image tag.
+
+```
+ml-ci-app:latest
+```
+
+Image name.
+
+```
+app/
+```
+
+Build context.
+
+Docker reads Dockerfile from here.
+
+---
+
+# Docker Build Process
+
+Docker performs
+
+```
+Read Dockerfile
+
+↓
+
+Download Base Image
+
+↓
+
+Install Packages
+
+↓
+
+Copy Files
+
+↓
+
+Create Layers
+
+↓
+
+Produce Final Image
+```
+
+---
+
+# Verify Image
+
+```bash
+docker images
+```
+
+Output
+
+```
+REPOSITORY
+
+ml-ci-app
+
+TAG
+
+latest
+```
+
+---
+
+# Stage 3
+
+Tagging
+
+Original
+
+```bash
+SHA=$(git -C app rev-parse --short HEAD)
+```
+
+This retrieves
+
+```
+Current Commit
+
+↓
+
+Short SHA
+
+↓
+
+Store in SHA
+```
+
+Example
+
+```
+2bc41ef
+```
+
+---
+
+# What Does -C Mean?
+
+```bash
+git -C app
+```
+
+Equivalent to
+
+```
+cd app
+
+git command
+
+cd back
+```
+
+Useful inside scripts.
+
+---
+
+# rev-parse
+
+Returns Git object information.
+
+```
+HEAD
+```
+
+means
+
+Latest commit.
+
+---
+
+# --short
+
+Without
+
+```
+2bc41ef6a9a62b839a541c...
+```
+
+With
+
+```
+2bc41ef
+```
+
+Short SHA preferred for Docker tags.
+
+---
+
+# The Bug
+
+Script created
+
+```bash
+SHA
+```
+
+Later used
+
+```bash
+$GIT_SHA
+```
+
+Problem
+
+Variable never existed.
+
+Error
+
+```
+unbound variable
+```
+
+Because
+
+```
+set -u
+```
+
+was enabled.
+
+---
+
+# Correct Statement
+
+```bash
+TAGGED="$REGISTRY/$IMAGE:$SHA"
+```
+
+Result
+
+```
+localhost:5555/ml-ci-app:2bc41ef
+```
+
+---
+
+# Docker Tag
+
+Command
+
+```bash
+docker tag SOURCE DESTINATION
+```
+
+Example
+
+```bash
+docker tag ml-ci-app:latest localhost:5555/ml-ci-app:2bc41ef
+```
+
+No new image created.
+
+Only another reference.
+
+Think of tagging as
+
+```
+Same Book
+
+Different Label
+```
+
+---
+
+# Stage 4
+
+Push
+
+Command
+
+```bash
+docker push "$TAGGED"
+```
+
+Uploads image into registry.
+
+Flow
+
+```
+Local Image
+
+↓
+
+Registry
+
+↓
+
+Available for Deployment
+```
+
+---
+
+# Registry API
+
+Docker registry exposes REST endpoints.
+
+---
+
+## List Repositories
+
+```
+GET
+
+/v2/_catalog
+```
+
+Command
+
+```bash
+curl http://localhost:5555/v2/_catalog
+```
+
+Output
+
+```json
+{
+  "repositories":[
+      "ml-ci-app"
+  ]
+}
+```
+
+---
+
+## List Tags
+
+```
+GET
+
+/v2/ml-ci-app/tags/list
+```
+
+Command
+
+```bash
+curl http://localhost:5555/v2/ml-ci-app/tags/list
+```
+
+Output
+
+```json
+{
+"name":"ml-ci-app",
+"tags":[
+"2bc41ef"
+]
+}
+```
+
+---
+
+# Why Git SHA Tagging?
+
+Using latest only
+
+```
+latest
+
+latest
+
+latest
+```
+
+Impossible to know which commit created image.
+
+Using Git SHA
+
+```
+2bc41ef
+
+ab910ef
+
+92bd001
+```
+
+Every image becomes traceable.
+
+Benefits
+
+- Rollback
+- Version Tracking
+- Debugging
+- Auditing
+- Deployment History
+
+---
+
+# Complete Pipeline
+
+```
+Git Commit
+
+↓
+
+Pytest
+
+↓
+
+Docker Build
+
+↓
+
+Git SHA
+
+↓
+
+Docker Tag
+
+↓
+
+Docker Push
+
+↓
+
+Registry
+
+↓
+
+Deployment
+```
+
+---
+
+# Final Correct Script
+
+```bash
+#!/bin/bash
+
+set -euo pipefail
+
+cd "$(dirname "$0")"
+
+IMAGE="ml-ci-app"
+REGISTRY="localhost:5555"
+
+echo "[ci] stage 1/4 — running tests"
+python3 -m pytest app/test_app.py
+
+echo "[ci] stage 2/4 — building image"
+docker build -t "$IMAGE:latest" app/
+
+echo "[ci] stage 3/4 — tagging"
+SHA=$(git -C app rev-parse --short HEAD)
+TAGGED="$REGISTRY/$IMAGE:$SHA"
+docker tag "$IMAGE:latest" "$TAGGED"
+
+echo "[ci] stage 4/4 — pushing"
+docker push "$TAGGED"
+
+echo "[ci] complete: $TAGGED"
+```
+
+---
+
+# Verification Commands
+
+Verify local image
+
+```bash
+docker images ml-ci-app
+```
+
+Verify registry catalog
+
+```bash
+curl http://localhost:5555/v2/_catalog
+```
+
+Verify image tags
+
+```bash
+curl http://localhost:5555/v2/ml-ci-app/tags/list
+```
+
+Verify Git SHA
+
+```bash
+git -C app rev-parse --short HEAD
+```
+
+Both SHA values must match.
+
+---
+
+# Common Interview Questions
+
+## Why use `set -euo pipefail`?
+
+To make shell scripts fail fast and catch errors early.
+
+---
+
+## Why tag Docker images with Git SHA?
+
+To uniquely identify the source code version that produced the image.
+
+---
+
+## Difference between `docker build` and `docker tag`?
+
+- `docker build` creates a new image.
+- `docker tag` creates another reference (name/tag) to an existing image.
+
+---
+
+## Why run tests before building?
+
+To avoid wasting time and resources building images for broken code.
+
+---
+
+## What is Docker Registry?
+
+A service that stores Docker images so they can be pulled by other systems or deployment platforms.
+
+---
+
+## What does `git rev-parse --short HEAD` do?
+
+It returns the short commit hash of the latest commit (`HEAD`) in the Git repository.
+
+---
+
+# Key Takeaways
+
+- CI pipelines automate testing, building, tagging, and publishing applications.
+- `set -euo pipefail` improves shell script reliability.
+- Always verify file paths used in scripts.
+- Docker images are typically tagged with Git SHAs for traceability.
+- A Docker registry stores versioned container images for deployment.
+- REST API endpoints like `/v2/_catalog` and `/v2/<image>/tags/list` help verify pushed images.
+- Shell variables should be used consistently to avoid runtime errors.
+- Running tests before building is a standard CI/CD best practice.
 ---
 
