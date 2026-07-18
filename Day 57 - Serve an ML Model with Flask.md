@@ -164,3 +164,13 @@ The responses should return different `is_fraud` values, confirming that the mod
 Successfully deployed a Flask-based prediction API for a fraud detection model, exposed health and prediction endpoints, verified model inference with multiple payloads, and configured the application to run on the required **8085** port.
 
 ### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/fbbc20a6-8b6e-4760-a0c6-c7086fc8a617" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/2f475f5f-e677-42e2-9fcd-c232678b28ac" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/13051ebc-c442-4199-9ff2-a2555aa8728c" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/e20a5eed-b5a0-412e-9435-9e84e9350e7f" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/b5dc00ac-8d50-461c-ae51-35a6078ee26c" />
+
+
+
+
+
