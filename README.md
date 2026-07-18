@@ -70,4 +70,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 56: Fix a Docker CI Pipeline with Git-SHA Tagging](./Day%2056%20-%20Fix%20a%20Docker%20CI%20Pipeline%20with%20Git-SHA%20Tagging.md)
 
+- [Day 57: Serve an ML Model with Flask](./Day%2057%20-%20Serve%20an%20ML%20Model%20with%20Flask.md)
+
 ---

@@ -8147,5 +8147,749 @@ It returns the short commit hash of the latest commit (`HEAD`) in the Git reposi
 - REST API endpoints like `/v2/_catalog` and `/v2/<image>/tags/list` help verify pushed images.
 - Shell variables should be used consistently to avoid runtime errors.
 - Running tests before building is a standard CI/CD best practice.
+
+# Day 57 Notes: Serving a Machine Learning Model with Flask
+
+# Introduction
+
+Machine Learning models are useful only when they can be used by other applications. Training a model is just one part of the ML lifecycle. The next important step is **serving** the trained model so that applications, websites, mobile apps, or other services can make predictions.
+
+In this lab, we used **Flask**, a lightweight Python web framework, to expose a trained fraud detection model through an HTTP API.
+
+The API exposes two endpoints:
+
+- `/health` – Used to verify that the service is running.
+- `/predict` – Used to send transaction data and receive a fraud prediction.
+
+---
+
+# What is Model Serving?
+
+Model Serving is the process of making a trained machine learning model available through an interface such as:
+
+- REST API
+- gRPC
+- Batch jobs
+- Message queues
+
+Instead of running Python scripts manually, clients send requests over HTTP.
+
+Example:
+
+```
+Mobile App
+      │
+      ▼
+ REST API (Flask)
+      │
+      ▼
+ Machine Learning Model
+      │
+      ▼
+ Prediction
+```
+
+---
+
+# Why Use Flask?
+
+Flask is a lightweight web framework for Python.
+
+Advantages:
+
+- Very small
+- Easy to learn
+- Easy to build REST APIs
+- Excellent for ML inference services
+- Works well with libraries like NumPy, Pandas and Scikit-Learn
+
+Install Flask
+
+```bash
+pip install flask
+```
+
+---
+
+# Project Structure
+
+```
+serving/
+│
+├── app.py
+├── model.pkl
+└── train.csv
+```
+
+### app.py
+
+Contains the Flask application.
+
+### model.pkl
+
+Serialized trained machine learning model.
+
+### train.csv
+
+Dataset that was used for training.
+
+---
+
+# Understanding model.pkl
+
+A machine learning model is trained once.
+
+Training may take:
+
+- Minutes
+- Hours
+- Days
+
+Instead of retraining every time the server starts, we save the trained model.
+
+Python uses **Joblib** to serialize the model.
+
+```
+Training
+     │
+     ▼
+RandomForest Model
+     │
+     ▼
+joblib.dump()
+     │
+     ▼
+model.pkl
+```
+
+Later
+
+```
+model.pkl
+     │
+     ▼
+joblib.load()
+     │
+     ▼
+Ready-to-use model
+```
+
+---
+
+# Loading the Model
+
+```python
+import joblib
+
+MODEL = joblib.load("model.pkl")
+```
+
+What happens?
+
+1. Reads model.pkl
+2. Recreates the RandomForest object
+3. Loads all learned parameters
+4. Model becomes ready for prediction
+
+No training happens here.
+
+---
+
+# Creating the Flask App
+
+```python
+from flask import Flask
+
+app = Flask(__name__)
+```
+
+Every Flask application starts by creating an application object.
+
+```
+Browser
+   │
+   ▼
+Flask App
+   │
+   ▼
+Routes
+```
+
+---
+
+# What is a Route?
+
+A route connects a URL with a Python function.
+
+Example
+
+```python
+@app.route("/health")
+def health():
+    ...
+```
+
+When a request comes to
+
+```
+GET /health
+```
+
+Flask executes
+
+```python
+health()
+```
+
+---
+
+# HTTP Methods
+
+There are several HTTP methods.
+
+GET
+
+Used for retrieving information.
+
+Example
+
+```
+GET /health
+```
+
+POST
+
+Used for sending data.
+
+Example
+
+```
+POST /predict
+```
+
+PUT
+
+Updates existing data.
+
+DELETE
+
+Deletes data.
+
+---
+
+# Health Endpoint
+
+```python
+@app.route("/health")
+def health():
+    return jsonify({"status":"ok"}),200
+```
+
+Purpose
+
+Health endpoints are used by
+
+- Kubernetes
+- Docker
+- Load Balancers
+- Monitoring tools
+
+to verify that the service is alive.
+
+Response
+
+```json
+{
+    "status":"ok"
+}
+```
+
+---
+
+# Understanding POST /predict
+
+A prediction endpoint receives user input.
+
+Example
+
+```json
+{
+    "amount":3200,
+    "hour":23,
+    "num_tx_past_day":5
+}
+```
+
+The endpoint performs
+
+Input
+
+↓
+
+Validation
+
+↓
+
+Feature Vector
+
+↓
+
+Model Prediction
+
+↓
+
+JSON Response
+
+---
+
+# Reading JSON Data
+
+```python
+data = request.get_json()
+```
+
+Suppose client sends
+
+```json
+{
+    "amount":3200,
+    "hour":23,
+    "num_tx_past_day":5
+}
+```
+
+Then
+
+```python
+data
+```
+
+becomes
+
+```python
+{
+    "amount":3200,
+    "hour":23,
+    "num_tx_past_day":5
+}
+```
+
+---
+
+# Accessing Values
+
+```python
+amount = data["amount"]
+hour = data["hour"]
+transactions = data["num_tx_past_day"]
+```
+
+Now
+
+```
+amount = 3200
+
+hour = 23
+
+transactions = 5
+```
+
+---
+
+# Creating Feature Array
+
+Scikit-Learn expects
+
+```
+(number_of_samples, number_of_features)
+```
+
+Since only one transaction is predicted
+
+```
+Samples = 1
+```
+
+Features
+
+- amount
+- hour
+- num_tx_past_day
+
+So
+
+```python
+features = np.array([
+    [
+        amount,
+        hour,
+        transactions
+    ]
+])
+```
+
+Shape
+
+```
+(1,3)
+```
+
+Visual representation
+
+```
+┌──────────────────────┐
+│3200 23 5             │
+└──────────────────────┘
+```
+
+---
+
+# Why NumPy?
+
+Scikit-Learn works internally with NumPy arrays.
+
+Advantages
+
+- Fast
+- Memory efficient
+- Vectorized operations
+- Standard format for ML libraries
+
+---
+
+# Making Prediction
+
+```python
+prediction = MODEL.predict(features)
+```
+
+Returns
+
+```
+array([1])
+```
+
+or
+
+```
+array([0])
+```
+
+Since JSON cannot serialize NumPy integers properly
+
+Convert
+
+```python
+prediction = int(prediction[0])
+```
+
+Now
+
+```
+1
+```
+
+or
+
+```
+0
+```
+
+---
+
+# Returning JSON
+
+```python
+return jsonify({
+    "is_fraud": prediction
+}),200
+```
+
+Flask automatically sets
+
+```
+Content-Type
+
+application/json
+```
+
+---
+
+# Complete Predict Function
+
+```python
+@app.route("/predict", methods=["POST"])
+def predict():
+    data = request.get_json()
+
+    features = np.array([[
+        data["amount"],
+        data["hour"],
+        data["num_tx_past_day"]
+    ]])
+
+    prediction = int(MODEL.predict(features)[0])
+
+    return jsonify({
+        "is_fraud": prediction
+    }),200
+```
+
+---
+
+# Running Flask
+
+```python
+app.run(
+    host="0.0.0.0",
+    port=8085
+)
+```
+
+Meaning
+
+Host
+
+```
+0.0.0.0
+```
+
+Accept requests from every network interface.
+
+Port
+
+```
+8085
+```
+
+Application listens on TCP port 8085.
+
+---
+
+# Why Not localhost?
+
+```
+127.0.0.1
+```
+
+means
+
+Only local machine.
+
+```
+0.0.0.0
+```
+
+means
+
+Accept connections from
+
+- Localhost
+- Docker
+- Kubernetes
+- Remote machines
+- Port forwarding
+
+---
+
+# Testing with curl
+
+Health
+
+```bash
+curl http://localhost:8085/health
+```
+
+Response
+
+```json
+{
+    "status":"ok"
+}
+```
+
+Prediction
+
+```bash
+curl -X POST http://localhost:8085/predict \
+-H "Content-Type: application/json" \
+-d '{"amount":3200,"hour":23,"num_tx_past_day":5}'
+```
+
+Low-risk transaction
+
+```bash
+curl -X POST http://localhost:8085/predict \
+-H "Content-Type: application/json" \
+-d '{"amount":25.5,"hour":10,"num_tx_past_day":1}'
+```
+
+---
+
+# Request Flow
+
+```
+Client
+
+     │
+
+POST /predict
+
+     │
+
+Flask
+
+     │
+
+request.get_json()
+
+     │
+
+NumPy Array
+
+     │
+
+MODEL.predict()
+
+     │
+
+Prediction
+
+     │
+
+JSON Response
+
+     │
+
+Client
+```
+
+---
+
+# Common Mistakes
+
+## Wrong Port
+
+Using
+
+```python
+5000
+```
+
+instead of
+
+```python
+8085
+```
+
+Lab fails because the grader checks port 8085.
+
+---
+
+## Forgetting POST Method
+
+Wrong
+
+```python
+@app.route("/predict")
+```
+
+Correct
+
+```python
+@app.route("/predict", methods=["POST"])
+```
+
+---
+
+## Using List Instead of 2D Array
+
+Wrong
+
+```python
+MODEL.predict([1,2,3])
+```
+
+Correct
+
+```python
+MODEL.predict([[1,2,3]])
+```
+
+---
+
+## Forgetting int()
+
+Wrong
+
+```python
+return prediction
+```
+
+Prediction is
+
+```
+numpy.int64
+```
+
+Correct
+
+```python
+int(prediction[0])
+```
+
+---
+
+## Forgetting jsonify()
+
+Wrong
+
+```python
+return {
+    "is_fraud":1
+}
+```
+
+Preferred
+
+```python
+return jsonify({
+    "is_fraud":1
+})
+```
+
+---
+
+# Real-World Applications
+
+The same architecture is used for:
+
+- Fraud Detection
+- Loan Approval
+- Credit Scoring
+- Spam Detection
+- Recommendation Systems
+- Face Recognition
+- Disease Prediction
+- Stock Market Prediction
+- Customer Churn Prediction
+- Insurance Risk Analysis
+
+---
+
+# Key Takeaways
+
+- A trained ML model is loaded from `model.pkl` using Joblib.
+- Flask is used to expose the model as a REST API.
+- `/health` confirms the service is running.
+- `/predict` accepts transaction details in JSON format.
+- JSON data is converted into a NumPy feature array before prediction.
+- `MODEL.predict()` returns the prediction.
+- The prediction is converted to a Python integer and returned as JSON.
+- Flask runs on `0.0.0.0:8085` so the service is accessible through the required port.
+- `curl` is a simple way to test REST APIs from the command line.
+- This workflow represents a standard pattern for deploying machine learning models in production environments.
+
+
 ---
 
