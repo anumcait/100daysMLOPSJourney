@@ -129,3 +129,15 @@ HTTP 422 Unprocessable Entity
 Successfully deployed a FastAPI inference service capable of validating incoming requests, serving predictions from a trained fraud detection model, recording prediction history, and exposing interactive API documentation through Swagger UI.
 
 ### Screenshots
+
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/465c1263-94e0-4af2-8d30-6c5094a9ba27" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/9c29579f-8d42-46df-a58d-8a10bb92c530" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/722202bb-7eb5-4ccf-b189-afb859f6f84d" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/ec4181ca-7022-4255-a61b-7f9a76252db8" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/8f72e691-0397-42c6-91a0-c8e3b628c46c" />
+
+
+
+
+
+
