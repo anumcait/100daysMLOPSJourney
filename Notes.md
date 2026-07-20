@@ -8891,5 +8891,894 @@ The same architecture is used for:
 - This workflow represents a standard pattern for deploying machine learning models in production environments.
 
 
+# FastAPI Model Serving – Complete Notes
+
+# Day 58: Serving a Machine Learning Model with FastAPI
+
+---
+
+# Introduction
+
+Building a Machine Learning model is only one part of an ML project. A trained model becomes useful only when users or applications can access it.
+
+This process is called **Model Serving**.
+
+Instead of asking users to run Python scripts manually, we expose the model through an API so any application can send data and receive predictions.
+
+Example:
+
+```
+Mobile App
+      │
+      ▼
+ FastAPI Server
+      │
+      ▼
+ Machine Learning Model
+      │
+      ▼
+Prediction Returned
+```
+
+FastAPI is one of the most popular Python frameworks for serving ML models because it is:
+
+- Extremely fast
+- Easy to write
+- Automatically generates API documentation
+- Supports request validation
+- Uses Python type hints
+
+---
+
+# What is FastAPI?
+
+FastAPI is a modern web framework for building APIs with Python.
+
+Unlike Flask or Django, FastAPI automatically:
+
+- validates user input
+- converts JSON into Python objects
+- generates API documentation
+- checks data types
+- returns useful error messages
+
+Example:
+
+```python
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/")
+def home():
+    return {"message":"Hello"}
+```
+
+Running this server automatically creates
+
+```
+/docs
+```
+
+which contains interactive Swagger UI.
+
+---
+
+# What is Model Serving?
+
+Suppose we trained a fraud detection model.
+
+Normally we would predict like this:
+
+```python
+prediction = model.predict(data)
+```
+
+But users cannot execute our Python file.
+
+Instead we create an API.
+
+User sends
+
+```json
+{
+    "amount":500,
+    "hour":14,
+    "num_tx_past_day":2
+}
+```
+
+Server predicts
+
+```json
+{
+    "is_fraud":0
+}
+```
+
+The user never sees the model.
+
+They only communicate through HTTP.
+
+---
+
+# Project Structure
+
+```
+serving/
+
+│
+├── app.py
+├── model.pkl
+└── train.csv
+```
+
+---
+
+## model.pkl
+
+Contains the trained Random Forest model.
+
+It has already learned fraud detection patterns.
+
+We simply load it.
+
+```python
+MODEL = joblib.load("model.pkl")
+```
+
+Loading is much faster than training every time.
+
+---
+
+## train.csv
+
+Contains the data used for training.
+
+It is not needed during prediction.
+
+It only helped create
+
+```
+model.pkl
+```
+
+---
+
+## app.py
+
+Main FastAPI application.
+
+Everything happens here.
+
+---
+
+# Loading Libraries
+
+```python
+from fastapi import FastAPI
+```
+
+Creates the web application.
+
+---
+
+```python
+from pydantic import BaseModel
+```
+
+Creates request and response schemas.
+
+---
+
+```python
+import numpy as np
+```
+
+Used to create arrays for prediction.
+
+---
+
+```python
+import joblib
+```
+
+Loads saved ML models.
+
+---
+
+# Loading the Model
+
+```python
+MODEL = joblib.load(MODEL_PATH)
+```
+
+The model is loaded once.
+
+If we loaded it inside every request,
+
+```
+Request 1
+Load model
+Predict
+
+Request 2
+Load model
+Predict
+
+Request 3
+Load model
+Predict
+```
+
+This would be slow.
+
+Instead
+
+```
+Start Server
+↓
+
+Load Model Once
+↓
+
+Keep in Memory
+↓
+
+Serve Thousands of Requests
+```
+
+---
+
+# Creating FastAPI App
+
+```python
+app = FastAPI()
+```
+
+This creates the API server.
+
+Every endpoint belongs to this app.
+
+---
+
+# Request vs Response
+
+Suppose client sends
+
+```json
+{
+    "amount":100,
+    "hour":15,
+    "num_tx_past_day":1
+}
+```
+
+This is the
+
+**Request**
+
+Server processes it.
+
+Server returns
+
+```json
+{
+    "is_fraud":0
+}
+```
+
+This is the
+
+**Response**
+
+---
+
+# Why Use Pydantic?
+
+Without validation
+
+User could send
+
+```json
+{
+    "amount":"hello"
+}
+```
+
+Your ML model crashes.
+
+Instead
+
+Pydantic validates automatically.
+
+Invalid requests never reach the prediction function.
+
+---
+
+# PredictRequest Model
+
+```python
+class PredictRequest(BaseModel):
+```
+
+Represents incoming JSON.
+
+---
+
+## amount
+
+```python
+amount: float = Field(..., ge=0)
+```
+
+Meaning
+
+Must be
+
+- decimal
+- integer
+- positive
+
+Allowed
+
+```
+50
+
+50.5
+
+1000
+```
+
+Rejected
+
+```
+-50
+
+"abc"
+
+null
+```
+
+---
+
+## ge
+
+Means
+
+Greater than or Equal
+
+```
+ge=0
+```
+
+Means
+
+```
+0 ✔
+
+1 ✔
+
+500 ✔
+
+-5 ✘
+```
+
+---
+
+# hour
+
+```python
+hour: int = Field(..., ge=0, le=23)
+```
+
+Represents hour of day.
+
+Valid values
+
+```
+0
+1
+2
+...
+23
+```
+
+Invalid
+
+```
+24
+
+25
+
+-1
+```
+
+---
+
+# le
+
+Means
+
+Less than or Equal
+
+```
+le=23
+```
+
+---
+
+# num_tx_past_day
+
+```python
+num_tx_past_day: int = Field(..., ge=0)
+```
+
+Cannot be negative.
+
+Allowed
+
+```
+0
+
+5
+
+20
+```
+
+Rejected
+
+```
+-3
+```
+
+---
+
+# Automatic Validation
+
+Suppose user sends
+
+```json
+{
+    "hour":25
+}
+```
+
+FastAPI immediately returns
+
+```
+422 Unprocessable Entity
+```
+
+Our prediction function never runs.
+
+This is one of FastAPI's biggest advantages.
+
+---
+
+# PredictResponse
+
+```python
+class PredictResponse(BaseModel):
+```
+
+Defines output.
+
+```python
+{
+    "is_fraud":1
+}
+```
+
+Nothing more.
+
+---
+
+# Prediction Endpoint
+
+```python
+@app.post("/predict")
+```
+
+Creates
+
+```
+POST /predict
+```
+
+POST is used because client sends data.
+
+---
+
+# Request Object
+
+```python
+def predict(req: PredictRequest):
+```
+
+FastAPI automatically converts JSON into
+
+```
+req.amount
+
+req.hour
+
+req.num_tx_past_day
+```
+
+No manual parsing required.
+
+---
+
+# Creating Feature Matrix
+
+Scikit-learn expects
+
+```
+Rows × Columns
+```
+
+Not
+
+```
+[100,12,3]
+```
+
+Instead
+
+```
+[[100,12,3]]
+```
+
+One row
+
+Three columns
+
+Code
+
+```python
+features = np.array([
+    [
+        req.amount,
+        req.hour,
+        req.num_tx_past_day
+    ]
+])
+```
+
+Shape becomes
+
+```
+(1,3)
+```
+
+Exactly what sklearn expects.
+
+---
+
+# Prediction
+
+```python
+MODEL.predict(features)
+```
+
+Returns
+
+```
+array([1])
+```
+
+We only need
+
+```
+1
+```
+
+Hence
+
+```python
+prediction = int(MODEL.predict(features)[0])
+```
+
+---
+
+# Why [0]?
+
+Because sklearn always predicts for multiple rows.
+
+Example
+
+```
+[[1,2,3],
+ [4,5,6]]
+```
+
+Returns
+
+```
+array([0,1])
+```
+
+For one row
+
+```
+array([1])
+```
+
+First prediction
+
+```
+[0]
+```
+
+---
+
+# Recording Prediction History
+
+```python
+prediction_history.append(...)
+```
+
+Stores
+
+```
+Amount
+
+Hour
+
+Transactions
+
+Prediction
+```
+
+Useful for auditing.
+
+Example
+
+```python
+[
+ {
+   "amount":100,
+   "hour":12,
+   "num_tx_past_day":3,
+   "is_fraud":0
+ }
+]
+```
+
+---
+
+# Returning Response
+
+```python
+return PredictResponse(
+    is_fraud=prediction
+)
+```
+
+FastAPI converts this into JSON.
+
+---
+
+# Health Endpoint
+
+```python
+GET /health
+```
+
+Returns
+
+```json
+{
+    "status":"ok"
+}
+```
+
+Used by monitoring tools.
+
+---
+
+# Swagger UI
+
+FastAPI automatically generates
+
+```
+/docs
+```
+
+No extra code needed.
+
+You can
+
+- test APIs
+- see schemas
+- view request examples
+- inspect responses
+
+---
+
+# Redirect Endpoint
+
+```python
+@app.get("/")
+```
+
+Instead of showing nothing,
+
+it redirects
+
+```
+/
+```
+
+to
+
+```
+/docs
+```
+
+Better user experience.
+
+---
+
+# Running the Server
+
+Using uvicorn
+
+```bash
+uvicorn app:app --host 0.0.0.0 --port 8085
+```
+
+Server becomes available at
+
+```
+http://localhost:8085
+```
+
+Swagger
+
+```
+http://localhost:8085/docs
+```
+
+---
+
+# Example Request
+
+```json
+{
+    "amount":3200,
+    "hour":23,
+    "num_tx_past_day":5
+}
+```
+
+Possible response
+
+```json
+{
+    "is_fraud":1
+}
+```
+
+---
+
+# Another Request
+
+```json
+{
+    "amount":25.5,
+    "hour":10,
+    "num_tx_past_day":1
+}
+```
+
+Response
+
+```json
+{
+    "is_fraud":0
+}
+```
+
+---
+
+# Invalid Request
+
+```json
+{
+    "hour":25
+}
+```
+
+FastAPI returns
+
+```
+422
+```
+
+because
+
+```
+25 > 23
+```
+
+Validation happens before prediction.
+
+---
+
+# Request Flow
+
+```
+Client
+   │
+   ▼
+POST /predict
+   │
+   ▼
+Pydantic Validation
+   │
+   ▼
+FastAPI
+   │
+   ▼
+NumPy Feature Array
+   │
+   ▼
+Random Forest Model
+   │
+   ▼
+Prediction
+   │
+   ▼
+Store History
+   │
+   ▼
+Return JSON
+```
+
+---
+
+# Why FastAPI is Excellent for ML Deployment
+
+- Very high performance
+- Automatic validation
+- Automatic OpenAPI generation
+- Interactive Swagger documentation
+- Easy integration with scikit-learn
+- Built-in type checking
+- Simple syntax
+- Production-ready
+
+---
+
+# Important Concepts Learned
+
+- Machine Learning Model Serving
+- REST APIs
+- FastAPI
+- Uvicorn
+- HTTP Methods (GET and POST)
+- Request Body
+- Response Model
+- Pydantic Validation
+- Field Constraints (`ge`, `le`)
+- Swagger UI
+- JSON Serialization
+- NumPy Feature Arrays
+- Loading Models with Joblib
+- Scikit-learn Prediction
+- Prediction Logging
+- API Documentation
+- HTTP Status Codes
+- Input Validation
+
+---
+
+# Summary
+
+In this project, we converted a trained Random Forest fraud detection model into a production-style REST API using FastAPI. The application loads the trained model only once at startup, validates incoming requests using Pydantic, converts transaction data into the format expected by scikit-learn, performs predictions, stores prediction history, and returns results as JSON responses. FastAPI automatically provides interactive Swagger documentation, making the API easy to test and integrate with other applications while ensuring invalid inputs are rejected before reaching the model.
+
+
 ---
 

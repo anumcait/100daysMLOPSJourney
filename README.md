@@ -72,4 +72,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 57: Serve an ML Model with Flask](./Day%2057%20-%20Serve%20an%20ML%20Model%20with%20Flask.md)
 
+- [Day 58: Serve an ML Model with FastAPI](./Day%2058%20-%20Serve%20an%20ML%20Model%20with%20FastAPI.md)
+
 ---
