@@ -9779,6 +9779,763 @@ Return JSON
 
 In this project, we converted a trained Random Forest fraud detection model into a production-style REST API using FastAPI. The application loads the trained model only once at startup, validates incoming requests using Pydantic, converts transaction data into the format expected by scikit-learn, performs predictions, stores prediction history, and returns results as JSON responses. FastAPI automatically provides interactive Swagger documentation, making the API easy to test and integrate with other applications while ensuring invalid inputs are rejected before reaching the model.
 
+# Day 59: Batch Predictions Using a Pre-Trained Machine Learning Model
+
+## Introduction
+
+In this task, we are working with a machine learning inference pipeline.
+
+The ML platform team at **xFusionCorp Industries** has already trained a fraud detection model using a RandomForest algorithm. The model is stored as a serialized file (`model.pkl`).
+
+Our responsibility is not to train the model. Instead, we need to perform **batch inference**.
+
+Batch inference means:
+
+- We receive a group of input records at once.
+- We pass every record through the trained model.
+- We generate predictions for all records.
+- We save the results for further processing.
+
+This is different from real-time prediction, where one request is processed at a time through an API.
+
+---
+
+# Project Structure
+
+The project exists inside:
+
+```text
+/root/code/serving/
+```
+
+The files are:
+
+```text
+/root/code/serving/
+│
+├── model.pkl
+├── input.csv
+├── batch_predict.py
+└── predictions.csv
+```
+
+---
+
+# Understanding Each File
+
+## 1. model.pkl
+
+`model.pkl` is the trained machine learning model.
+
+The model was created using a RandomForest classifier.
+
+It was trained on a synthetic fraud detection dataset with these features:
+
+- `amount`
+- `hour`
+- `num_tx_past_day`
+
+The target label is:
+
+```
+is_fraud
+```
+
+The model learned patterns from historical transaction data and can now classify new transactions.
+
+The output classes are:
+
+```
+0 = Not Fraud
+1 = Fraud
+```
+
+The model file is serialized using Python's `joblib` library.
+
+Serialization means:
+
+- Convert a trained Python object into a file.
+- Store it permanently.
+- Load it later without retraining.
+
+---
+
+# 2. input.csv
+
+This file contains the new transaction data that needs predictions.
+
+Example:
+
+```csv
+amount,hour,num_tx_past_day
+1200,10,5
+50,22,1
+8000,2,15
+```
+
+Important points:
+
+- It contains only feature columns.
+- It does not contain the target label.
+- The model will predict the missing label.
+
+The columns are:
+
+| Column | Meaning |
+|---|---|
+| amount | Transaction amount |
+| hour | Hour of transaction |
+| num_tx_past_day | Number of previous transactions in the day |
+
+---
+
+# 3. batch_predict.py
+
+This is the inference script.
+
+Its job is:
+
+1. Load the trained model.
+2. Read new transaction data.
+3. Select required features.
+4. Generate predictions.
+5. Save predictions.
+
+---
+
+# Importing Required Libraries
+
+The script starts with:
+
+```python
+import joblib
+import pandas as pd
+```
+
+## joblib
+
+`joblib` is used for loading the trained machine learning model.
+
+Example:
+
+```python
+model = joblib.load("model.pkl")
+```
+
+It restores the saved RandomForest object.
+
+---
+
+## pandas
+
+Pandas is used for working with CSV files and tables.
+
+It provides:
+
+- Reading CSV files
+- Selecting columns
+- Adding new columns
+- Writing output files
+
+Example:
+
+```python
+df = pd.read_csv("input.csv")
+```
+
+---
+
+# File Path Configuration
+
+The script contains:
+
+```python
+MODEL_PATH = "/root/code/serving/model.pkl"
+
+INPUT_CSV = "/root/code/serving/input.csv"
+
+OUTPUT_CSV = "/root/code/serving/predictions.csv"
+```
+
+These constants store the locations of:
+
+- The trained model
+- The input dataset
+- The output prediction file
+
+Using constants makes the script easier to maintain.
+
+If the file location changes, we only update one place.
+
+---
+
+# Loading the Machine Learning Model
+
+Code:
+
+```python
+model = joblib.load(MODEL_PATH)
+```
+
+What happens internally:
+
+1. Python opens `model.pkl`.
+2. The serialized RandomForest object is restored.
+3. The model is ready to make predictions.
+
+At this stage:
+
+```
+model
+ |
+ |
+ RandomForest Classifier
+ |
+ |
+ Ready for inference
+```
+
+---
+
+# Reading Input Data
+
+Code:
+
+```python
+df = pd.read_csv(INPUT_CSV)
+```
+
+This loads the CSV file into a pandas DataFrame.
+
+A DataFrame is a table-like structure.
+
+Example:
+
+Before loading:
+
+```csv
+amount,hour,num_tx_past_day
+100,9,2
+500,15,4
+```
+
+After loading:
+
+```
+   amount  hour  num_tx_past_day
+
+0    100     9          2
+1    500    15          4
+```
+
+---
+
+# Selecting Feature Columns
+
+The model was trained using:
+
+```
+amount
+hour
+num_tx_past_day
+```
+
+Therefore, prediction input must contain exactly these columns.
+
+Code:
+
+```python
+features = df[
+    [
+        "amount",
+        "hour",
+        "num_tx_past_day"
+    ]
+]
+```
+
+Why select columns?
+
+Because:
+
+- The model expects the same features used during training.
+- Extra columns may cause errors.
+- Missing columns will cause prediction failure.
+
+Machine learning models require the same input format during training and inference.
+
+---
+
+# Generating Predictions
+
+The important step:
+
+```python
+df["prediction"] = model.predict(features)
+```
+
+## predict()
+
+`model.predict()` returns the predicted class.
+
+Example:
+
+Input:
+
+```
+amount = 10000
+hour = 3
+num_tx_past_day = 20
+```
+
+Output:
+
+```
+1
+```
+
+Meaning:
+
+```
+Fraud transaction
+```
+
+Another example:
+
+```
+amount = 20
+hour = 14
+num_tx_past_day = 1
+```
+
+Output:
+
+```
+0
+```
+
+Meaning:
+
+```
+Normal transaction
+```
+
+---
+
+# predict() vs predict_proba()
+
+A very important concept.
+
+## model.predict()
+
+Returns class labels.
+
+Example:
+
+```python
+model.predict(features)
+```
+
+Output:
+
+```text
+[0,1,0,1]
+```
+
+These are final decisions.
+
+---
+
+## model.predict_proba()
+
+Returns probabilities.
+
+Example:
+
+```python
+model.predict_proba(features)
+```
+
+Output:
+
+```text
+[
+ [0.95,0.05],
+ [0.20,0.80]
+]
+```
+
+Meaning:
+
+First transaction:
+
+```
+95% not fraud
+5% fraud
+```
+
+Second transaction:
+
+```
+20% not fraud
+80% fraud
+```
+
+For this task, we need:
+
+```
+0 or 1 labels
+```
+
+Therefore we use:
+
+```python
+model.predict()
+```
+
+not:
+
+```python
+model.predict_proba()
+```
+
+---
+
+# Converting Predictions to Integer
+
+Code:
+
+```python
+.astype(int)
+```
+
+Example:
+
+Before:
+
+```
+0.0
+1.0
+0.0
+```
+
+After:
+
+```
+0
+1
+0
+```
+
+The requirement says:
+
+- Prediction must be an integer class label.
+- It must not be a probability.
+- Values must be only `0` or `1`.
+
+---
+
+# Saving the Output
+
+Code:
+
+```python
+df.to_csv(
+    OUTPUT_CSV,
+    index=False
+)
+```
+
+This creates:
+
+```
+predictions.csv
+```
+
+The output contains:
+
+- Original feature columns
+- New prediction column
+
+Example:
+
+```csv
+amount,hour,num_tx_past_day,prediction
+100,9,2,0
+500,15,4,1
+```
+
+---
+
+# Why index=False?
+
+Without:
+
+```python
+index=False
+```
+
+Pandas adds an extra index column.
+
+Example:
+
+Wrong:
+
+```csv
+,index,amount,hour,prediction
+0,100,9,0
+```
+
+Correct:
+
+```csv
+amount,hour,prediction
+100,9,0
+```
+
+For ML pipelines, extra unwanted columns can create problems.
+
+---
+
+# Complete batch_predict.py Logic
+
+The complete workflow:
+
+```python
+import joblib
+import pandas as pd
+
+MODEL_PATH = "/root/code/serving/model.pkl"
+INPUT_CSV = "/root/code/serving/input.csv"
+OUTPUT_CSV = "/root/code/serving/predictions.csv"
+
+
+model = joblib.load(MODEL_PATH)
+
+df = pd.read_csv(INPUT_CSV)
+
+features = df[
+    [
+        "amount",
+        "hour",
+        "num_tx_past_day"
+    ]
+]
+
+df["prediction"] = model.predict(features).astype(int)
+
+df.to_csv(
+    OUTPUT_CSV,
+    index=False
+)
+
+print(
+    f"Wrote {len(df)} rows to {OUTPUT_CSV}"
+)
+```
+
+---
+
+# Running the Script
+
+Execute:
+
+```bash
+python3 /root/code/serving/batch_predict.py
+```
+
+Expected output:
+
+```text
+Wrote 10 rows to /root/code/serving/predictions.csv
+```
+
+---
+
+# Validation Steps
+
+## Check File Exists
+
+Command:
+
+```bash
+ls -l /root/code/serving/predictions.csv
+```
+
+The file should exist.
+
+---
+
+## View Output
+
+Command:
+
+```bash
+cat /root/code/serving/predictions.csv
+```
+
+Example:
+
+```csv
+amount,hour,num_tx_past_day,prediction
+500,10,3,0
+9000,2,20,1
+```
+
+---
+
+# Requirements Checklist
+
+## Model Loading
+
+Completed:
+
+```python
+joblib.load(MODEL_PATH)
+```
+
+---
+
+## Reading Input
+
+Completed:
+
+```python
+pd.read_csv(INPUT_CSV)
+```
+
+---
+
+## Feature Selection
+
+Completed:
+
+```python
+amount
+hour
+num_tx_past_day
+```
+
+---
+
+## Prediction Generation
+
+Completed:
+
+```python
+model.predict()
+```
+
+---
+
+## Integer Labels
+
+Completed:
+
+```python
+.astype(int)
+```
+
+---
+
+## Output Generation
+
+Completed:
+
+```python
+to_csv(index=False)
+```
+
+---
+
+## Row Count Validation
+
+Input:
+
+```
+10 rows
+```
+
+Output:
+
+```
+10 rows
+```
+
+The number of predictions must always match the number of input transactions.
+
+---
+
+# Key Machine Learning Concepts Learned
+
+## Training vs Inference
+
+Training:
+
+```
+Historical Data
+      |
+      |
+ Machine Learning Algorithm
+      |
+      |
+ Saved Model
+```
+
+Inference:
+
+```
+New Data
+      |
+      |
+ Saved Model
+      |
+      |
+ Prediction
+```
+
+---
+
+## Batch Inference Pipeline
+
+The complete flow:
+
+```
+input.csv
+    |
+    |
+Read Data
+    |
+    |
+Select Features
+    |
+    |
+Load Model
+    |
+    |
+model.predict()
+    |
+    |
+Add Prediction Column
+    |
+    |
+Save predictions.csv
+```
+
+---
+
+# Final Outcome
+
+The fraud detection batch scoring pipeline is successfully implemented.
+
+The system can now:
+
+- Load a trained RandomForest model.
+- Process multiple transactions together.
+- Generate fraud predictions.
+- Store results in a CSV file.
+
+This completes the batch prediction workflow for the ML serving environment.
 
 ---
 

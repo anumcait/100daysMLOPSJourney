@@ -74,4 +74,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 58: Serve an ML Model with FastAPI](./Day%2058%20-%20Serve%20an%20ML%20Model%20with%20FastAPI.md)
 
+- [Day 59: Run Batch Predictions on a Dataset](./Day%2059%20-%20Run%20Batch%20Predictions%20on%20a%20Dataset.md)
+
 ---
