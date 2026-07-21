@@ -104,4 +104,9 @@ The generated `predictions.csv` contains:
 Successfully implemented the batch prediction pipeline for the fraud detection model. The script now performs end-to-end batch inference by loading the trained model, scoring every transaction, and exporting the predictions to a new CSV file.
 
 ### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/d09059a2-649a-4530-9e0a-89da507da136" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/4d568269-1885-48e9-b401-5daa6be5a23c" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/4a6ac81e-8b8c-42dd-950b-2abef3c17a8d" />
+
+
 
