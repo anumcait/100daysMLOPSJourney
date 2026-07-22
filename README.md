@@ -76,4 +76,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 59: Run Batch Predictions on a Dataset](./Day%2059%20-%20Run%20Batch%20Predictions%20on%20a%20Dataset.md)
 
+- [Day 60: Package a Model as a BentoML Service](./Day%2060%20-%20Package%20a%20Model%20as%20a%20BentoML%20Service.md)
+
 ---

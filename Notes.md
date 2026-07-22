@@ -10537,5 +10537,927 @@ The system can now:
 
 This completes the batch prediction workflow for the ML serving environment.
 
+# Day 60 Notes: Packaging and Serving a Machine Learning Model with BentoML
+
+# Introduction
+
+Machine Learning is not complete when a model is trained. A trained model sitting inside a Jupyter Notebook has no practical value until other applications can use it.
+
+This process of making a trained model available to users or applications is called **Model Serving**.
+
+Today we learned how BentoML simplifies this entire deployment process.
+
+---
+
+# What is BentoML?
+
+BentoML is an open-source framework for packaging and serving machine learning models.
+
+Instead of writing an entire web server manually using Flask or FastAPI, BentoML handles most of the infrastructure for us.
+
+It provides:
+
+- Model management
+- Model versioning
+- REST API generation
+- Swagger documentation
+- Production deployment support
+- Multiple framework support
+
+Supported frameworks include:
+
+- Scikit-Learn
+- TensorFlow
+- PyTorch
+- XGBoost
+- LightGBM
+- ONNX
+- HuggingFace Transformers
+
+Think of BentoML as the bridge between your trained model and the real world.
+
+---
+
+# Traditional Deployment vs BentoML
+
+Without BentoML:
+
+```
+Train Model
+      ↓
+Save Model
+      ↓
+Load Model
+      ↓
+Create Flask/FastAPI
+      ↓
+Write Routes
+      ↓
+Handle JSON
+      ↓
+Prediction
+      ↓
+Deploy
+```
+
+With BentoML:
+
+```
+Train Model
+      ↓
+Save using BentoML
+      ↓
+Create Service
+      ↓
+Run bentoml serve
+      ↓
+Ready API
+```
+
+Much less code.
+
+---
+
+# BentoML Architecture
+
+```
+               Client
+
+                  |
+
+          HTTP Request
+
+                  |
+
+          BentoML Service
+
+                  |
+
+          Loaded ML Model
+
+                  |
+
+           Prediction
+
+                  |
+
+          HTTP Response
+```
+
+---
+
+# What is a Model Store?
+
+Normally we save models like this:
+
+```python
+joblib.dump(model, "model.pkl")
+```
+
+or
+
+```python
+pickle.dump(model, file)
+```
+
+The problem:
+
+- no versioning
+- difficult management
+- easy to overwrite
+- manual loading
+
+BentoML solves this using a **Model Store**.
+
+Example:
+
+```
+fraud_detector:latest
+```
+
+or
+
+```
+fraud_detector:v1
+```
+
+or
+
+```
+fraud_detector:v2
+```
+
+Each model is stored with metadata.
+
+---
+
+# Saving a Model
+
+Example:
+
+```python
+bentoml.sklearn.save_model(
+    "fraud_detector",
+    model
+)
+```
+
+This registers the model inside BentoML's model store.
+
+Later we can load it without knowing its exact file location.
+
+---
+
+# Listing Stored Models
+
+Command:
+
+```bash
+bentoml models list
+```
+
+Example:
+
+```
+Tag
+
+fraud_detector:latest
+```
+
+This confirms that BentoML knows about the model.
+
+---
+
+# Loading a Model
+
+Our service loads the model like this:
+
+```python
+bento_model = bentoml.models.BentoModel(
+    "fraud_detector:latest"
+)
+```
+
+Inside the constructor:
+
+```python
+self.model = bentoml.sklearn.load_model(
+    self.bento_model
+)
+```
+
+Now the trained RandomForest model is available.
+
+---
+
+# Understanding the Service
+
+Our service begins with
+
+```python
+@bentoml.service
+class FraudService:
+```
+
+This decorator tells BentoML:
+
+"This class is an API service."
+
+Everything inside becomes part of the HTTP server.
+
+---
+
+# Service Lifecycle
+
+When the server starts
+
+```
+Server Starts
+
+↓
+
+FraudService created
+
+↓
+
+__init__()
+
+↓
+
+Model Loaded
+
+↓
+
+Ready to receive requests
+```
+
+Notice:
+
+The model loads **once**.
+
+It is **not loaded for every request**.
+
+This makes prediction much faster.
+
+---
+
+# __init__()
+
+```python
+def __init__(self):
+```
+
+Purpose:
+
+Initialize everything once.
+
+Here we load
+
+```
+RandomForest Model
+```
+
+and create
+
+```
+Prediction History
+```
+
+```
+self._history = []
+```
+
+---
+
+# API Endpoints
+
+Every endpoint uses
+
+```python
+@bentoml.api
+```
+
+Example:
+
+```python
+@bentoml.api
+def predict(...)
+```
+
+This automatically becomes
+
+```
+POST /predict
+```
+
+Similarly,
+
+```python
+@bentoml.api
+def last_predictions()
+```
+
+becomes
+
+```
+POST /last_predictions
+```
+
+No Flask routing required.
+
+---
+
+# Input Parameters
+
+Our prediction function accepts
+
+```python
+amount
+
+hour
+
+num_tx_past_day
+```
+
+These represent
+
+Transaction Amount
+
+Transaction Hour
+
+Number of Transactions in Last Day
+
+---
+
+# Why NumPy?
+
+Scikit-Learn expects data like
+
+```
+Rows × Columns
+```
+
+One sample containing three features becomes
+
+```
+[[3200,23,5]]
+```
+
+Notice the double brackets.
+
+Single brackets
+
+```
+[3200,23,5]
+```
+
+are incorrect.
+
+---
+
+# Creating Features
+
+```python
+features = np.array([
+    [amount,
+     hour,
+     num_tx_past_day]
+])
+```
+
+Result:
+
+```
+1 sample
+
+3 features
+```
+
+Shape:
+
+```
+(1,3)
+```
+
+---
+
+# Prediction
+
+```python
+prediction = self.model.predict(features)
+```
+
+Output
+
+```
+array([1])
+```
+
+or
+
+```
+array([0])
+```
+
+Since JSON cannot return NumPy integers,
+
+we convert
+
+```python
+int(prediction[0])
+```
+
+Now
+
+```
+1
+
+or
+
+0
+```
+
+---
+
+# Why Convert to int?
+
+NumPy returns
+
+```
+numpy.int64
+```
+
+JSON expects
+
+```
+int
+```
+
+Therefore
+
+```python
+int(...)
+```
+
+avoids serialization problems.
+
+---
+
+# Prediction History
+
+Every request is saved.
+
+```python
+self._history.append(
+{
+...
+}
+)
+```
+
+Stored information
+
+```
+Amount
+
+Hour
+
+Transactions
+
+Prediction
+```
+
+This creates an audit log.
+
+---
+
+# Returning JSON
+
+We return
+
+```python
+{
+"is_fraud": prediction
+}
+```
+
+BentoML automatically converts this dictionary into
+
+```
+JSON
+```
+
+Example
+
+```json
+{
+    "is_fraud":1
+}
+```
+
+---
+
+# last_predictions Endpoint
+
+Returns
+
+```python
+{
+    "count": len(...),
+    "predictions": ...
+}
+```
+
+Useful for
+
+- debugging
+- auditing
+- monitoring
+
+---
+
+# Starting the Server
+
+Command
+
+```bash
+bentoml serve service:FraudService --port 3000
+```
+
+Meaning
+
+```
+service
+
+↓
+
+Find FraudService
+
+↓
+
+Start HTTP server
+
+↓
+
+Load model
+
+↓
+
+Wait for requests
+```
+
+---
+
+# Swagger UI
+
+Open
+
+```
+http://localhost:3000
+```
+
+Swagger is automatically generated.
+
+Benefits
+
+- Interactive testing
+- API documentation
+- No Postman required
+- Shows request schema
+- Shows response schema
+
+---
+
+# Testing with curl
+
+Example
+
+```bash
+curl -X POST \
+http://localhost:3000/predict \
+-H "Content-Type: application/json" \
+-d '{"amount":3200,"hour":23,"num_tx_past_day":5}'
+```
+
+The request contains
+
+```
+JSON
+
+↓
+
+HTTP POST
+
+↓
+
+Server
+
+↓
+
+Prediction
+
+↓
+
+JSON Response
+```
+
+---
+
+# Example Request
+
+```json
+{
+    "amount":3200,
+    "hour":23,
+    "num_tx_past_day":5
+}
+```
+
+Features
+
+High Amount
+
+Late Night
+
+Many Transactions
+
+Likely Fraud
+
+---
+
+# Example Response
+
+```json
+{
+    "is_fraud":1
+}
+```
+
+---
+
+# Low Risk Example
+
+```json
+{
+    "amount":25.5,
+    "hour":10,
+    "num_tx_past_day":1
+}
+```
+
+Expected
+
+```json
+{
+    "is_fraud":0
+}
+```
+
+---
+
+# Complete Request Flow
+
+```
+User
+
+↓
+
+POST /predict
+
+↓
+
+BentoML API
+
+↓
+
+FraudService
+
+↓
+
+NumPy Feature Array
+
+↓
+
+RandomForest.predict()
+
+↓
+
+Prediction
+
+↓
+
+Dictionary
+
+↓
+
+JSON
+
+↓
+
+Client
+```
+
+---
+
+# Why Swagger Matters
+
+Without Swagger
+
+- Need Postman
+- Need curl
+- Need documentation
+
+With Swagger
+
+- Click endpoint
+- Enter values
+- Press Execute
+- View response instantly
+
+---
+
+# Why Keep Prediction History?
+
+Useful for
+
+Debugging
+
+Finding incorrect predictions
+
+Logging
+
+Auditing
+
+Monitoring production systems
+
+---
+
+# Why BentoML is Popular
+
+It automatically provides
+
+Model Store
+
+Versioning
+
+Dependency Management
+
+REST APIs
+
+Swagger
+
+Docker Support
+
+Cloud Deployment
+
+Model Packaging
+
+Production Serving
+
+Minimal Code
+
+---
+
+# Real-World Workflow
+
+```
+Collect Data
+
+↓
+
+Clean Data
+
+↓
+
+Train Model
+
+↓
+
+Evaluate
+
+↓
+
+Save using BentoML
+
+↓
+
+Create Service
+
+↓
+
+Serve Model
+
+↓
+
+Users send requests
+
+↓
+
+Receive Predictions
+
+↓
+
+Monitor Performance
+```
+
+---
+
+# Important Commands
+
+List models
+
+```bash
+bentoml models list
+```
+
+Start server
+
+```bash
+bentoml serve service:FraudService --port 3000
+```
+
+Test homepage
+
+```bash
+curl http://localhost:3000/
+```
+
+Predict
+
+```bash
+curl -X POST http://localhost:3000/predict \
+-H "Content-Type: application/json" \
+-d '{"amount":3200,"hour":23,"num_tx_past_day":5}'
+```
+
+Prediction history
+
+```bash
+curl -X POST http://localhost:3000/last_predictions
+```
+
+---
+
+# Key Interview Questions
+
+### What is BentoML?
+
+A framework used to package, manage, and serve machine learning models as production-ready APIs.
+
+---
+
+### Why use BentoML instead of Flask?
+
+Because BentoML provides built-in model management, automatic API generation, Swagger UI, versioning, and deployment tools, reducing the amount of infrastructure code you need to write.
+
+---
+
+### What is the BentoML Model Store?
+
+A centralized local repository where trained models are stored with names, versions, and metadata instead of as standalone files.
+
+---
+
+### What does `@bentoml.service` do?
+
+It marks a class as a BentoML service that can expose APIs over HTTP.
+
+---
+
+### What does `@bentoml.api` do?
+
+It exposes a class method as an HTTP endpoint.
+
+---
+
+### Why is the model loaded in `__init__()`?
+
+To load the model only once when the service starts, improving performance by avoiding repeated loading for every request.
+
+---
+
+### Why use `np.array([[...]])`?
+
+Scikit-Learn expects a 2D array where each row represents one sample and each column represents one feature.
+
+---
+
+### Why convert the prediction to `int`?
+
+Because Scikit-Learn returns a NumPy integer (`numpy.int64`), which should be converted to a native Python `int` for JSON serialization.
+
+---
+
+### What is Swagger UI?
+
+An automatically generated web interface that documents the API and allows users to test endpoints directly from the browser.
+
+---
+
+# Summary
+
+In this lesson, we learned how to take a trained Scikit-Learn model and make it available as a production-ready web service using BentoML. We explored model registration, the BentoML Model Store, service creation with `@bentoml.service`, API endpoints with `@bentoml.api`, prediction using NumPy feature arrays, maintaining request history, starting the server, testing endpoints with `curl`, and using Swagger UI for interactive API testing. These concepts form the foundation of deploying machine learning models for real-world applications.
+
+
 ---
 
