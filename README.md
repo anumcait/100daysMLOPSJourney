@@ -78,4 +78,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 60: Package a Model as a BentoML Service](./Day%2060%20-%20Package%20a%20Model%20as%20a%20BentoML%20Service.md)
 
+- [Day 61: Deploy a Model-Serving Container via Portainer](./Day%2061%20-%20Deploy%20a%20Model-Serving%20Container%20via%20Portainer.md)
+
 ---

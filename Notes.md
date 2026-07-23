@@ -11458,6 +11458,856 @@ An automatically generated web interface that documents the API and allows users
 
 In this lesson, we learned how to take a trained Scikit-Learn model and make it available as a production-ready web service using BentoML. We explored model registration, the BentoML Model Store, service creation with `@bentoml.service`, API endpoints with `@bentoml.api`, prediction using NumPy feature arrays, maintaining request history, starting the server, testing endpoints with `curl`, and using Swagger UI for interactive API testing. These concepts form the foundation of deploying machine learning models for real-world applications.
 
+# Day 61 Notes: Deploy a Model-Serving Container via Portainer
+
+## Introduction
+
+Today we are learning how to deploy a machine learning model-serving application using **Portainer**.
+
+In a real production environment, ML teams usually do not manually run Docker commands every time. Instead, they use management platforms like Portainer to:
+
+- Inspect Docker images
+- Create and manage containers
+- View container logs
+- Configure networking
+- Manage storage volumes
+- Restart services
+- Monitor running applications
+
+In this task, the ML platform team has already created a Docker image called:
+
+```
+fraud-detector:v1
+```
+
+Our responsibility is to deploy this image as a running API service using the Portainer web interface.
+
+---
+
+# Understanding the Architecture
+
+The complete flow looks like this:
+
+```
+Developer
+    |
+    |
+    v
+FastAPI Application
+(app.py)
+    |
+    |
+    v
+Docker Image
+(fraud-detector:v1)
+    |
+    |
+    v
+Portainer
+(Container Management UI)
+    |
+    |
+    v
+Docker Container
+(fraud-api)
+    |
+    |
+    v
+API Users
+```
+
+The container will run a FastAPI application that loads a machine learning model:
+
+```
+model.pkl
+```
+
+and exposes two endpoints:
+
+```
+GET  /health
+POST /predict
+```
+
+---
+
+# Project Structure
+
+The application files are stored on the host machine:
+
+```
+/root/code/serving/
+```
+
+The directory contains:
+
+```
+serving/
+|
+├── app.py
+├── Dockerfile
+└── model.pkl
+```
+
+---
+
+# Understanding Each File
+
+## app.py
+
+`app.py` contains the FastAPI application.
+
+Its responsibilities:
+
+1. Start the API server.
+2. Load the machine learning model.
+3. Create API endpoints.
+4. Receive prediction requests.
+5. Return prediction results.
+
+The application loads:
+
+```
+/app/model.pkl
+```
+
+inside the container.
+
+---
+
+## model.pkl
+
+This is the trained machine learning model.
+
+The model is:
+
+```
+RandomForest
+```
+
+It was created during training and saved using joblib/pickle.
+
+The API uses this model to predict whether a transaction is fraudulent.
+
+---
+
+## Dockerfile
+
+The Dockerfile defines how the image was created.
+
+It uses:
+
+```
+python:3.11-slim
+```
+
+as the base image.
+
+It installs:
+
+```
+fastapi
+uvicorn
+joblib
+scikit-learn
+```
+
+The container starts using:
+
+```
+uvicorn app:app
+```
+
+The application listens on:
+
+```
+port 8085
+```
+
+---
+
+# What Is Portainer?
+
+Portainer is a graphical interface for Docker management.
+
+Instead of writing:
+
+```bash
+docker run
+```
+
+commands manually, we can create containers using forms.
+
+Portainer communicates with Docker through:
+
+```
+/var/run/docker.sock
+```
+
+This socket allows Portainer to control the Docker engine.
+
+---
+
+# Portainer Docker Connection
+
+When Portainer starts, it needs access to Docker.
+
+The important mount is:
+
+```
+/var/run/docker.sock:/var/run/docker.sock
+```
+
+Meaning:
+
+Host Docker socket:
+
+```
+/var/run/docker.sock
+```
+
+is shared with the Portainer container.
+
+Without this:
+
+- Portainer opens successfully
+- But it cannot see Docker containers
+- It cannot create new containers
+
+---
+
+# Logging Into Portainer
+
+Portainer runs on:
+
+```
+http://<server>:9090
+```
+
+Credentials:
+
+```
+Username:
+admin
+
+Password:
+xFusionCorp2026!
+```
+
+After login:
+
+Select:
+
+```
+local
+```
+
+environment.
+
+The local environment represents the Docker engine running on the server.
+
+---
+
+# Container Deployment Concepts
+
+Before deploying, understand the important Docker options.
+
+---
+
+# 1. Container Name
+
+Every running container needs an identifier.
+
+Example:
+
+```
+fraud-api
+```
+
+This allows us to manage it:
+
+```bash
+docker logs fraud-api
+docker restart fraud-api
+docker inspect fraud-api
+```
+
+---
+
+# 2. Docker Image
+
+An image is a packaged application.
+
+Here:
+
+```
+fraud-detector:v1
+```
+
+contains:
+
+- Python runtime
+- Required libraries
+- Application code
+- Startup command
+
+A container is created from an image.
+
+Relationship:
+
+```
+Image
+ |
+ |
+ v
+Container
+```
+
+Example:
+
+```
+fraud-detector:v1
+        |
+        |
+        v
+    fraud-api
+```
+
+---
+
+# 3. Port Mapping
+
+Containers have their own network.
+
+The application listens inside the container:
+
+```
+Container port:
+8085
+```
+
+Users access the service through the host machine:
+
+```
+Host port:
+8085
+```
+
+Mapping:
+
+```
+Host               Container
+
+8085  -----------> 8085
+```
+
+Docker option:
+
+```bash
+-p 8085:8085
+```
+
+Without port mapping:
+
+- Container works internally
+- Users cannot access the API
+
+---
+
+# 4. Volume Mounting
+
+A volume connects host files with container files.
+
+Required mount:
+
+```
+Host:
+/root/code/serving
+
+Container:
+/app
+```
+
+Mapping:
+
+```
+/root/code/serving
+        |
+        |
+        v
+       /app
+```
+
+Docker option:
+
+```bash
+-v /root/code/serving:/app
+```
+
+Why do we need this?
+
+Because the application expects:
+
+```
+/app/app.py
+/app/model.pkl
+```
+
+The bind mount allows the container to read the files from the host.
+
+Benefits:
+
+- Update code without rebuilding image
+- Replace model files easily
+- Maintain external configuration
+
+---
+
+# 5. Restart Policy
+
+Containers can stop because of:
+
+- Server restart
+- Application failure
+- Docker restart
+
+Restart policy:
+
+```
+Always
+```
+
+means Docker automatically starts the container again.
+
+Production services usually use restart policies.
+
+---
+
+# Creating the Container in Portainer
+
+Steps:
+
+1. Open Portainer.
+2. Select:
+
+```
+local environment
+```
+
+3. Go to:
+
+```
+Containers
+```
+
+4. Click:
+
+```
+Add container
+```
+
+5. Enter:
+
+```
+Name:
+fraud-api
+```
+
+6. Enter image:
+
+```
+fraud-detector:v1
+```
+
+7. Configure port:
+
+```
+Host:
+8085
+
+Container:
+8085
+```
+
+8. Add volume:
+
+```
+Host:
+/root/code/serving
+
+Container:
+/app
+```
+
+9. Set restart policy:
+
+```
+Always
+```
+
+10. Deploy.
+
+---
+
+# Equivalent Docker Command
+
+The Portainer form creates an equivalent Docker command:
+
+```bash
+docker run -d \
+--name fraud-api \
+-p 8085:8085 \
+-v /root/code/serving:/app \
+--restart always \
+fraud-detector:v1
+```
+
+Understanding Docker commands helps us understand what Portainer does internally.
+
+---
+
+# Container Verification
+
+After deployment:
+
+Check running containers:
+
+```bash
+docker ps
+```
+
+Expected:
+
+```
+fraud-api
+```
+
+should be running.
+
+---
+
+# Inspect Container
+
+Command:
+
+```bash
+docker inspect fraud-api
+```
+
+This shows:
+
+- Image information
+- Network configuration
+- Volume mounts
+- Environment variables
+- Container state
+
+Important verification:
+
+```
+/root/code/serving
+        |
+        v
+       /app
+```
+
+---
+
+# Testing the Application
+
+## Health Endpoint
+
+Purpose:
+
+Checks whether the API is alive.
+
+Request:
+
+```bash
+curl http://localhost:8085/health
+```
+
+Response:
+
+```json
+{
+ "status":"ok"
+}
+```
+
+A successful response means:
+
+- Container is running
+- FastAPI started
+- Network port works
+
+---
+
+# Prediction Endpoint
+
+The prediction API accepts transaction information.
+
+Example request:
+
+```bash
+curl -X POST http://localhost:8085/predict \
+-H "Content-Type: application/json" \
+-d '{"amount":3200,"hour":23,"num_tx_past_day":5}'
+```
+
+Input:
+
+```
+amount = 3200
+hour = 23
+transactions today = 5
+```
+
+The model processes the values.
+
+Response:
+
+```json
+{
+"is_fraud":0
+}
+```
+
+or:
+
+```json
+{
+"is_fraud":1
+}
+```
+
+Meaning:
+
+```
+0 = Not Fraud
+1 = Fraud
+```
+
+---
+
+# Troubleshooting Guide
+
+## Problem: Portainer Cannot See Docker
+
+Check:
+
+```bash
+docker inspect portainer
+```
+
+Look for:
+
+```
+/var/run/docker.sock
+```
+
+If missing, recreate Portainer with:
+
+```bash
+-v /var/run/docker.sock:/var/run/docker.sock
+```
+
+---
+
+## Problem: Container Starts But API Fails
+
+Check logs:
+
+```bash
+docker logs fraud-api
+```
+
+Common issues:
+
+- Missing model file
+- Wrong application path
+- Dependency errors
+- Port mismatch
+
+---
+
+## Problem: Port Already Used
+
+Check:
+
+```bash
+docker ps
+```
+
+or:
+
+```bash
+netstat -tulpn
+```
+
+Another service may already use:
+
+```
+8085
+```
+
+---
+
+## Problem: Model File Missing
+
+Check inside container:
+
+```bash
+docker exec -it fraud-api bash
+```
+
+Then:
+
+```bash
+ls /app
+```
+
+Expected:
+
+```
+app.py
+model.pkl
+```
+
+---
+
+# Important Docker Concepts Learned
+
+## Image
+
+A read-only package containing an application.
+
+Example:
+
+```
+fraud-detector:v1
+```
+
+---
+
+## Container
+
+A running instance of an image.
+
+Example:
+
+```
+fraud-api
+```
+
+---
+
+## Volume
+
+Persistent storage shared between host and container.
+
+Example:
+
+```
+/root/code/serving:/app
+```
+
+---
+
+## Port Mapping
+
+Allows outside users to access container applications.
+
+Example:
+
+```
+8085:8085
+```
+
+---
+
+## Docker Socket
+
+Allows tools like Portainer to manage Docker.
+
+Example:
+
+```
+/var/run/docker.sock
+```
+
+---
+
+# Final Architecture
+
+```
+                User
+                 |
+                 |
+                 v
+        localhost:8085
+                 |
+                 |
+                 v
+          fraud-api Container
+                 |
+        -------------------
+        |                 |
+        v                 v
+     app.py          model.pkl
+        |
+        |
+        v
+   RandomForest Model
+```
+
+---
+
+# Final Checklist
+
+Deployment is successful when:
+
+- Portainer is running on port `9090`
+- Local Docker environment is connected
+- Container name is `fraud-api`
+- Image is `fraud-detector:v1`
+- Port `8085` is published
+- `/root/code/serving` is mounted to `/app`
+- `/health` returns:
+
+```json
+{"status":"ok"}
+```
+
+- `/predict` returns:
+
+```json
+{"is_fraud":0}
+```
+
+or:
+
+```json
+{"is_fraud":1}
+```
+
+---
+
+# Summary
+
+In this lesson, we learned how to deploy a machine learning model-serving API using Portainer.
+
+The main production workflow is:
+
+1. Build Docker image.
+2. Store application and model files.
+3. Deploy container using Portainer.
+4. Configure networking.
+5. Mount required files.
+6. Verify API health.
+7. Test machine learning predictions.
+
+This workflow is commonly used in MLOps environments to deploy and manage AI services.
 
 ---
 
