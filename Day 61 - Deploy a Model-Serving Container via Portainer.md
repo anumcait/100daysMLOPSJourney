@@ -244,6 +244,26 @@ or
 
 ---
 
-## Completed
+### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/b2cfa07a-fd18-4bba-bc75-cd3139ef540c" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/dbfec68b-0ff2-49bb-9892-b3e86753dad5" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/ca528a78-0c4a-47f3-aa34-d55ce7525ed9" />
+ <img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/4e211915-c3bf-4e85-961d-84e8c585852b" />
+ <img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/3886d002-c0e6-45d1-b0d3-09dc526b36a2" />
+ <img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/c3fe4822-e81f-4a17-8ba6-3fa9db43f0c2" />
+ <img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/38730e6b-f61e-45be-ac8e-86548427ef4b" />
+ <img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/c7eeff0a-edd4-4c40-bd7a-2b926f9784ec" />
+ <img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/9528deb6-7e95-4d79-bfe1-9307e18cd869" />
+ <img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/8683f120-babe-44e1-8e57-7260e73dd9cd" />
+ 
 
-Day 61: Deploy a Model-Serving Container via Portainer ✅
+
+
+
+
+
+
+
+
+
+
