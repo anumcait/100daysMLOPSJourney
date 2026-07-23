@@ -202,3 +202,13 @@ Example response:
 - API testing with `curl`
 
 ### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/97c3c27b-d852-4e49-894e-9a6d7c543c61" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/e0fe7dd0-7f01-44cf-8ac5-6a3e8a561717" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/198b7f47-74d7-42ae-8245-dc57784ad82d" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/80b08d5b-57cf-4824-8adb-04607daf8cc0" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/92fc8b97-4a7d-4f5d-9513-d86363120655" />
+
+
+
+
+
