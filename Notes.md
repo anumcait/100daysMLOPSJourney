@@ -12309,5 +12309,768 @@ The main production workflow is:
 
 This workflow is commonly used in MLOps environments to deploy and manage AI services.
 
+# Day 62 Notes: Implement A/B Testing for Model Deployment
+
+## Topic: A/B Testing in Machine Learning Model Deployment
+
+---
+
+# 1. Introduction
+
+In machine learning projects, developing a model is only one part of the journey. The real challenge begins when we deploy the model into production.
+
+A production ML system must handle:
+
+- Receiving user requests
+- Preparing input data
+- Running model predictions
+- Returning predictions quickly
+- Monitoring model performance
+- Updating models safely
+
+When a new model version is created, replacing the existing production model immediately can be risky.
+
+The new model may:
+
+- Perform worse on real-world data
+- Have unexpected behavior
+- Create incorrect predictions
+- Affect business decisions
+
+To reduce this risk, companies use **A/B testing for model deployment**.
+
+---
+
+# 2. What is A/B Testing?
+
+A/B testing is a technique where two versions of a system are operated at the same time, and real traffic is divided between them.
+
+In machine learning:
+
+- Version A → Existing stable model
+- Version B → New candidate model
+
+The goal is to compare both models using real production traffic.
+
+Example:
+
+```
+Incoming Requests
+        |
+        |
+     A/B Router
+      /      \
+     /        \
+  80%          20%
+   |            |
+ MODEL_V1    MODEL_V2
+ Stable      Candidate
+```
+
+The stable model continues handling most users while the new model receives a smaller percentage of requests.
+
+---
+
+# 3. Why Use A/B Testing for ML Models?
+
+Deploying a new model directly can introduce problems.
+
+A/B testing provides:
+
+## Safety
+
+The old model continues serving most users.
+
+Example:
+
+```
+Old Model  → 80% traffic
+New Model  → 20% traffic
+```
+
+If the new model performs poorly, the impact is limited.
+
+---
+
+## Real-World Evaluation
+
+Offline testing is done using historical datasets.
+
+However, production traffic may contain:
+
+- New user behavior
+- Different data distributions
+- Unexpected patterns
+
+A/B testing evaluates the model using real requests.
+
+---
+
+## Performance Comparison
+
+Teams can compare:
+
+- Accuracy
+- Fraud detection rate
+- False positives
+- False negatives
+- Latency
+- Business impact
+
+---
+
+# 4. Scenario: Fraud Detection System
+
+In this project, xFusionCorp Industries has a fraud detection platform.
+
+Two RandomForest models exist:
+
+```
+model_v1.pkl
+model_v2.pkl
+```
+
+They represent two versions of the fraud detection model.
+
+---
+
+## Model Versions
+
+### MODEL_V1
+
+Stable production model.
+
+Properties:
+
+- Already trusted
+- Handles most traffic
+- Used as the baseline
+
+Traffic:
+
+```
+80%
+```
+
+---
+
+### MODEL_V2
+
+New candidate model.
+
+Properties:
+
+- Recently trained
+- Needs production testing
+- Performance must be compared
+
+Traffic:
+
+```
+20%
+```
+
+---
+
+# 5. Project Structure
+
+The application directory:
+
+```
+/root/code/serving/
+
+├── model_v1.pkl
+├── model_v2.pkl
+└── ab_server.py
+```
+
+Explanation:
+
+## model_v1.pkl
+
+Contains the first trained RandomForest model.
+
+This is the stable production version.
+
+---
+
+## model_v2.pkl
+
+Contains the second trained RandomForest model.
+
+This is the experimental version.
+
+---
+
+## ab_server.py
+
+Flask application responsible for:
+
+- Loading models
+- Receiving requests
+- Routing traffic
+- Running predictions
+- Returning responses
+
+---
+
+# 6. Flask Server Architecture
+
+The application uses Flask.
+
+Flask provides:
+
+- HTTP endpoints
+- Request handling
+- JSON responses
+
+The server exposes two endpoints:
+
+```
+/health
+/predict
+```
+
+---
+
+# 7. Health Endpoint
+
+The health endpoint checks whether the server is running.
+
+Example:
+
+Request:
+
+```
+GET /health
+```
+
+Response:
+
+```json
+{
+    "status": "ok"
+}
+```
+
+This is commonly used by:
+
+- Kubernetes probes
+- Monitoring systems
+- Load balancers
+
+---
+
+# 8. Prediction Endpoint
+
+The prediction endpoint receives transaction information.
+
+Example request:
+
+```json
+{
+    "amount": 100.5,
+    "hour": 12,
+    "num_tx_past_day": 3
+}
+```
+
+The server converts this JSON data into model input.
+
+---
+
+# 9. Request Processing Flow
+
+The complete prediction flow:
+
+```
+Client
+  |
+  |
+POST /predict
+  |
+  |
+Flask receives JSON
+  |
+  |
+Convert JSON to numpy array
+  |
+  |
+A/B Router selects model
+  |
+  |
+Selected model predicts
+  |
+  |
+Return prediction + model version
+```
+
+---
+
+# 10. Input Feature Preparation
+
+The incoming JSON:
+
+```json
+{
+ "amount":100,
+ "hour":12,
+ "num_tx_past_day":5
+}
+```
+
+is converted into:
+
+```python
+[
+ [
+  100,
+  12,
+  5
+ ]
+]
+```
+
+Machine learning models require numerical arrays as input.
+
+---
+
+# 11. A/B Routing Logic
+
+The important part of the implementation is selecting the model.
+
+Python provides:
+
+```python
+random.random()
+```
+
+It generates a random floating-point number between:
+
+```
+0.0 and 1.0
+```
+
+Example:
+
+```
+0.25
+0.73
+0.91
+```
+
+---
+
+The routing rule:
+
+```python
+if random.random() < 0.8:
+```
+
+means:
+
+```
+80% probability
+```
+
+because numbers from:
+
+```
+0.0 - 0.79
+```
+
+represent approximately 80% of possible values.
+
+---
+
+The implementation:
+
+```python
+if random.random() < 0.8:
+    model = MODEL_V1
+    model_version = "v1"
+else:
+    model = MODEL_V2
+    model_version = "v2"
+```
+
+---
+
+# 12. Prediction Execution
+
+After selecting the model:
+
+```python
+prediction = model.predict(features)[0]
+```
+
+The selected model performs inference.
+
+Example:
+
+MODEL_V1:
+
+```
+Input transaction
+       |
+       |
+Prediction
+       |
+       |
+Fraud = 0
+```
+
+---
+
+# 13. Why Return model_version?
+
+A prediction alone is not enough.
+
+Example:
+
+```json
+{
+ "is_fraud":1
+}
+```
+
+Monitoring systems do not know:
+
+- Which model predicted this?
+- Was it v1?
+- Was it v2?
+
+Therefore every response includes:
+
+```json
+{
+ "is_fraud":1,
+ "model_version":"v2"
+}
+```
+
+Now the system can measure each model separately.
+
+---
+
+# 14. Final API Response Format
+
+Successful response:
+
+```json
+{
+    "is_fraud": 0,
+    "model_version": "v1"
+}
+```
+
+Fields:
+
+## is_fraud
+
+Prediction result.
+
+Values:
+
+```
+0 → Not Fraud
+1 → Fraud
+```
+
+---
+
+## model_version
+
+Model that generated the prediction.
+
+Possible values:
+
+```
+v1
+v2
+```
+
+---
+
+# 15. Testing the Application
+
+## Start Server
+
+Command:
+
+```bash
+python3 ab_server.py
+```
+
+The server starts:
+
+```
+Port: 8085
+```
+
+---
+
+## Check Health
+
+Command:
+
+```bash
+curl http://localhost:8085/health
+```
+
+Expected:
+
+```json
+{
+ "status":"ok"
+}
+```
+
+---
+
+## Send Prediction Request
+
+Command:
+
+```bash
+curl -X POST http://localhost:8085/predict \
+-H "Content-Type: application/json" \
+-d '{"amount":200,"hour":10,"num_tx_past_day":4}'
+```
+
+Possible output:
+
+```json
+{
+ "is_fraud":0,
+ "model_version":"v1"
+}
+```
+
+---
+
+# 16. Testing the Traffic Split
+
+Because routing is random, one request does not prove the split.
+
+We test many requests.
+
+Example:
+
+Send:
+
+```
+200 requests
+```
+
+Expected result:
+
+```
+MODEL_V1:
+Around 160 requests
+
+MODEL_V2:
+Around 40 requests
+```
+
+Allowed variation exists because randomness is involved.
+
+---
+
+# 17. Production Monitoring
+
+After deployment, monitoring systems can calculate:
+
+## Model Usage
+
+Example:
+
+```
+v1:
+80%
+
+v2:
+20%
+```
+
+---
+
+## Model Performance
+
+Compare:
+
+```
+v1 accuracy
+vs
+v2 accuracy
+```
+
+---
+
+## Business Metrics
+
+For fraud detection:
+
+- Fraud caught
+- False alarms
+- Customer complaints
+- Transaction approval rate
+
+---
+
+# 18. Rollout Strategies
+
+A/B testing is one deployment strategy.
+
+Other strategies:
+
+## Blue-Green Deployment
+
+Two environments:
+
+```
+Blue  → Current version
+Green → New version
+```
+
+Traffic switches completely after validation.
+
+---
+
+## Canary Deployment
+
+Small percentage first:
+
+```
+99% old model
+1% new model
+```
+
+Then gradually increase.
+
+---
+
+## Shadow Deployment
+
+New model receives copied traffic but does not affect users.
+
+---
+
+# 19. Common Mistakes
+
+## Mistake 1: Forgetting model_version
+
+Bad:
+
+```json
+{
+"is_fraud":1
+}
+```
+
+Problem:
+
+Cannot identify model source.
+
+---
+
+## Mistake 2: Wrong traffic split
+
+Example:
+
+```python
+random.random() < 0.5
+```
+
+This creates:
+
+```
+50/50 split
+```
+
+Not required.
+
+---
+
+## Mistake 3: Loading model for every request
+
+Bad:
+
+```python
+model = joblib.load(...)
+```
+
+inside `/predict`.
+
+Problem:
+
+- Slow
+- Wastes resources
+
+Correct:
+
+Load once when application starts.
+
+---
+
+## Mistake 4: Returning wrong data type
+
+Prediction should be JSON serializable.
+
+Correct:
+
+```python
+int(prediction)
+```
+
+---
+
+# 20. Final Implementation Checklist
+
+Before completing the task verify:
+
+[x] Both models are loaded
+
+[x] Flask server starts successfully
+
+[x] `/health` endpoint works
+
+[x] `/predict` accepts JSON input
+
+[x] Traffic split is 80/20
+
+[x] MODEL_V1 returns `"v1"`
+
+[x] MODEL_V2 returns `"v2"`
+
+[x] Every response contains:
+
+```json
+{
+"is_fraud": value,
+"model_version": value
+}
+```
+
+[x] Batch testing shows approximately:
+
+```
+160 requests → v1
+40 requests  → v2
+```
+
+---
+
+# 21. Key Takeaways
+
+- A/B testing reduces deployment risk.
+- ML models should be monitored after deployment.
+- Traffic routing allows safe model comparison.
+- Model version tracking is essential for production observability.
+- Randomized routing is a simple way to implement controlled experiments.
+
+A/B testing transforms model deployment from a risky replacement process into a measurable and controlled release process.
+
+
 ---
 

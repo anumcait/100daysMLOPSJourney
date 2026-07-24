@@ -80,4 +80,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 61: Deploy a Model-Serving Container via Portainer](./Day%2061%20-%20Deploy%20a%20Model-Serving%20Container%20via%20Portainer.md)
 
+- [Day 62: Implement A/B Testing for Model Deployment](./Day%2062%20-%20Implement%20A-B%20Testing%20for%20Model%20Deployment.md)
+
 ---
