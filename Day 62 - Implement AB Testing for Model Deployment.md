@@ -174,3 +174,11 @@ Example response:
 A/B testing in ML deployment allows teams to safely introduce new models by gradually exposing real traffic to candidate versions while measuring performance against the stable production model.
 
 ### Screenshots
+
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/1e4b7b37-6c9c-48a1-93c1-391a75d27394" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/8376233d-ebc2-4705-b7ac-6294ec9a1903" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/d03fbb34-0fd4-47e5-929b-8e88278cd85d" />
+
+
+
+
