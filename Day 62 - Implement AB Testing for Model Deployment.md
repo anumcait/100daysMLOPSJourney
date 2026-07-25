@@ -1,4 +1,4 @@
-Day 62: Implement A/B Testing for Model Deployment
+### Day 62: Implement A/B Testing for Model Deployment
 The xFusionCorp Industries ML platform team operates an asynchronous fraud-detection scoring system, ensuring that the HTTP entry point responds within single-digit milliseconds while the model processes data in a background worker. The scaffold for this process, located at /root/code/serving/async_app.py, is designed to delegate tasks to a background worker and is intended to persist the results of each task in Redis. However, the implementation for storing results in Redis has not yet been completed.
 
 Your objective is to implement the Redis round-trip within async_app.py. This involves storing each result in Redis after the worker has completed its task. In addition, you must ensure that the GET /result/<task_id> endpoint retrieves the stored results. The expected workflow is for clients to submit a request through POST /predict-async, then to subsequently poll the results using GET /result/<task_id>, which should return an is_fraud flag corresponding to the submitted payload.
