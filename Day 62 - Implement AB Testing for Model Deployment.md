@@ -1,19 +1,21 @@
-# Day 62: Implement A/B Testing for Model Deployment
-The xFusionCorp Industries ML platform team has deployed a new fraud-detection model into production, utilizing an A/B router to manage traffic. The traffic distribution is set at 80% for the stable MODEL_V1 and 20% for the candidate MODEL_V2. Each response from the server includes a model_version field, enabling downstream monitoring to accurately attribute each prediction to the corresponding model. The ab_server.py scaffold, located at /root/code/serving/, is responsible for loading both models and parsing incoming requests; however, the routing logic has yet to be implemented. Your task is to develop the A/B routing functionality in ab_server.py, ensuring that approximately 80% of traffic is directed to MODEL_V1, 20% to MODEL_V2, and that all responses correctly indicate which model provided the prediction.
+Day 63: Async Predictions with a Redis-Backed Worker
+The xFusionCorp Industries ML platform team operates an asynchronous fraud-detection scoring system, ensuring that the HTTP entry point responds within single-digit milliseconds while the model processes data in a background worker. The scaffold for this process, located at /root/code/serving/async_app.py, is designed to delegate tasks to a background worker and is intended to persist the results of each task in Redis. However, the implementation for storing results in Redis has not yet been completed.
+
+Your objective is to implement the Redis round-trip within async_app.py. This involves storing each result in Redis after the worker has completed its task. In addition, you must ensure that the GET /result/<task_id> endpoint retrieves the stored results. The expected workflow is for clients to submit a request through POST /predict-async, then to subsequently poll the results using GET /result/<task_id>, which should return an is_fraud flag corresponding to the submitted payload.
 
 
-Flask is installed at startup (not part of the lab image by default). Two model versions are pre-trained: model_v1.pkl (10-tree RandomForest) and model_v2.pkl (50-tree RandomForest). Both live under /root/code/serving/.
+Flask + redis-py are installed at startup. A Redis container named async-redis is already running on host port 6379.
 
 The project layout under /root/code/serving/:
 
-model_v1.pkl + model_v2.pkl – The two model versions the router multiplexes between. Correct.
-ab_server.py – Flask app. /health, both model loads, and the request-body parsing in POST /predict are wired; the routing logic (split, model selection, response) is left as a TODO to author.
+model.pkl – Deterministic RandomForest trained at startup.
+async_app.py – Flask app. The Redis connection, /health, POST /predict-async (returns a task_id, runs the model on a background thread), and the thread itself are wired. Two things are left as TODOs to author: the worker's result store in Redis, and the GET /result/<task_id> lookup that reads it back.
 The end state must include:
 
-ab_server.py splits traffic 80 % to MODEL_V1 and 20 % to MODEL_V2.
-Every response to POST /predict carries both is_fraud and model_version; model_version is "v1" or "v2".
-Over a batch of 200 requests, roughly 160 land on v1 (±20) and roughly 40 land on v2 (±20).
-Flask reads the JSON body via request.get_json(); the scaffold already handles this.
+redis.Redis(host="localhost", port=6379, ...) in async_app.py.
+GET /result/<task_id> reads the stored value back from Redis and returns it as part of the JSON body.
+POST /predict-async returns a JSON body carrying a task_id; after a short poll, GET /result/<task_id> returns a JSON body carrying an is_fraud flag of 0 or 1.
+The background worker stores results at keys shaped result:<task_id>, with a 600-second TTL.
 
 ## Overview
 

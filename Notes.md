@@ -13071,6 +13071,1010 @@ Before completing the task verify:
 
 A/B testing transforms model deployment from a risky replacement process into a measurable and controlled release process.
 
+# Day 63 Notes – Async Predictions with a Redis-Backed Worker
+
+# Introduction
+
+In production Machine Learning systems, predictions are not always returned immediately.
+
+For small models, synchronous prediction works well because the response is generated within milliseconds. However, for large models such as fraud detection, recommendation systems, image recognition, NLP models, or deep learning models, inference can take several seconds or even minutes.
+
+If an API waits until prediction is complete, users experience slow responses, requests may time out, and the server becomes less scalable.
+
+To solve this problem, production systems often use **asynchronous processing**.
+
+Instead of making the client wait:
+
+1. Accept the request immediately.
+2. Give the client a unique Task ID.
+3. Process the prediction in the background.
+4. Store the result somewhere.
+5. Let the client retrieve the result later.
+
+This architecture is used by many large-scale systems including OpenAI, AWS, Azure ML, Google Cloud AI, Stripe, and payment fraud detection services.
+
+---
+
+# What is Asynchronous Processing?
+
+Asynchronous means:
+
+> Start a task now and finish it later.
+
+The client does **not** wait for the task to finish.
+
+Instead:
+
+```
+Client
+   |
+   | POST /predict-async
+   |
+Server
+   |
+   | Generate task_id
+   |
+   | Start background worker
+   |
+   | Return task_id immediately
+   |
+Client receives response instantly
+```
+
+Later...
+
+```
+Background Worker
+      |
+      |
+Runs ML Model
+      |
+Stores Result in Redis
+      |
+Client polls for result
+```
+
+This keeps APIs extremely fast.
+
+---
+
+# Synchronous vs Asynchronous
+
+## Synchronous
+
+```
+Client
+   |
+POST /predict
+   |
+Server
+   |
+Run ML Model
+   |
+Return prediction
+```
+
+The client waits.
+
+If prediction takes:
+
+```
+5 seconds
+```
+
+The client waits for all 5 seconds.
+
+---
+
+## Asynchronous
+
+```
+Client
+    |
+POST /predict-async
+    |
+Server
+    |
+Create task_id
+    |
+Return task_id immediately
+```
+
+Background:
+
+```
+Run prediction
+Store result
+```
+
+Client:
+
+```
+GET /result/task_id
+```
+
+The client can continue doing other work.
+
+---
+
+# Why Companies Prefer Async APIs
+
+Imagine an image classification model.
+
+Inference time:
+
+```
+12 seconds
+```
+
+Without async:
+
+```
+Client waits
+
+12 seconds...
+```
+
+With async:
+
+```
+POST request
+
+↓
+
+Task ID returned in 5 ms
+
+↓
+
+Prediction runs in background
+
+↓
+
+Client checks later
+```
+
+This is a much better user experience.
+
+---
+
+# Real World Examples
+
+## ChatGPT
+
+You submit a prompt.
+
+The request starts processing.
+
+You don't manually poll, but internally the request is processed asynchronously.
+
+---
+
+## YouTube
+
+Upload video.
+
+Immediately:
+
+```
+Upload successful
+```
+
+Video processing happens later.
+
+---
+
+## Google Drive
+
+Upload PDF.
+
+Background tasks:
+
+- Virus scanning
+- Thumbnail generation
+- OCR
+
+---
+
+## Banking Systems
+
+When a transaction occurs:
+
+```
+Fraud detection
+
+Risk scoring
+
+Notifications
+
+Logging
+```
+
+Many of these run asynchronously.
+
+---
+
+# Project Overview
+
+The application consists of:
+
+```
+Client
+    |
+    |
+Flask API
+    |
+Background Thread
+    |
+ML Model
+    |
+Redis
+```
+
+The ML model predicts whether a transaction is fraudulent.
+
+---
+
+# Project Flow
+
+```
+POST /predict-async
+
+↓
+
+Generate task_id
+
+↓
+
+Return task_id
+
+↓
+
+Background Thread Starts
+
+↓
+
+Run Model
+
+↓
+
+Prediction Generated
+
+↓
+
+Save in Redis
+
+↓
+
+Client Requests Result
+
+↓
+
+GET /result/task_id
+
+↓
+
+Prediction Returned
+```
+
+---
+
+# Project Files
+
+```
+serving/
+
+│
+
+├── async_app.py
+
+├── model.pkl
+```
+
+---
+
+# model.pkl
+
+Contains the trained Random Forest model.
+
+Loaded using:
+
+```python
+MODEL = joblib.load("/root/code/serving/model.pkl")
+```
+
+---
+
+# Why Joblib?
+
+Machine Learning models are large Python objects.
+
+Joblib efficiently serializes them.
+
+```
+Training
+
+↓
+
+Save
+
+↓
+
+Load later
+```
+
+---
+
+# Redis
+
+Redis is an in-memory database.
+
+It stores data in RAM.
+
+Advantages:
+
+- Very fast
+- Lightweight
+- Key-value storage
+- Supports expiration
+- Ideal for caching
+- Excellent for temporary task results
+
+---
+
+# Redis Connection
+
+```python
+REDIS = redis.Redis(
+    host="localhost",
+    port=6379,
+    decode_responses=True
+)
+```
+
+Explanation:
+
+### host
+
+```
+localhost
+```
+
+Redis runs on the local machine.
+
+---
+
+### port
+
+```
+6379
+```
+
+Default Redis port.
+
+---
+
+### decode_responses
+
+Without:
+
+Redis returns
+
+```
+b'1'
+```
+
+(bytes)
+
+With:
+
+```
+"1"
+```
+
+(string)
+
+Much easier to use.
+
+---
+
+# Result Key
+
+```python
+RESULT_KEY = "result:{task_id}"
+```
+
+Suppose:
+
+```
+task_id
+
+abc123
+```
+
+The stored key becomes
+
+```
+result:abc123
+```
+
+Another task:
+
+```
+xyz789
+```
+
+Stored as
+
+```
+result:xyz789
+```
+
+Each task has a unique Redis key.
+
+---
+
+# TTL
+
+```python
+RESULT_TTL_SECONDS = 600
+```
+
+TTL means
+
+**Time To Live**
+
+Redis automatically deletes the key after 600 seconds.
+
+Why?
+
+Prediction results are temporary.
+
+Old data shouldn't stay forever.
+
+---
+
+# Flask Application
+
+```python
+app = Flask(__name__)
+```
+
+Creates the Flask server.
+
+---
+
+# Health Endpoint
+
+```python
+@app.route("/health")
+```
+
+Returns:
+
+```json
+{
+    "status":"ok"
+}
+```
+
+Used for:
+
+- Kubernetes
+- Docker
+- Load Balancers
+- Monitoring
+
+To verify that the application is alive.
+
+---
+
+# Prediction Endpoint
+
+```
+POST /predict-async
+```
+
+Client sends:
+
+```json
+{
+    "amount":100,
+    "hour":15,
+    "num_tx_past_day":5
+}
+```
+
+---
+
+# Reading JSON
+
+```python
+payload = request.get_json() or {}
+```
+
+Converts JSON into a Python dictionary.
+
+---
+
+# Feature Extraction
+
+```python
+features = [
+    float(payload.get("amount",0)),
+    int(payload.get("hour",0)),
+    int(payload.get("num_tx_past_day",0))
+]
+```
+
+The model expects numerical input.
+
+Features become:
+
+```
+[
+100.0,
+15,
+5
+]
+```
+
+---
+
+# Creating Task ID
+
+```python
+task_id = uuid.uuid4().hex
+```
+
+UUID generates a globally unique identifier.
+
+Example:
+
+```
+7d7d4b2bba584b70af6ef514a25f1c0d
+```
+
+Why?
+
+Every request must have its own identifier.
+
+---
+
+# Background Thread
+
+```python
+threading.Thread(
+    target=_run_prediction,
+    args=(task_id,features),
+    daemon=True
+).start()
+```
+
+Instead of blocking Flask:
+
+```
+Flask
+
+↓
+
+Starts Worker
+
+↓
+
+Immediately Returns
+```
+
+The worker executes independently.
+
+---
+
+# Worker Function
+
+```python
+_run_prediction()
+```
+
+Responsible for:
+
+- Running the model
+- Saving result
+
+---
+
+# Artificial Delay
+
+```python
+time.sleep(0.3)
+```
+
+Simulates expensive model inference.
+
+Real models may take:
+
+- 500 ms
+- 5 seconds
+- 30 seconds
+
+---
+
+# Running Prediction
+
+```python
+MODEL.predict(...)
+```
+
+Returns
+
+```
+0
+```
+
+or
+
+```
+1
+```
+
+Where:
+
+```
+0
+
+↓
+
+Not Fraud
+```
+
+```
+1
+
+↓
+
+Fraud
+```
+
+---
+
+# Converting to Integer
+
+```python
+is_fraud = int(...)
+```
+
+Ensures the prediction is JSON serialisable.
+
+---
+
+# Saving Result in Redis
+
+```python
+REDIS.set(
+    RESULT_KEY.format(task_id=task_id),
+    is_fraud,
+    ex=RESULT_TTL_SECONDS
+)
+```
+
+Breaking it down:
+
+Key
+
+```
+result:abc123
+```
+
+Value
+
+```
+1
+```
+
+Expiration
+
+```
+600 seconds
+```
+
+Redis stores:
+
+```
+result:abc123
+
+↓
+
+1
+```
+
+---
+
+# Why Expiration?
+
+Without expiration:
+
+Millions of completed tasks accumulate.
+
+Memory usage increases.
+
+Redis eventually fills up.
+
+TTL automatically cleans up old results.
+
+---
+
+# Returning Task ID
+
+```python
+return jsonify({
+    "task_id":task_id
+}),202
+```
+
+Notice:
+
+No prediction is returned.
+
+Only:
+
+```json
+{
+    "task_id":"abc123"
+}
+```
+
+---
+
+# HTTP Status 202
+
+202 means:
+
+```
+Accepted
+```
+
+The server accepted the request.
+
+Processing continues in the background.
+
+---
+
+# Result Endpoint
+
+```
+GET /result/task_id
+```
+
+Purpose:
+
+Retrieve completed prediction.
+
+---
+
+# Reading Redis
+
+```python
+value = REDIS.get(
+    RESULT_KEY.format(task_id=task_id)
+)
+```
+
+If Redis contains:
+
+```
+result:abc123
+
+↓
+
+1
+```
+
+Value becomes
+
+```
+"1"
+```
+
+---
+
+# Pending Case
+
+If Redis returns
+
+```
+None
+```
+
+Prediction isn't ready.
+
+Return:
+
+```json
+{
+    "task_id":"abc123",
+    "status":"pending"
+}
+```
+
+HTTP
+
+```
+202
+```
+
+---
+
+# Completed Case
+
+If Redis contains
+
+```
+1
+```
+
+Return
+
+```json
+{
+    "task_id":"abc123",
+    "is_fraud":1
+}
+```
+
+Status
+
+```
+200 OK
+```
+
+---
+
+# Full Workflow
+
+```
+Client
+
+↓
+
+POST /predict-async
+
+↓
+
+Flask
+
+↓
+
+Generate Task ID
+
+↓
+
+Return Task ID
+
+↓
+
+Background Thread
+
+↓
+
+Run Model
+
+↓
+
+Prediction
+
+↓
+
+Store in Redis
+
+↓
+
+Client Polls
+
+↓
+
+GET /result/task_id
+
+↓
+
+Redis Returns Prediction
+
+↓
+
+Client Receives Result
+```
+
+---
+
+# Why Redis Instead of a Python Dictionary?
+
+A Python dictionary:
+
+- Exists only while the process runs.
+- Is not shared across multiple application instances.
+- Loses data if the application restarts.
+
+Redis:
+
+- Stores data outside the Flask process.
+- Can be shared by multiple workers.
+- Supports key expiration.
+- Is significantly faster than disk-based storage for temporary data.
+
+---
+
+# Why Use Background Threads?
+
+Background threads allow Flask to continue serving new requests while a prediction is running.
+
+Without a background thread:
+
+```
+Request 1
+
+↓
+
+Wait
+
+↓
+
+Request 2 waits
+
+↓
+
+Request 3 waits
+```
+
+With background threads:
+
+```
+Request 1
+
+↓
+
+Worker
+
+Request 2
+
+↓
+
+Worker
+
+Request 3
+
+↓
+
+Worker
+```
+
+The API remains responsive.
+
+---
+
+# Limitations of This Approach
+
+Using Python threads is suitable for demonstrations and lightweight workloads.
+
+For production systems, common alternatives include:
+
+- Celery + Redis
+- RQ (Redis Queue)
+- Dramatiq
+- Apache Kafka
+- RabbitMQ
+- AWS SQS
+- Google Pub/Sub
+
+These tools provide durable queues, retries, monitoring, scheduling, and better scalability.
+
+---
+
+# Key Takeaways
+
+- Asynchronous APIs return immediately and perform work in the background.
+- A unique `task_id` lets clients retrieve results later.
+- Redis is an excellent temporary store for task results.
+- TTL automatically removes stale data and prevents memory growth.
+- Background threads keep the Flask application responsive.
+- `POST /predict-async` starts the task, while `GET /result/<task_id>` lets clients poll for completion.
+- This request/worker/result pattern is widely used in production ML serving systems.
 
 ---
 

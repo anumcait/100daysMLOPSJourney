@@ -82,4 +82,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 62: Implement A/B Testing for Model Deployment](./Day%2062%20-%20Implement%20A-B%20Testing%20for%20Model%20Deployment.md)
 
+- [Day 63: Async Predictions with a Redis-Backed Worker](./Day%2063%20-%20Async%20Predictions%20with%20a%20Redis-Backed%20Worker.md)
+
 ---
