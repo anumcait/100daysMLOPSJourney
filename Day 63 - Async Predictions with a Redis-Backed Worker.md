@@ -171,3 +171,11 @@ Successfully implemented an asynchronous prediction service where:
 - Clients can poll for prediction results using the provided `task_id`.
 
 ### Screenshots
+
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/80096eb9-2ffd-43cf-a0f0-62006d71d713" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/e6f8c127-be87-4010-8c84-dc55d5ffc976" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/0de890fc-d53e-4f2e-a255-c46434284399" />
+
+---
+
+
