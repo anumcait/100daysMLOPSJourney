@@ -221,3 +221,13 @@ Successfully integrated the **recommend** model into the existing ML serving pla
 - Verifying that all three model endpoints responded through the unified API gateway.
 
 ### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/7ad6b138-9665-4dd7-b27c-17b6e51ac0b0" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/eb625f1c-09b8-4530-b956-11b20858aca3" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/e520d6ea-a6ba-4d0c-a3b2-bc529eaf54c8" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/641ed7c1-7b9c-4472-bf2a-3b2ec0796d03" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/d372e58c-4560-4b0b-8436-5d8b4f0c5afc" />
+
+
+
+
+
