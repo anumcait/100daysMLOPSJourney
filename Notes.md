@@ -14076,5 +14076,949 @@ These tools provide durable queues, retries, monitoring, scheduling, and better 
 - `POST /predict-async` starts the task, while `GET /result/<task_id>` lets clients poll for completion.
 - This request/worker/result pattern is widely used in production ML serving systems.
 
+# Day 64 Notes: Serving Multiple ML Models Behind a Unified Nginx API Gateway
+
+---
+
+# Introduction
+
+In production Machine Learning systems, it is very common to have **multiple models** serving different business use cases.
+
+For example:
+
+- Fraud Detection Model
+- Customer Churn Prediction Model
+- Recommendation System
+- Sentiment Analysis Model
+- Price Prediction Model
+
+Instead of exposing each model on different ports, organizations usually expose **one API endpoint** and use a **Reverse Proxy** to forward requests to the correct model.
+
+That is exactly what this lab demonstrates.
+
+---
+
+# Architecture Overview
+
+```
+                Client
+
+                  │
+
+                  │ HTTP Request
+
+                  ▼
+
+         +------------------+
+         |      Nginx       |
+         | Reverse Proxy    |
+         +------------------+
+
+      /fraud/      /churn/      /recommend/
+
+         │             │               │
+
+         ▼             ▼               ▼
+
++-------------+ +-------------+ +--------------+
+| Fraud Model | | Churn Model | | Recommend ML |
+| Flask App   | | Flask App   | | Flask App    |
++-------------+ +-------------+ +--------------+
+```
+
+The client only knows about
+
+```
+localhost:8085
+```
+
+The client never directly talks to the Flask applications.
+
+---
+
+# Why use Nginx?
+
+Imagine three Flask applications running on
+
+```
+Fraud       :5000
+Churn       :5000
+Recommend   :5000
+```
+
+Although every application listens on port 5000, they are inside different Docker containers.
+
+Docker provides internal networking.
+
+So
+
+```
+fraud:5000
+```
+
+means
+
+> Container named fraud
+
+Similarly
+
+```
+recommend:5000
+```
+
+means
+
+> Container named recommend
+
+Nginx forwards requests to these containers.
+
+---
+
+# Reverse Proxy
+
+A Reverse Proxy receives requests from clients and forwards them to backend servers.
+
+Example:
+
+```
+Browser
+
+↓
+
+Nginx
+
+↓
+
+Flask
+```
+
+The browser never communicates with Flask directly.
+
+Advantages:
+
+- Security
+- Load balancing
+- SSL termination
+- URL routing
+- Centralized access
+- Hiding backend services
+
+---
+
+# What is Docker Compose?
+
+Docker Compose allows us to run multiple containers using a single YAML file.
+
+Instead of typing
+
+```
+docker run ...
+docker run ...
+docker run ...
+```
+
+we simply write
+
+```yaml
+services:
+```
+
+and define each container.
+
+---
+
+# Existing Services
+
+Initially the project had
+
+```
+Fraud
+
+Churn
+
+Nginx
+```
+
+The recommendation model already existed on disk but Compose didn't know about it.
+
+Project structure
+
+```
+multi-model/
+
+docker-compose.yml
+
+nginx.conf
+
+fraud/
+
+churn/
+
+recommend/
+```
+
+---
+
+# Docker Compose Services
+
+Every application becomes one service.
+
+Example
+
+```yaml
+services:
+
+  fraud:
+
+  churn:
+
+  recommend:
+
+  nginx:
+```
+
+Each service runs inside its own container.
+
+---
+
+# Fraud Service
+
+```yaml
+fraud:
+  build: ./fraud
+  container_name: mm-fraud
+```
+
+Explanation
+
+```
+build
+```
+
+Docker builds an image from
+
+```
+./fraud/Dockerfile
+```
+
+instead of downloading one.
+
+```
+container_name
+```
+
+Specifies the actual Docker container name.
+
+Instead of random names like
+
+```
+happy_pike
+```
+
+we get
+
+```
+mm-fraud
+```
+
+---
+
+# Churn Service
+
+Exactly the same idea.
+
+```yaml
+churn:
+  build: ./churn
+  container_name: mm-churn
+```
+
+---
+
+# Recommendation Service
+
+The task was to add
+
+```yaml
+recommend:
+  build: ./recommend
+  container_name: mm-recommend
+```
+
+Now Compose knows another container must be built.
+
+---
+
+# Nginx Service
+
+```yaml
+nginx:
+```
+
+Runs the reverse proxy.
+
+Example
+
+```yaml
+image: nginx:alpine
+```
+
+Instead of building an image ourselves, Docker downloads
+
+```
+nginx:alpine
+```
+
+---
+
+# Port Mapping
+
+```yaml
+ports:
+
+- "8085:80"
+```
+
+Meaning
+
+```
+Host Machine
+
+8085
+      │
+
+      ▼
+
+Container
+
+80
+```
+
+The client accesses
+
+```
+localhost:8085
+```
+
+Nginx receives traffic on port
+
+```
+80
+```
+
+inside the container.
+
+---
+
+# Mounting Configuration
+
+```yaml
+volumes:
+
+- ./nginx.conf:/etc/nginx/nginx.conf:ro
+```
+
+Meaning
+
+```
+Host File
+
+nginx.conf
+
+↓
+
+Mounted Into
+
+/etc/nginx/nginx.conf
+```
+
+Whenever the container starts, Nginx uses our configuration.
+
+```
+ro
+```
+
+means
+
+Read Only.
+
+The container cannot modify the host configuration.
+
+---
+
+# depends_on
+
+Initially
+
+```yaml
+depends_on:
+
+- fraud
+
+- churn
+```
+
+After adding recommendation
+
+```yaml
+depends_on:
+
+- fraud
+
+- churn
+
+- recommend
+```
+
+Compose starts backend services before Nginx.
+
+---
+
+# Understanding Nginx Upstreams
+
+Instead of repeatedly writing
+
+```
+fraud:5000
+```
+
+Nginx lets us create aliases.
+
+Example
+
+```nginx
+upstream fraud {
+
+server fraud:5000;
+
+}
+```
+
+Now
+
+```
+fraud
+```
+
+becomes an alias for
+
+```
+fraud:5000
+```
+
+---
+
+# Why Upstreams?
+
+Without upstream
+
+```nginx
+proxy_pass http://fraud:5000;
+```
+
+With upstream
+
+```nginx
+proxy_pass http://fraud;
+```
+
+Cleaner configuration.
+
+Easy to change backend later.
+
+---
+
+# Recommendation Upstream
+
+Added
+
+```nginx
+upstream recommend {
+
+server recommend:5000;
+
+}
+```
+
+Meaning
+
+```
+recommend
+
+↓
+
+recommend container
+
+↓
+
+Port 5000
+```
+
+---
+
+# Nginx Location Block
+
+A location block matches URLs.
+
+Example
+
+```nginx
+location /fraud/
+```
+
+Matches
+
+```
+/fraud
+
+/fraud/
+
+/fraud/predict
+```
+
+---
+
+# Recommendation Location
+
+```nginx
+location /recommend/ {
+
+proxy_pass http://recommend;
+
+}
+```
+
+Meaning
+
+```
+Incoming Request
+
+/recommend/predict
+
+↓
+
+Nginx
+
+↓
+
+recommend container
+
+↓
+
+Port 5000
+```
+
+---
+
+# Proxy Headers
+
+Common configuration
+
+```nginx
+proxy_set_header Host $host;
+
+proxy_set_header X-Real-IP $remote_addr;
+
+proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+proxy_set_header X-Forwarded-Proto $scheme;
+```
+
+Purpose
+
+Host
+
+Original host name
+
+Example
+
+```
+localhost
+```
+
+---
+
+## X-Real-IP
+
+Passes client's IP address.
+
+Useful for logging.
+
+---
+
+## X-Forwarded-For
+
+Preserves the chain of proxies.
+
+Useful when multiple proxies exist.
+
+---
+
+## X-Forwarded-Proto
+
+Indicates
+
+```
+HTTP
+
+or
+
+HTTPS
+```
+
+Useful for redirects.
+
+---
+
+# Docker Networking
+
+One important question
+
+How does
+
+```
+recommend
+```
+
+become an IP address?
+
+Docker Compose automatically creates a network.
+
+Example
+
+```
+compose_network
+```
+
+Every service joins this network.
+
+DNS entries become
+
+```
+fraud
+
+↓
+
+Container IP
+
+recommend
+
+↓
+
+Container IP
+```
+
+Nginx resolves names automatically.
+
+No IP addresses are needed.
+
+---
+
+# Starting Containers
+
+Command
+
+```bash
+docker compose up -d
+```
+
+Meaning
+
+```
+up
+```
+
+Create and start services.
+
+```
+-d
+```
+
+Detached mode.
+
+Runs in background.
+
+---
+
+# Checking Running Containers
+
+```bash
+docker compose ps
+```
+
+Shows
+
+- Container Name
+- Status
+- Ports
+
+Expected
+
+```
+mm-fraud
+
+mm-churn
+
+mm-recommend
+
+mm-nginx
+```
+
+All should be
+
+```
+Up
+```
+
+---
+
+# Testing APIs
+
+Fraud
+
+```bash
+curl -X POST http://localhost:8085/fraud/predict
+```
+
+Nginx forwards request
+
+```
+↓
+
+Fraud Flask
+
+↓
+
+JSON Response
+```
+
+---
+
+Churn
+
+```bash
+curl -X POST http://localhost:8085/churn/predict
+```
+
+---
+
+Recommendation
+
+```bash
+curl -X POST http://localhost:8085/recommend/predict
+```
+
+Expected JSON
+
+```json
+{
+  "service":"recommend",
+  "items":[...]
+}
+```
+
+---
+
+# Complete Request Flow
+
+```
+curl
+
+↓
+
+localhost:8085
+
+↓
+
+Nginx
+
+↓
+
+Location Matching
+
+↓
+
+/recommend/
+
+↓
+
+Proxy Pass
+
+↓
+
+recommend container
+
+↓
+
+Flask
+
+↓
+
+JSON
+
+↓
+
+Nginx
+
+↓
+
+Client
+```
+
+---
+
+# Why Not Expose Every Flask App?
+
+Instead of
+
+```
+localhost:5001
+
+localhost:5002
+
+localhost:5003
+```
+
+We expose only
+
+```
+localhost:8085
+```
+
+Benefits
+
+- Cleaner APIs
+- Easier maintenance
+- Better security
+- One entry point
+- Easy SSL configuration
+- Easy authentication
+- Easy logging
+
+---
+
+# Real Production Example
+
+```
+api.company.com
+
+│
+
+├── /login
+
+├── /payments
+
+├── /fraud
+
+├── /recommend
+
+├── /orders
+
+├── /customers
+
+└── /analytics
+```
+
+Internally
+
+```
+Each route
+
+↓
+
+Different microservice
+
+↓
+
+Different container
+
+↓
+
+Different language
+
+↓
+
+Different team
+```
+
+Users never know.
+
+---
+
+# Common Interview Questions
+
+### What is a Reverse Proxy?
+
+A server that receives client requests and forwards them to backend servers while hiding backend implementation details.
+
+---
+
+### Why use Nginx instead of exposing Flask directly?
+
+- Better security
+- Better performance
+- SSL support
+- Load balancing
+- Routing
+- Caching
+- Compression
+
+---
+
+### What does `proxy_pass` do?
+
+It forwards the incoming HTTP request to another server.
+
+---
+
+### What is an upstream?
+
+An alias representing one or more backend servers.
+
+---
+
+### Why use Docker Compose?
+
+To define and manage multiple containers using a single configuration file.
+
+---
+
+### What does `depends_on` do?
+
+It controls startup order, ensuring dependent services start before others. It does **not** guarantee that an application inside the container is fully ready to accept traffic.
+
+---
+
+### Why are all containers listening on port 5000?
+
+Each container has its own isolated network namespace, so every Flask application can safely use port 5000 without conflicting with the others.
+
+---
+
+### How does Nginx find the Flask containers?
+
+Docker Compose creates an internal network with DNS-based service discovery. Service names such as `fraud`, `churn`, and `recommend` resolve automatically to the corresponding container IP addresses.
+
+---
+
+# Key Takeaways
+
+- Docker Compose simplifies running multi-container applications.
+- Every ML model can run in its own isolated container.
+- Nginx acts as a single API gateway for all backend services.
+- `upstream` blocks make backend definitions reusable and easier to maintain.
+- `location` blocks route requests based on URL paths.
+- Docker's internal DNS allows containers to communicate using service names instead of IP addresses.
+- `docker compose up -d` builds and starts the application stack.
+- `docker compose ps` verifies the status of running containers.
+- `curl` is a simple way to test API endpoints exposed through the reverse proxy.
+
+---
+
+# Summary
+
+In this lab, we extended an existing ML serving platform by integrating a new **Recommendation** model into a Docker Compose application. We updated the Compose configuration to build and run the new service, configured Nginx with an additional upstream and routing rule, launched the complete stack, and verified that all three machine learning models were accessible through a single unified API gateway. This pattern is widely used in production microservice and MLOps environments because it provides a single entry point for clients while allowing backend services to scale and evolve independently.
+
+
 ---
 
