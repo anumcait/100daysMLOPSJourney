@@ -84,6 +84,7 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 63: Async Predictions with a Redis-Backed Worker](./Day%2063%20-%20Async%20Predictions%20with%20a%20Redis-Backed%20Worker.md)
 
-- [Day 64: Serve Multiple Models Behind a Unified API Gateway](./Day%2064%20-%20Serve%20Multiple%20Models%20Behind%20a%20Unified%20API%20Gateway.md)
+- [Day 64: Serve Multiple Models Behind a Unified API Gateway](./ Day%2064%20-%20Serve%20Multiple%20Models%20Behind%20a%20Unified%20API%20Gateway.md)
 
+- [Day 65: Simulate a Canary Rollout for Model Updates](./Day%2065%20-%20Simulate%20a%20Canary%20Rollout%20for%20Model%20Updates.md)
 ---

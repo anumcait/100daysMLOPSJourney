@@ -15020,5 +15020,1048 @@ Docker Compose creates an internal network with DNS-based service discovery. Ser
 In this lab, we extended an existing ML serving platform by integrating a new **Recommendation** model into a Docker Compose application. We updated the Compose configuration to build and run the new service, configured Nginx with an additional upstream and routing rule, launched the complete stack, and verified that all three machine learning models were accessible through a single unified API gateway. This pattern is widely used in production microservice and MLOps environments because it provides a single entry point for clients while allowing backend services to scale and evolve independently.
 
 
+# Day 65 Notes
+# Simulate a Canary Rollout for Model Updates
+
+---
+
+# Introduction
+
+In modern Machine Learning systems, deploying a newly trained model directly to every user is extremely risky.
+
+Imagine your fraud detection model has been retrained.
+
+Although offline testing may show excellent accuracy, you never know how it will behave with **real production traffic**.
+
+If the new model contains bugs or makes incorrect predictions, it could:
+
+- Block legitimate transactions
+- Allow fraudulent transactions
+- Reduce customer trust
+- Cause financial loss
+
+Instead of replacing the old model instantly, organizations perform a **Canary Deployment**.
+
+A Canary Deployment slowly shifts traffic from the old model to the new model while continuously monitoring its health.
+
+If everything looks healthy, traffic gradually increases.
+
+If anything goes wrong, the deployment immediately rolls back.
+
+---
+
+# Why is it called Canary Deployment?
+
+The name comes from coal mining.
+
+Years ago miners carried **canary birds** into coal mines.
+
+Canaries are extremely sensitive to poisonous gases.
+
+If dangerous gas leaked, the canary became sick before the miners noticed.
+
+The miners could safely escape.
+
+The canary acted as an **early warning system**.
+
+Software deployments use exactly the same idea.
+
+Instead of exposing every customer to the new software,
+
+only a tiny percentage sees it first.
+
+If problems appear,
+
+the rollout stops before everyone is affected.
+
+---
+
+# Traditional Deployment vs Canary Deployment
+
+## Traditional Deployment
+
+```
+100% Users
+      │
+      ▼
+ Old Version
+      │
+      ▼
+Deploy New Version
+      │
+      ▼
+100% Users use New Version
+```
+
+Problem:
+
+If the new version has a bug,
+
+every user experiences it immediately.
+
+---
+
+## Canary Deployment
+
+```
+100% Users
+      │
+      ▼
+
+95% → Old Version
+5%  → New Version
+
+↓
+
+70% → Old Version
+30% → New Version
+
+↓
+
+0% → Old Version
+100% → New Version
+```
+
+Only a few users experience problems if something goes wrong.
+
+---
+
+# Real Companies Using Canary Deployments
+
+Many major companies use this strategy.
+
+- Google
+- Netflix
+- Amazon
+- Microsoft
+- Meta
+- Uber
+
+They rarely deploy software to everyone at once.
+
+Instead they:
+
+Deploy
+
+↓
+
+Monitor
+
+↓
+
+Increase traffic
+
+↓
+
+Monitor again
+
+↓
+
+Increase again
+
+↓
+
+Complete rollout
+
+---
+
+# ML Model Deployment
+
+Suppose we have
+
+```
+Model v1
+```
+
+Current production model.
+
+Now data scientists train
+
+```
+Model v2
+```
+
+Offline evaluation looks good.
+
+But production traffic is different.
+
+Therefore we never trust offline metrics alone.
+
+Instead we perform
+
+```
+Canary Deployment
+```
+
+---
+
+# Traffic Split
+
+Traffic split simply means
+
+"What percentage of users go to each version?"
+
+Example
+
+```
+100 requests
+```
+
+95%
+
+↓
+
+v1
+
+5%
+
+↓
+
+v2
+
+Out of 100 users
+
+95 use old model
+
+5 use new model
+
+---
+
+# Traffic Weight
+
+Weights define routing probability.
+
+Example
+
+```
+v1 = 95%
+
+v2 = 5%
+```
+
+Whenever a request arrives
+
+Random routing decides
+
+```
+95%
+```
+
+Send to v1
+
+or
+
+```
+5%
+```
+
+Send to v2
+
+---
+
+# Our Project
+
+We have
+
+```
+canary_deploy.py
+```
+
+This file simulates a deployment.
+
+No Kubernetes.
+
+No Docker.
+
+No Network.
+
+Everything happens using Python.
+
+---
+
+# Project Constants
+
+The program contains
+
+```python
+REQUESTS_PER_PHASE = 100
+```
+
+Meaning
+
+Every rollout phase receives
+
+100 requests.
+
+There are
+
+3 phases.
+
+Therefore
+
+```
+100 × 3 = 300 requests
+```
+
+Final output
+
+```
+Total requests: 300
+```
+
+---
+
+# Simulated Error Rate
+
+The program contains
+
+```python
+V2_ERROR_RATE = 0.02
+```
+
+Meaning
+
+The new model has
+
+2%
+
+probability of failing.
+
+Notice
+
+This is only a simulation.
+
+Real deployments would calculate errors from
+
+- HTTP failures
+- Prediction failures
+- Latency
+- Timeouts
+- Business metrics
+
+---
+
+# Random Simulation
+
+The code uses
+
+```python
+random.Random(seed=42)
+```
+
+Why?
+
+Without a seed
+
+Every execution gives different numbers.
+
+With a seed
+
+Every execution produces identical results.
+
+Example
+
+```
+Run 1
+
+Phase 3
+
+3% errors
+```
+
+Run 2
+
+Same result.
+
+This makes testing reproducible.
+
+---
+
+# CanaryDeployer Class
+
+The class controls deployment.
+
+```
+CanaryDeployer
+```
+
+Responsibilities
+
+- store weights
+- promote deployment
+- rollback deployment
+- send requests
+
+---
+
+# Initial State
+
+Initially
+
+```python
+self.v1_weight = 1.0
+```
+
+Means
+
+```
+100%
+```
+
+traffic goes to v1.
+
+And
+
+```python
+self.v2_weight = 0.0
+```
+
+Means
+
+No traffic reaches v2.
+
+---
+
+# Promotion
+
+Promotion means
+
+Increase traffic to the new model.
+
+Our rollout consists of
+
+---
+
+## Phase 1
+
+```
+95%
+
+↓
+
+v1
+
+5%
+
+↓
+
+v2
+```
+
+Purpose
+
+Very small exposure.
+
+Only a few users test the new model.
+
+---
+
+## Phase 2
+
+```
+70%
+
+↓
+
+v1
+
+30%
+
+↓
+
+v2
+```
+
+Purpose
+
+Gain more confidence.
+
+If monitoring still looks healthy,
+
+continue.
+
+Notice
+
+v1 still receives more traffic than v2.
+
+---
+
+## Phase 3
+
+```
+0%
+
+↓
+
+v1
+
+100%
+
+↓
+
+v2
+```
+
+Purpose
+
+Full deployment.
+
+The old model is no longer serving traffic.
+
+---
+
+# promote()
+
+Our implementation
+
+```python
+def promote(self):
+    self.phase += 1
+
+    if self.phase == 1:
+        self.v1_weight = 0.95
+        self.v2_weight = 0.05
+
+    elif self.phase == 2:
+        self.v1_weight = 0.70
+        self.v2_weight = 0.30
+
+    elif self.phase == 3:
+        self.v1_weight = 0.00
+        self.v2_weight = 1.00
+
+    return self.v1_weight, self.v2_weight
+```
+
+---
+
+# Understanding Each Line
+
+```
+self.phase += 1
+```
+
+Move to the next rollout stage.
+
+---
+
+```
+if self.phase == 1
+```
+
+Configure first rollout.
+
+---
+
+```
+self.v1_weight = 0.95
+```
+
+95%
+
+traffic
+
+↓
+
+old model.
+
+---
+
+```
+self.v2_weight = 0.05
+```
+
+5%
+
+traffic
+
+↓
+
+new model.
+
+---
+
+Same logic repeats for
+
+Phase 2
+
+and
+
+Phase 3.
+
+---
+
+# send_requests()
+
+This function simulates
+
+100 incoming users.
+
+Pseudo flow
+
+```
+for each request
+
+↓
+
+Random number
+
+↓
+
+Route request
+
+↓
+
+v1 or v2
+
+↓
+
+If v2
+
+↓
+
+Randomly generate error
+
+↓
+
+Count errors
+```
+
+---
+
+# Routing Logic
+
+```python
+if random < v1_weight
+```
+
+Suppose
+
+```
+Random = 0.31
+
+Weight = 0.95
+```
+
+Since
+
+```
+0.31 < 0.95
+```
+
+Request goes to
+
+v1.
+
+Another example
+
+```
+Random = 0.98
+
+Weight = 0.95
+```
+
+Now
+
+```
+0.98 > 0.95
+```
+
+Request goes to
+
+v2.
+
+---
+
+# Error Simulation
+
+If routed to v2
+
+Program executes
+
+```python
+if random < V2_ERROR_RATE
+```
+
+Suppose
+
+```
+V2_ERROR_RATE
+
+=
+
+0.02
+```
+
+Only
+
+2%
+
+of requests become errors.
+
+---
+
+# Error Rate Formula
+
+```
+Error Rate
+
+=
+
+Errors
+
+÷
+
+Requests
+```
+
+Example
+
+```
+Errors
+
+=
+
+3
+
+Requests
+
+=
+
+100
+
+Rate
+
+=
+
+3%
+```
+
+---
+
+# Rollback Threshold
+
+Important variable
+
+```python
+ROLLBACK_THRESHOLD
+```
+
+We changed
+
+```python
+1.0
+```
+
+to
+
+```python
+0.05
+```
+
+Meaning
+
+```
+5%
+```
+
+---
+
+# Why 5%?
+
+Suppose
+
+Threshold
+
+```
+100%
+```
+
+Even terrible models continue running.
+
+No rollback happens.
+
+Very dangerous.
+
+---
+
+Suppose
+
+Threshold
+
+```
+1%
+```
+
+Healthy models may randomly exceed
+
+1%.
+
+Deployment stops unnecessarily.
+
+False rollback.
+
+---
+
+Suppose
+
+Threshold
+
+```
+5%
+```
+
+Healthy rollout continues.
+
+Bad rollout stops.
+
+Balanced choice.
+
+---
+
+# Rollback
+
+If
+
+```
+Error Rate
+
+>
+
+Threshold
+```
+
+Program executes
+
+```python
+rollback()
+```
+
+Rollback sets
+
+```python
+v1 = 100%
+
+v2 = 0%
+```
+
+Old model serves everyone again.
+
+---
+
+# Main Loop
+
+Program runs
+
+```python
+for phase in range(1,4)
+```
+
+Meaning
+
+```
+Phase 1
+
+↓
+
+Phase 2
+
+↓
+
+Phase 3
+```
+
+Each phase
+
+- updates weights
+- sends requests
+- calculates errors
+- checks threshold
+
+---
+
+# Promotion Condition
+
+If
+
+```
+Error Rate
+
+≤
+
+Threshold
+```
+
+Continue.
+
+Next phase starts.
+
+---
+
+# Rollback Condition
+
+If
+
+```
+Error Rate
+
+>
+
+Threshold
+```
+
+Stop deployment.
+
+Rollback immediately.
+
+---
+
+# Final Output
+
+Healthy rollout
+
+```
+Phase 1
+
+↓
+
+Healthy
+
+↓
+
+Phase 2
+
+↓
+
+Healthy
+
+↓
+
+Phase 3
+
+↓
+
+Healthy
+
+↓
+
+OUTCOME: PROMOTED
+```
+
+---
+
+# Sample Output
+
+```
+Phase 1: v1=95% v2=5%
+v1_requests=94
+v2_requests=6
+v2_error_rate=0.00%
+
+Phase 2: v1=70% v2=30%
+v1_requests=70
+v2_requests=30
+v2_error_rate=0.00%
+
+Phase 3: v1=0% v2=100%
+v1_requests=0
+v2_requests=100
+v2_error_rate=3.00%
+
+OUTCOME: PROMOTED
+
+Total requests:300
+```
+
+---
+
+# Why Did Phase 3 Show 3% Instead of 2%?
+
+The configured error probability is
+
+```
+2%
+```
+
+not exactly
+
+2 errors every 100 requests.
+
+Probability means
+
+some executions may produce
+
+- 1%
+- 2%
+- 3%
+- 4%
+
+Using the fixed random seed (`42`) makes the simulation deterministic, and for this sequence the final phase happens to produce **3%**.
+
+---
+
+# Real Deployment Tools
+
+This simulator demonstrates the same ideas used by:
+
+- Argo Rollouts
+- Flagger
+- Linkerd
+- Istio
+- Kubernetes Deployments
+
+These tools automate progressive delivery by shifting traffic, monitoring metrics, and rolling back automatically when thresholds are exceeded.
+
+---
+
+# Interview Questions
+
+## What is Canary Deployment?
+
+A deployment strategy where a small percentage of traffic is routed to the new version first. If the new version remains healthy, traffic is gradually increased until all users are served by the new version.
+
+---
+
+## Why is Canary Deployment better than Blue-Green Deployment?
+
+Canary deployment exposes only a small percentage of users to the new version initially, reducing risk and allowing early detection of issues before a full rollout.
+
+---
+
+## Why do we need a rollback threshold?
+
+The rollback threshold defines the maximum acceptable failure rate. If the new version exceeds this value, the deployment automatically reverts to the stable version to protect users.
+
+---
+
+## Why use `random.Random(seed=42)`?
+
+Using a fixed seed ensures the simulation produces the same sequence of random values every run, making results reproducible and easier to test.
+
+---
+
+## Why is Phase 2 still using 70% v1?
+
+The majority of traffic remains on the stable version while confidence in the new version is built. This limits user impact if unexpected issues appear.
+
+---
+
+## Why do we use 5% as the rollback threshold?
+
+A 5% threshold is a commonly used default because it balances stability and sensitivity. A much higher threshold delays rollback, while a much lower threshold can trigger unnecessary rollbacks due to normal statistical variation.
+
+---
+
+# Key Takeaways
+
+- Canary deployment reduces deployment risk.
+- Traffic is shifted gradually rather than all at once.
+- Health metrics are checked after each rollout phase.
+- Automatic rollback protects users from unhealthy releases.
+- A fixed random seed makes simulations reproducible.
+- Progressive delivery is a standard practice in modern ML and cloud-native deployments.
+- The simulator mirrors the behaviour of real deployment tools such as Argo Rollouts, Flagger, and Linkerd.
+
+
 ---
 
