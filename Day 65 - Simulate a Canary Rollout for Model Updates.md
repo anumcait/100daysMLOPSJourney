@@ -137,3 +137,12 @@ All lab requirements were satisfied:
 - A **5% rollback threshold** is a common default in progressive delivery platforms such as Argo Rollouts, Flagger, and Linkerd.
 
 ### Screenshots
+
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/6732e430-1b83-44b9-ae0a-11996c8567ad" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/11e30adb-fa7f-4c0d-8ccf-acfddd010f40" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/03d92f84-940c-4e0d-863d-5bbf58aad785" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/f46d2366-92a7-42ba-b0ce-37eb3b4b2b3e" />
+
+
+
+
