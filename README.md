@@ -87,4 +87,8 @@ Tracking my 100-day journey into Machine Learning Operations.
 - [Day 64: Serve Multiple Models Behind a Unified API Gateway](./Day%2064%20-%20Serve%20Multiple%20Models%20Behind%20a%20Unified%20API%20Gateway.md)
 
 - [Day 65: Simulate a Canary Rollout for Model Updates](./Day%2065%20-%20Simulate%20a%20Canary%20Rollout%20for%20Model%20Updates.md)
+
+- [Day 66: Production Model Serving with Docker Compose](./Day%2066%20-%20Production%20Model%20Serving%20with%20Docker%20Compose.md)
+
+
 ---

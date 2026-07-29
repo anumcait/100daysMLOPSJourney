@@ -16063,5 +16063,808 @@ A 5% threshold is a commonly used default because it balances stability and sens
 - The simulator mirrors the behaviour of real deployment tools such as Argo Rollouts, Flagger, and Linkerd.
 
 
+# Day 66 Notes: Production Model Serving with Docker Compose
+
+## Topic: Building a Production ML Serving and Observability Stack
+
+---
+
+# 1. Introduction
+
+In a real production machine learning environment, deploying a trained model is not only about creating an API endpoint.
+
+A production ML system requires:
+
+- A model serving layer
+- Request handling
+- Security and traffic control
+- Monitoring
+- Metrics collection
+- Visualization
+- Container orchestration
+- Health checks
+- Failure recovery
+
+In this task, we are deploying a fraud detection model with the following production architecture:
+
+```
+Client
+  |
+  |
+nginx Reverse Proxy
+  |
+  |
+Flask Model API
+  |
+  +----------------+
+  |                |
+Redis          Prometheus
+(rate limit)   (metrics)
+                   |
+                   |
+                Grafana
+             (visualization)
+```
+
+Everything runs using Docker Compose.
+
+---
+
+# 2. Components Overview
+
+The complete stack contains six containers:
+
+## 1. model-api
+
+This is the machine learning inference service.
+
+Technology:
+
+- Python
+- Flask
+- Scikit-learn
+- Joblib
+- Prometheus Flask Exporter
+
+Responsibilities:
+
+- Load trained model
+- Accept prediction requests
+- Return fraud prediction
+- Provide health endpoint
+- Export metrics
+
+
+Endpoints:
+
+## Health Check
+
+```
+GET /health
+```
+
+Example:
+
+```json
+{
+  "status": "ok"
+}
+```
+
+
+## Prediction API
+
+```
+POST /predict
+```
+
+Example request:
+
+```json
+{
+  "amount":500,
+  "hour":12,
+  "num_tx_past_day":2
+}
+```
+
+
+Example response:
+
+```json
+{
+  "is_fraud":0
+}
+```
+
+
+## Metrics Endpoint
+
+```
+GET /metrics
+```
+
+Used by Prometheus.
+
+---
+
+# 3. Why We Need Docker Compose
+
+A machine learning production system contains multiple services.
+
+Running everything manually is difficult.
+
+Docker Compose allows us to define:
+
+- Containers
+- Networks
+- Ports
+- Volumes
+- Dependencies
+- Restart policies
+
+
+Example:
+
+```
+docker-compose.yml
+```
+
+describes the complete application.
+
+One command starts everything:
+
+```bash
+docker compose up -d
+```
+
+---
+
+# 4. Understanding Container Networking
+
+Docker Compose automatically creates an internal network.
+
+Every service can communicate using the service name.
+
+Example:
+
+```
+model-api
+```
+
+is automatically available as:
+
+```
+http://model-api
+```
+
+inside the Docker network.
+
+This is important because containers should communicate using service names, not localhost.
+
+Incorrect:
+
+```
+localhost:5000
+```
+
+Correct:
+
+```
+model-api:5000
+```
+
+---
+
+# 5. Flask Application
+
+The Flask application is responsible for serving the ML model.
+
+The application flow:
+
+```
+Request
+  |
+  |
+Flask
+  |
+  |
+Validate input
+  |
+  |
+Prepare features
+  |
+  |
+Load model prediction
+  |
+  |
+Return JSON response
+```
+
+---
+
+# 6. Loading the ML Model
+
+The model is stored as:
+
+```
+model.pkl
+```
+
+It is loaded during application startup:
+
+```python
+MODEL = joblib.load("/app/model.pkl")
+```
+
+This avoids loading the model every request.
+
+Production systems normally load the model once when the application starts.
+
+---
+
+# 7. Redis Rate Limiting
+
+## Why Rate Limiting?
+
+Without protection, one client can send unlimited requests.
+
+Example:
+
+```
+Attacker
+   |
+   |
+100000 requests/sec
+   |
+   |
+API crashes
+```
+
+To prevent this, we use Redis.
+
+---
+
+## Rate Limit Logic
+
+Each client IP gets a counter.
+
+Example:
+
+```
+IP Address:
+
+192.168.1.10
+
+Redis key:
+
+ratelimit:192.168.1.10
+```
+
+Every request increases the counter:
+
+```
+Request 1
+counter = 1
+
+Request 2
+counter = 2
+
+Request 100
+counter = 100
+```
+
+After the limit:
+
+```
+Request 101
+
+Response:
+
+429 Too Many Requests
+```
+
+---
+
+# 8. Prometheus Monitoring
+
+## What is Prometheus?
+
+Prometheus is a monitoring system.
+
+It collects numerical metrics from applications.
+
+Applications expose metrics:
+
+```
+Application
+    |
+    |
+/metrics endpoint
+    |
+    |
+Prometheus
+```
+
+Prometheus periodically scrapes metrics.
+
+---
+
+# 9. Prometheus Flask Exporter
+
+The Flask exporter automatically creates metrics.
+
+Example:
+
+```
+flask_http_request_total
+```
+
+Meaning:
+
+Total HTTP requests received.
+
+Example:
+
+```
+flask_http_request_total{method="POST",status="200"} 159
+```
+
+Meaning:
+
+159 successful POST requests.
+
+
+---
+
+# 10. Important Debugging Issue
+
+Initially Prometheus was configured incorrectly.
+
+The Flask application listens on:
+
+```
+5000
+```
+
+but Prometheus tried:
+
+```
+8000
+```
+
+
+Wrong:
+
+```yaml
+targets:
+  - model-api:8000
+```
+
+
+Correct:
+
+```yaml
+targets:
+  - model-api:5000
+```
+
+
+Why?
+
+Because Prometheus communicates directly with the container.
+
+It does not use the exposed host port.
+
+---
+
+# 11. nginx Reverse Proxy
+
+## Why nginx?
+
+Users should not directly access the Flask application.
+
+Instead:
+
+```
+User
+
+ |
+
+nginx
+
+ |
+
+Flask
+```
+
+
+Benefits:
+
+- Security
+- Load balancing
+- SSL termination
+- Routing
+- Traffic management
+
+
+---
+
+# 12. nginx Configuration Issue
+
+The Flask container listens on:
+
+```
+5000
+```
+
+but nginx was forwarding to:
+
+```
+8000
+```
+
+
+Incorrect:
+
+```nginx
+server model-api:8000;
+```
+
+
+Correct:
+
+```nginx
+server model-api:5000;
+```
+
+
+---
+
+# 13. Health Checks
+
+Docker health checks verify whether the application is alive.
+
+Example:
+
+```yaml
+healthcheck:
+  test:
+    curl http://localhost:5000/health
+```
+
+
+Docker states:
+
+```
+Starting
+
+        |
+        |
+Healthy
+```
+
+A healthy container can receive traffic.
+
+---
+
+# 14. Starting the Application
+
+First stop old containers:
+
+```bash
+docker compose down
+```
+
+
+Build and start:
+
+```bash
+docker compose up -d --build
+```
+
+
+Check status:
+
+```bash
+docker compose ps
+```
+
+Expected:
+
+```
+model-api       Up (healthy)
+prod-redis      Up
+prod-nginx      Up
+prod-prometheus Up
+prod-grafana    Up
+prod-traffic    Up
+```
+
+---
+
+# 15. Testing the API
+
+Direct Flask test:
+
+```bash
+curl http://localhost:5000/metrics
+```
+
+
+Through nginx:
+
+```bash
+curl -X POST http://localhost:8085/predict \
+-H "Content-Type: application/json" \
+-d '{"amount":500,"hour":12,"num_tx_past_day":2}'
+```
+
+
+The second method represents real production traffic.
+
+---
+
+# 16. Prometheus Target Verification
+
+Prometheus API:
+
+```bash
+curl http://localhost:9090/api/v1/targets
+```
+
+
+Successful output:
+
+```json
+{
+"health":"up"
+}
+```
+
+
+This confirms:
+
+```
+Prometheus
+     |
+     |
+ Flask API
+```
+
+communication is working.
+
+---
+
+# 17. Grafana Dashboard
+
+## What is Grafana?
+
+Grafana is a visualization platform.
+
+Prometheus stores data.
+
+Grafana displays data.
+
+
+Architecture:
+
+```
+Prometheus
+
+     |
+
+ Grafana
+
+     |
+
+ Dashboard
+```
+
+
+---
+
+# 18. Creating Request Rate Dashboard
+
+The metric:
+
+```
+flask_http_request_total
+```
+
+is a counter.
+
+Counters continuously increase.
+
+Example:
+
+```
+100 requests
+
+after traffic:
+
+200 requests
+```
+
+
+To calculate requests per second:
+
+we use:
+
+```promql
+rate()
+```
+
+
+Query:
+
+```promql
+sum(rate(flask_http_request_total[1m]))
+```
+
+
+Explanation:
+
+```
+rate()
+```
+
+calculates change over time.
+
+
+```
+[1m]
+```
+
+means last one minute.
+
+
+```
+sum()
+```
+
+combines all request types.
+
+---
+
+# 19. Grafana Validation
+
+Datasource check:
+
+```bash
+curl -u admin:grafana2026 \
+http://localhost:3000/api/datasources
+```
+
+
+Dashboard check:
+
+```bash
+curl -u admin:grafana2026 \
+http://localhost:3000/api/search?type=dash-db
+```
+
+
+A valid dashboard must contain:
+
+- Dashboard object
+- UID
+- At least one panel
+
+---
+
+# 20. Complete Production Flow
+
+Final request flow:
+
+```
+User
+ |
+ |
+localhost:8085
+ |
+ |
+nginx
+ |
+ |
+model-api:5000
+ |
+ |
+Prediction
+ |
+ |
+Redis checks IP limit
+ |
+ |
+Model predicts
+ |
+ |
+JSON response
+```
+
+
+Monitoring flow:
+
+```
+model-api
+
+ |
+ |
+/metrics
+
+ |
+ |
+Prometheus
+
+ |
+ |
+Grafana
+
+ |
+ |
+Dashboard
+```
+
+---
+
+# 21. Common Production Mistakes
+
+## Mistake 1
+
+Using localhost between containers.
+
+Wrong:
+
+```
+localhost:5000
+```
+
+Correct:
+
+```
+model-api:5000
+```
+
+
+---
+
+## Mistake 2
+
+Using host ports internally.
+
+Wrong:
+
+```
+model-api:8000
+```
+
+Correct:
+
+```
+model-api:5000
+```
+
+
+---
+
+## Mistake 3
+
+Importing Prometheus exporter but not enabling it.
+
+Wrong:
+
+```python
+from prometheus_flask_exporter import PrometheusMetrics
+```
+
+alone.
+
+Correct:
+
+```python
+metrics = PrometheusMetrics(app)
+```
+
+
 ---
 
