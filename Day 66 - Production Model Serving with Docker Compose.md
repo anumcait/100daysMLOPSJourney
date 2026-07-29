@@ -405,4 +405,16 @@ Dashboard successfully created.
 ---
 
 ### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/349aff86-1822-43ef-b197-c750ab836e79" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/cfbfa3ff-f96f-4ec7-9a81-e4b9152b5e5f" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/2b04056a-3678-4e2f-86d4-ebd6c8e94bcd" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/c676637e-03ec-46ea-ad85-ff50bc7c4fb3" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/1e843e04-fe2e-40b3-b368-4be30ca26750" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/41d0799d-f4d7-4018-b5fa-333800c776be" />
+
+---
+
+
+
+
 
