@@ -218,3 +218,13 @@ Successfully configured Grafana with Prometheus as the data source, verified API
 
 ### Screenshots
 
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/2bf844cb-da1f-468e-aa89-3c1a816c95ae" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/dc14d5c8-1086-4b99-8608-ce201defdbf0" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/d2feda11-e01a-44a8-948c-d592cc3f83b0" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/538761b8-1703-449e-a6b8-9b327169229f" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/0560affb-1c4b-4aff-9ac4-18403c562d8d" />
+
+
+
+
+
