@@ -90,5 +90,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 66: Production Model Serving with Docker Compose](./Day%2066%20-%20Production%20Model%20Serving%20with%20Docker%20Compose.md)
 
+- [Day 67: Add Prometheus as a Grafana Data Source](./Day%2067%20-%20Add%20Prometheus%20as%20a%20Grafana%20Data%20Source.md)
 
 ---

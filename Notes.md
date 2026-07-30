@@ -16865,6 +16865,1061 @@ Correct:
 metrics = PrometheusMetrics(app)
 ```
 
+# Day 67 Notes
+# Grafana + Prometheus Monitoring (Complete Lecture Notes)
+
+---
+
+# Introduction
+
+In modern cloud-native environments, applications are no longer monitored by manually checking log files or CPU usage. Instead, applications expose **metrics**, which are numerical values that continuously describe the application's behaviour.
+
+Examples:
+
+- Number of HTTP requests
+- CPU utilisation
+- Memory usage
+- Response time
+- Database connections
+- Prediction accuracy of an ML model
+- Model inference latency
+- Data drift score
+
+These metrics are collected, stored, queried, and visualised using monitoring tools.
+
+The most common open-source monitoring stack is:
+
+```
+Application
+      │
+      ▼
+Prometheus
+      │
+      ▼
+Grafana
+```
+
+---
+
+# Architecture of This Lab
+
+Our monitoring stack consists of three containers.
+
+```
+                Docker Network
+──────────────────────────────────────────
+
++-------------------+
+| metric-emitter    |
+| Flask Application |
+| Port : 5000       |
+| /metrics          |
++-------------------+
+          │
+          │ scrape every 5 sec
+          ▼
+
++-------------------+
+| Prometheus        |
+| Port : 9090       |
+| Stores metrics    |
++-------------------+
+          │
+          │ query metrics
+          ▼
+
++-------------------+
+| Grafana           |
+| Port : 3000       |
+| Dashboard UI      |
++-------------------+
+
+──────────────────────────────────────────
+```
+
+Each service has a different responsibility.
+
+---
+
+# What is Prometheus?
+
+Prometheus is an **open-source monitoring system**.
+
+Its main job is to collect metrics from applications.
+
+Prometheus continuously asks applications:
+
+```
+Give me your latest metrics.
+```
+
+Applications expose metrics through an HTTP endpoint.
+
+Usually:
+
+```
+/metrics
+```
+
+Example:
+
+```
+http://application:5000/metrics
+```
+
+Prometheus periodically downloads this page.
+
+This process is called:
+
+```
+Scraping
+```
+
+---
+
+# What Does Scraping Mean?
+
+Scraping means:
+
+> Collecting metrics from an application at regular intervals.
+
+Example:
+
+```
+Every 5 seconds
+
+Prometheus
+     │
+     │ GET /metrics
+     ▼
+
+Application
+
+Returns:
+
+prediction_accuracy 0.96
+cpu_usage 40
+memory_usage 1024
+```
+
+Prometheus saves these values into its own database.
+
+---
+
+# What is a Metric?
+
+A metric is simply a numerical value.
+
+Example:
+
+```
+prediction_accuracy 0.94
+
+```
+
+Meaning:
+
+Current model accuracy is 94%.
+
+Example:
+
+```
+cpu_usage 61
+```
+
+Meaning:
+
+CPU usage is 61%.
+
+Example:
+
+```
+requests_total 2000
+```
+
+Meaning:
+
+Application has handled 2000 requests.
+
+---
+
+# Metric Types
+
+Prometheus supports several metric types.
+
+## Counter
+
+Only increases.
+
+Example:
+
+```
+http_requests_total
+```
+
+Values:
+
+```
+1
+2
+3
+4
+5
+```
+
+Never decreases.
+
+---
+
+## Gauge
+
+Can increase or decrease.
+
+Example:
+
+```
+prediction_accuracy
+
+0.92
+0.95
+0.91
+0.96
+```
+
+CPU usage is also a gauge.
+
+---
+
+## Histogram
+
+Measures distributions.
+
+Example:
+
+```
+Request duration
+
+10ms
+15ms
+20ms
+```
+
+Useful for latency calculations.
+
+---
+
+## Summary
+
+Similar to histogram but calculates quantiles.
+
+---
+
+# The Flask Metric Emitter
+
+The lab contains a Flask application.
+
+Its only purpose is exposing metrics.
+
+```
+metric-emitter
+```
+
+Available metrics include:
+
+```
+prediction_accuracy
+
+flask_http_request_total
+
+data_drift_score
+
+model_inference_duration_seconds
+```
+
+Every five seconds a background thread updates values.
+
+This allows dashboards to display live changes.
+
+---
+
+# What is PromQL?
+
+PromQL stands for
+
+```
+Prometheus Query Language
+```
+
+It is SQL for Prometheus metrics.
+
+Instead of querying tables,
+
+you query metrics.
+
+Example:
+
+```
+prediction_accuracy
+```
+
+Returns
+
+```
+0.95
+```
+
+Example:
+
+```
+flask_http_request_total
+```
+
+Returns
+
+```
+145
+```
+
+---
+
+# Examples of PromQL
+
+## View current metric
+
+```
+prediction_accuracy
+```
+
+---
+
+## HTTP Requests
+
+```
+flask_http_request_total
+```
+
+---
+
+## Average
+
+```
+avg(prediction_accuracy)
+```
+
+---
+
+## Maximum
+
+```
+max(prediction_accuracy)
+```
+
+---
+
+## Minimum
+
+```
+min(prediction_accuracy)
+```
+
+---
+
+## Rate
+
+```
+rate(flask_http_request_total[5m])
+```
+
+Shows requests per second.
+
+---
+
+# What is Grafana?
+
+Grafana is a visualisation platform.
+
+It does **not** collect metrics.
+
+Instead it asks another system for data.
+
+Example:
+
+```
+Grafana
+
+asks
+
+Prometheus
+
+for metrics.
+```
+
+Grafana converts numbers into:
+
+- Graphs
+- Tables
+- Gauges
+- Pie Charts
+- Heatmaps
+- Alerts
+
+---
+
+# Relationship Between Grafana and Prometheus
+
+```
+Application
+
+      │
+
+      ▼
+
+Prometheus
+
+stores metrics
+
+      │
+
+      ▼
+
+Grafana
+
+visualises metrics
+```
+
+Prometheus stores.
+
+Grafana displays.
+
+---
+
+# Why Does Grafana Need a Data Source?
+
+Grafana cannot magically know where metrics are stored.
+
+We must tell Grafana:
+
+```
+Where should I get my data?
+```
+
+This configuration is called:
+
+```
+Data Source
+```
+
+Without a data source:
+
+```
+No dashboards
+
+No queries
+
+No graphs
+```
+
+---
+
+# Data Source in This Lab
+
+Type:
+
+```
+Prometheus
+```
+
+URL:
+
+```
+http://prometheus:9090
+```
+
+---
+
+# Why NOT localhost?
+
+This is one of the most important Docker concepts.
+
+Suppose three containers exist.
+
+```
+Container A
+
+Container B
+
+Container C
+```
+
+Each container has its own network namespace.
+
+Inside Grafana:
+
+```
+localhost
+```
+
+means
+
+```
+Grafana container
+```
+
+NOT
+
+```
+Prometheus
+```
+
+Therefore
+
+```
+http://localhost:9090
+```
+
+tries connecting to
+
+Grafana itself.
+
+Prometheus is elsewhere.
+
+---
+
+# Docker Networking
+
+Docker Compose creates an internal network.
+
+Each service receives a DNS name.
+
+Example:
+
+```
+services:
+
+grafana
+
+prometheus
+
+metric-emitter
+```
+
+Docker automatically creates hostnames:
+
+```
+grafana
+
+prometheus
+
+metric-emitter
+```
+
+Therefore
+
+Grafana can access
+
+```
+http://prometheus:9090
+```
+
+without knowing its IP.
+
+Docker resolves
+
+```
+prometheus
+```
+
+into the container IP.
+
+---
+
+# Why Service Names Are Better
+
+IPs change.
+
+Containers restart.
+
+New IP assigned.
+
+Service names remain the same.
+
+Therefore always use
+
+```
+http://prometheus:9090
+```
+
+instead of
+
+```
+http://172.x.x.x:9090
+```
+
+---
+
+# Adding a Data Source
+
+Open Grafana.
+
+Navigate
+
+```
+Connections
+
+↓
+
+Data Sources
+
+↓
+
+Add Data Source
+```
+
+Choose
+
+```
+Prometheus
+```
+
+URL
+
+```
+http://prometheus:9090
+```
+
+Save & Test.
+
+---
+
+# What Happens When You Click Save & Test?
+
+Grafana sends an HTTP request.
+
+```
+Grafana
+
+↓
+
+Prometheus
+
+↓
+
+API Response
+```
+
+If successful:
+
+```
+Data source is working
+```
+
+Otherwise
+
+```
+Connection failed
+```
+
+---
+
+# Grafana Health API
+
+Grafana exposes REST APIs.
+
+Example
+
+```
+GET
+
+/api/datasources
+```
+
+Lists every configured data source.
+
+---
+
+Health endpoint
+
+```
+/api/datasources/uid/<uid>/health
+```
+
+Example response
+
+```json
+{
+  "status":"OK"
+}
+```
+
+Meaning
+
+Grafana successfully communicated with Prometheus.
+
+---
+
+# Dashboard
+
+A dashboard is a collection of panels.
+
+Example
+
+```
++------------------------+
+
+CPU Usage
+
++------------------------+
+
+Memory
+
++------------------------+
+
+Latency
+
++------------------------+
+
+Accuracy
+
++------------------------+
+```
+
+Each rectangle is a panel.
+
+---
+
+# Panel
+
+A panel contains
+
+- Query
+- Visualisation
+- Title
+
+Example
+
+Title
+
+```
+Prediction Accuracy
+```
+
+Query
+
+```
+prediction_accuracy
+```
+
+Visualisation
+
+```
+Time Series
+```
+
+---
+
+# Why Save the Dashboard?
+
+Unsaved dashboards disappear.
+
+Saving stores
+
+- Layout
+- Panels
+- Queries
+- Titles
+
+inside Grafana.
+
+---
+
+# API Verification
+
+List data sources
+
+```bash
+curl -u admin:grafana2026 \
+http://localhost:3000/api/datasources
+```
+
+---
+
+Health
+
+```bash
+curl -u admin:grafana2026 \
+http://localhost:3000/api/datasources/uid/<uid>/health
+```
+
+---
+
+List dashboards
+
+```bash
+curl -u admin:grafana2026 \
+http://localhost:3000/api/search
+```
+
+---
+
+Dashboard JSON
+
+```bash
+curl -u admin:grafana2026 \
+http://localhost:3000/api/dashboards/uid/<uid>
+```
+
+Useful for checking saved panels and PromQL queries.
+
+---
+
+# Common PromQL Queries
+
+Prediction accuracy
+
+```promql
+prediction_accuracy
+```
+
+HTTP requests
+
+```promql
+flask_http_request_total
+```
+
+Inference latency
+
+```promql
+model_inference_duration_seconds
+```
+
+Data drift
+
+```promql
+data_drift_score
+```
+
+Request rate
+
+```promql
+rate(flask_http_request_total[5m])
+```
+
+Average accuracy
+
+```promql
+avg(prediction_accuracy)
+```
+
+Maximum accuracy
+
+```promql
+max(prediction_accuracy)
+```
+
+---
+
+# Common Mistakes
+
+## Using localhost
+
+Wrong
+
+```
+http://localhost:9090
+```
+
+Correct
+
+```
+http://prometheus:9090
+```
+
+---
+
+## Forgetting Save Dashboard
+
+Creating a panel is not enough.
+
+Always click
+
+```
+Save Dashboard
+```
+
+---
+
+## Empty Query
+
+Wrong
+
+```
+
+```
+
+Correct
+
+```promql
+prediction_accuracy
+```
+
+---
+
+## Wrong Data Source
+
+Panel must use
+
+```
+Prometheus
+```
+
+---
+
+## Prometheus Not Running
+
+Always verify
+
+```bash
+docker ps
+```
+
+---
+
+# Complete Flow
+
+```
+Flask App
+
+↓
+
+Exposes /metrics
+
+↓
+
+Prometheus scrapes metrics
+
+↓
+
+Prometheus stores metrics
+
+↓
+
+Grafana queries Prometheus
+
+↓
+
+Prometheus returns values
+
+↓
+
+Grafana displays graphs
+
+↓
+
+User monitors application health
+```
+
+---
+
+# Commands Used
+
+List data sources
+
+```bash
+curl -u admin:grafana2026 \
+http://localhost:3000/api/datasources
+```
+
+Health check
+
+```bash
+curl -u admin:grafana2026 \
+http://localhost:3000/api/datasources/uid/<uid>/health
+```
+
+List dashboards
+
+```bash
+curl -u admin:grafana2026 \
+http://localhost:3000/api/search
+```
+
+Retrieve dashboard JSON
+
+```bash
+curl -u admin:grafana2026 \
+http://localhost:3000/api/dashboards/uid/<uid>
+```
+
+---
+
+# Interview Questions
+
+### 1. What is Prometheus?
+
+An open-source monitoring system that collects, stores, and queries time-series metrics from applications.
+
+---
+
+### 2. What is Grafana?
+
+A visualisation platform that displays metrics from data sources such as Prometheus, InfluxDB, Elasticsearch, Loki, and many others.
+
+---
+
+### 3. Does Grafana store metrics?
+
+No.
+
+Grafana only visualises data. Storage is handled by systems like Prometheus.
+
+---
+
+### 4. What is scraping?
+
+The process where Prometheus periodically requests metrics from an application's `/metrics` endpoint.
+
+---
+
+### 5. What is PromQL?
+
+PromQL (Prometheus Query Language) is used to query and analyse metrics stored in Prometheus.
+
+---
+
+### 6. Why can't Grafana use localhost to reach Prometheus?
+
+Because `localhost` inside the Grafana container refers to the Grafana container itself. Containers communicate using Docker networking and service names such as `http://prometheus:9090`.
+
+---
+
+### 7. What is a dashboard?
+
+A collection of one or more panels used to visualise related metrics.
+
+---
+
+### 8. What is a panel?
+
+A single visualisation (graph, table, gauge, etc.) backed by a PromQL query.
+
+---
+
+### 9. Why are Docker service names preferred over IP addresses?
+
+Service names are stable and automatically resolved by Docker DNS, whereas container IP addresses can change when containers restart.
+
+---
+
+### 10. What does the Grafana data source health check verify?
+
+It confirms that Grafana can successfully communicate with the configured Prometheus server.
+
+---
+
+# Summary
+
+In this lab, we configured Grafana to connect to Prometheus using the Docker Compose service name `http://prometheus:9090`, verified connectivity through Grafana's health API, and created a dashboard with a PromQL-based panel displaying live metrics. This completed the monitoring pipeline from the Flask metric emitter through Prometheus to Grafana, demonstrating how modern cloud-native monitoring systems collect, store, query, and visualise application metrics.
+
 
 ---
 
