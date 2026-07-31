@@ -17920,6 +17920,845 @@ It confirms that Grafana can successfully communicate with the configured Promet
 
 In this lab, we configured Grafana to connect to Prometheus using the Docker Compose service name `http://prometheus:9090`, verified connectivity through Grafana's health API, and created a dashboard with a PromQL-based panel displaying live metrics. This completed the monitoring pipeline from the Flask metric emitter through Prometheus to Grafana, demonstrating how modern cloud-native monitoring systems collect, store, query, and visualise application metrics.
 
+# Day 68 Notes
+# Grafana Time-Series Panel for Prediction Accuracy
+
+---
+
+# Introduction
+
+In modern Machine Learning Operations (MLOps), training a model is only one part of the lifecycle. Once a model is deployed into production, it must be continuously monitored to ensure it continues to perform well.
+
+One of the most important metrics to monitor is **prediction accuracy**.
+
+If prediction accuracy starts decreasing over time, it could indicate:
+
+- Data drift
+- Concept drift
+- Poor model performance
+- Bad feature engineering
+- Model degradation
+- Incorrect deployments
+
+To monitor these metrics visually, we commonly use:
+
+- Flask (exports metrics)
+- Prometheus (collects metrics)
+- Grafana (visualizes metrics)
+
+This lab demonstrates how these three tools work together.
+
+---
+
+# Architecture
+
+```
+ML Application
+      │
+      │ exposes metrics
+      ▼
+ Flask Metrics Endpoint
+      │
+      │ /metrics
+      ▼
+ Prometheus
+      │
+      │ scrapes metrics every few seconds
+      ▼
+ Time-Series Database
+      │
+      ▼
+ Grafana
+      │
+      ▼
+ Dashboard
+```
+
+---
+
+# What is Grafana?
+
+Grafana is an open-source visualization platform.
+
+It connects to many data sources such as:
+
+- Prometheus
+- MySQL
+- PostgreSQL
+- Loki
+- Elasticsearch
+- InfluxDB
+- CloudWatch
+- Azure Monitor
+
+Grafana itself does **not** store metrics.
+
+Instead, it queries another system (called a datasource) and displays the results.
+
+Think of Grafana as the frontend and Prometheus as the backend.
+
+---
+
+# What is Prometheus?
+
+Prometheus is a monitoring and alerting toolkit.
+
+Its job is to:
+
+- Scrape metrics
+- Store metrics
+- Allow querying through PromQL
+- Send alerts
+
+Prometheus continuously collects data from applications.
+
+Example:
+
+```
+Application
+
+prediction_accuracy 0.94
+
+↓
+
+Prometheus stores
+
+Time                  Value
+------------------------------
+12:00                 0.94
+12:01                 0.95
+12:02                 0.93
+12:03                 0.96
+```
+
+Grafana simply reads this stored data.
+
+---
+
+# What is a Metric?
+
+A metric is simply a numerical measurement.
+
+Examples:
+
+```
+CPU Usage
+
+RAM Usage
+
+Disk Space
+
+Prediction Accuracy
+
+Response Time
+
+Request Count
+
+Error Count
+```
+
+Metrics change over time.
+
+That is why Grafana uses time-series graphs.
+
+---
+
+# Why Prediction Accuracy?
+
+Suppose a fraud detection model initially performs very well.
+
+```
+Accuracy
+
+98%
+97%
+99%
+98%
+```
+
+After a month:
+
+```
+89%
+87%
+86%
+84%
+```
+
+The graph immediately tells us:
+
+Something is wrong.
+
+Without monitoring, we might never notice.
+
+---
+
+# Gauge Metric
+
+In this lab:
+
+```
+prediction_accuracy
+```
+
+is a **Gauge**.
+
+A Gauge is a metric whose value can both increase and decrease.
+
+Examples:
+
+```
+Temperature
+
+CPU Usage
+
+Memory Usage
+
+Accuracy
+
+Humidity
+```
+
+Unlike counters, gauges are not cumulative.
+
+---
+
+# Counter vs Gauge
+
+Counter:
+
+```
+0
+
+1
+
+2
+
+3
+
+4
+
+5
+
+6
+
+```
+
+Always increases.
+
+Example:
+
+```
+HTTP Requests
+
+Errors
+
+Jobs Completed
+```
+
+---
+
+Gauge:
+
+```
+90%
+
+92%
+
+88%
+
+95%
+
+91%
+
+```
+
+Can move both upward and downward.
+
+Prediction accuracy is naturally a Gauge.
+
+---
+
+# Metric Exposed by Flask
+
+Flask exposes metrics like:
+
+```
+prediction_accuracy 0.96
+```
+
+through:
+
+```
+/metrics
+```
+
+Example:
+
+```
+http://server:5000/metrics
+```
+
+Prometheus visits this endpoint periodically.
+
+---
+
+# Prometheus Scraping
+
+Prometheus configuration contains:
+
+```yaml
+scrape_configs:
+
+- job_name: flask
+
+  static_configs:
+
+  - targets:
+      - flask:5000
+```
+
+Every scrape:
+
+```
+Flask
+
+↓
+
+Prometheus
+
+↓
+
+Database
+```
+
+This happens automatically.
+
+---
+
+# Datasource in Grafana
+
+A datasource tells Grafana where data comes from.
+
+Examples:
+
+```
+Prometheus
+
+MySQL
+
+Loki
+
+InfluxDB
+```
+
+In this lab:
+
+```
+Datasource = Prometheus
+```
+
+It is already configured.
+
+So no manual setup is required.
+
+---
+
+# Dashboard
+
+A dashboard is a collection of panels.
+
+Example:
+
+```
+Dashboard
+
++---------------------+
+
+CPU Usage
+
++---------------------+
+
+Memory
+
++---------------------+
+
+Prediction Accuracy
+
++---------------------+
+
+Network
+
++---------------------+
+```
+
+Each rectangle is a panel.
+
+---
+
+# Panel
+
+A panel is an individual visualization.
+
+Examples:
+
+- Time Series
+- Gauge
+- Stat
+- Table
+- Pie Chart
+- Bar Gauge
+- Heatmap
+
+Our task requires a **Time Series** panel.
+
+---
+
+# Why Time Series?
+
+Prediction accuracy changes with time.
+
+Example:
+
+```
+Time
+
+12:00
+
+12:05
+
+12:10
+
+12:15
+
+↓
+
+Accuracy
+
+95
+
+94
+
+96
+
+97
+```
+
+A Time Series chart is ideal because the X-axis is time and the Y-axis is the metric value.
+
+---
+
+# Other Visualization Types
+
+## Stat
+
+Shows one value.
+
+```
+95%
+```
+
+No historical trend.
+
+---
+
+## Gauge
+
+Looks like a speedometer.
+
+```
+      95%
+
+|------●----|
+```
+
+Shows current state only.
+
+---
+
+## Table
+
+Displays rows.
+
+```
+Time
+
+Accuracy
+```
+
+No graph.
+
+---
+
+## Time Series
+
+Displays change over time.
+
+```
+98 ──────╮
+
+97 ────╮ │
+
+96 ──╮ │ │
+
+95 ╮ │ │ │
+
+──────────────►
+```
+
+Perfect for monitoring.
+
+---
+
+# PromQL
+
+Prometheus uses its own query language called PromQL.
+
+Example:
+
+```promql
+prediction_accuracy
+```
+
+This returns every recorded value.
+
+---
+
+Other examples:
+
+Average:
+
+```promql
+avg(prediction_accuracy)
+```
+
+Maximum:
+
+```promql
+max(prediction_accuracy)
+```
+
+Minimum:
+
+```promql
+min(prediction_accuracy)
+```
+
+Rate:
+
+```promql
+rate(flask_http_request_total[5m])
+```
+
+---
+
+# Available Metrics
+
+This lab includes:
+
+```
+prediction_accuracy
+
+flask_http_request_total
+
+data_drift_score
+
+model_inference_duration_seconds
+```
+
+We only need:
+
+```promql
+prediction_accuracy
+```
+
+---
+
+# Step-by-Step Lab
+
+## Login
+
+```
+http://localhost:3000
+```
+
+Username
+
+```
+admin
+```
+
+Password
+
+```
+grafana2026
+```
+
+---
+
+## Verify Datasource
+
+Navigate:
+
+```
+Connections
+
+↓
+
+Data Sources
+```
+
+Ensure Prometheus exists.
+
+---
+
+## Create Dashboard
+
+```
+Dashboards
+
+↓
+
+New Dashboard
+
+↓
+
+Add Visualization
+```
+
+---
+
+## Select Datasource
+
+Choose:
+
+```
+Prometheus
+```
+
+---
+
+## Enter Query
+
+```promql
+prediction_accuracy
+```
+
+---
+
+## Choose Visualization
+
+Select:
+
+```
+Time Series
+```
+
+Do **not** select:
+
+- Gauge
+- Stat
+- Table
+- Pie Chart
+
+The validator specifically checks for:
+
+```
+"type":"timeseries"
+```
+
+---
+
+## Apply
+
+Click:
+
+```
+Apply
+```
+
+---
+
+## Save Dashboard
+
+Click:
+
+```
+Save Dashboard
+```
+
+Example name:
+
+```
+ML Monitoring
+```
+
+---
+
+# Validator Checks
+
+The automated checker verifies:
+
+## 1.
+
+Datasource exists.
+
+```
+Prometheus
+```
+
+---
+
+## 2.
+
+Dashboard exists.
+
+API:
+
+```
+GET /api/search?type=dash-db
+```
+
+Must return at least one dashboard.
+
+---
+
+## 3.
+
+Dashboard contains a panel.
+
+Specifically:
+
+```
+"type":"timeseries"
+```
+
+---
+
+## 4.
+
+Panel query contains:
+
+```promql
+prediction_accuracy
+```
+
+---
+
+# Common Mistakes
+
+## Forgot to Save Dashboard
+
+Dashboard disappears.
+
+Always click:
+
+```
+Save Dashboard
+```
+
+---
+
+## Forgot Apply
+
+Changes are not committed.
+
+Always click:
+
+```
+Apply
+```
+
+before saving.
+
+---
+
+## Wrong Visualization
+
+Using:
+
+- Gauge
+- Stat
+- Table
+
+will fail validation.
+
+---
+
+## Wrong Query
+
+Incorrect:
+
+```promql
+prediction
+```
+
+Correct:
+
+```promql
+prediction_accuracy
+```
+
+---
+
+## Wrong Datasource
+
+Selecting another datasource causes no data or validation failure.
+
+Use the pre-provisioned Prometheus datasource.
+
+---
+
+# Real-World Use Cases
+
+Production ML dashboards often monitor:
+
+- Prediction Accuracy
+- Precision
+- Recall
+- F1 Score
+- Data Drift
+- Feature Drift
+- Model Latency
+- Request Count
+- Error Rate
+- GPU Utilization
+- CPU Usage
+- Memory Usage
+
+Grafana can display all of these on a single dashboard.
+
+---
+
+# Key Takeaways
+
+- Grafana visualizes metrics; it does not store them.
+- Prometheus collects and stores metrics from applications.
+- Flask exposes metrics through the `/metrics` endpoint.
+- `prediction_accuracy` is a **Gauge** metric because it can increase or decrease.
+- A **Time Series** panel is the appropriate visualization for metrics that change over time.
+- PromQL is the query language used to retrieve metrics from Prometheus.
+- The required query for this lab is:
+
+```promql
+prediction_accuracy
+```
+
+- The dashboard must be saved after clicking **Apply**.
+- The validator checks for a dashboard containing a panel of type `timeseries` with a Prometheus query referencing `prediction_accuracy`.
+
+---
+
+# Summary
+
+This lab demonstrates the complete monitoring pipeline for an ML model:
+
+1. The Flask application exposes the `prediction_accuracy` metric.
+2. Prometheus periodically scrapes the metric and stores it as time-series data.
+3. Grafana connects to Prometheus as a datasource.
+4. A dashboard with a **Time Series** panel visualizes how prediction accuracy changes over time.
+5. This enables ML engineers to detect model degradation, data drift, and other production issues early through continuous monitoring.
+
 
 ---
 

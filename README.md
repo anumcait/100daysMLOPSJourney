@@ -92,4 +92,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 67: Add Prometheus as a Grafana Data Source](./Day%2067%20-%20Add%20Prometheus%20as%20a%20Grafana%20Data%20Source.md)
 
+- [Day 68: Build a Grafana Time-Series Panel for Prediction Accuracy](./Day%2068%20-%20Build%20a%20Grafana%20Time-Series%20Panel%20for%20Prediction%20Accuracy.md)
+
 ---
