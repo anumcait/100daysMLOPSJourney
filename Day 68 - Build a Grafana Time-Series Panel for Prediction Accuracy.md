@@ -189,3 +189,11 @@ prediction_accuracy
 The Grafana dashboard now displays the rolling prediction accuracy of the fraud-detection model using a **Time series** visualization backed by the pre-configured Prometheus datasource.
 
 ### Screenshots
+
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/6fec294e-7812-4e2f-90b5-cf98ef55cb32" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/af8deb7b-61c1-4b81-b6d7-4fd315361b7e" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/9602d399-2a8c-494d-bf86-80aa5657ac4a" />
+
+
+
+
