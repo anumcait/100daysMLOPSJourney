@@ -94,4 +94,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 68: Build a Grafana Time-Series Panel for Prediction Accuracy](./Day%2068%20-%20Build%20a%20Grafana%20Time-Series%20Panel%20for%20Prediction%20Accuracy.md)
 
+- [Day 69: Build a Grafana Table Panel for Per-Feature Data Drift](./Day%2069%20-%20Build%20a%20Grafana%20Table%20Panel%20for%20Per-Feature%20Data%20Drift.md)
+
 ---

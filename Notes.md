@@ -18759,6 +18759,724 @@ This lab demonstrates the complete monitoring pipeline for an ML model:
 4. A dashboard with a **Time Series** panel visualizes how prediction accuracy changes over time.
 5. This enables ML engineers to detect model degradation, data drift, and other production issues early through continuous monitoring.
 
+# Day 69 Notes
+# Build a Grafana Table Panel for Per-Feature Data Drift
+
+---
+
+# Introduction
+
+In any Machine Learning system deployed in production, monitoring is just as important as training the model.
+
+Even if a model had 99% accuracy during training, its performance can degrade over time because the incoming data changes.
+
+This phenomenon is called **Data Drift**.
+
+A common question that ML engineers ask is:
+
+> **"Which feature has changed compared to the training data?"**
+
+Instead of looking at one feature at a time, we create a **Grafana Table Panel** that lists every feature alongside its drift score.
+
+This gives engineers an immediate overview of the health of every feature.
+
+---
+
+# What is Data Drift?
+
+Data Drift means the statistical distribution of input data has changed.
+
+Example:
+
+Suppose a fraud detection model was trained using transactions like:
+
+| Feature | Training Average |
+|----------|-----------------|
+| amount | \$120 |
+| hour | 2 PM |
+| num_tx_past_day | 5 |
+
+Months later, production traffic becomes:
+
+| Feature | Production Average |
+|----------|-------------------|
+| amount | \$480 |
+| hour | 11 PM |
+| num_tx_past_day | 19 |
+
+Now the production data is very different from training data.
+
+This is **data drift**.
+
+Even if the model code never changes, predictions may become worse.
+
+---
+
+# Why Monitor Per Feature?
+
+Suppose only one feature changes.
+
+Example:
+
+```
+amount → High drift
+
+hour → Normal
+
+num_tx_past_day → Normal
+```
+
+Without per-feature monitoring you only know:
+
+```
+Overall drift = High
+```
+
+But you don't know **why**.
+
+With per-feature monitoring you instantly know:
+
+```
+The amount feature is responsible.
+```
+
+This helps data scientists investigate much faster.
+
+---
+
+# Understanding the Metric
+
+The Flask application exports a Prometheus metric:
+
+```text
+data_drift_score
+```
+
+Unlike a normal metric, this metric has labels.
+
+Example:
+
+```text
+data_drift_score{column="amount"}
+```
+
+Another one:
+
+```text
+data_drift_score{column="hour"}
+```
+
+Another:
+
+```text
+data_drift_score{column="num_tx_past_day"}
+```
+
+Notice something.
+
+The metric name is the same.
+
+Only the label changes.
+
+---
+
+# Understanding Labels
+
+Prometheus labels are key-value pairs.
+
+Example:
+
+```text
+column="amount"
+```
+
+Here
+
+Key
+
+```
+column
+```
+
+Value
+
+```
+amount
+```
+
+Another series
+
+```
+column="hour"
+```
+
+Another
+
+```
+column="num_tx_past_day"
+```
+
+These labels allow Prometheus to store multiple related time series under one metric name.
+
+Internally Prometheus stores:
+
+```
+Metric Name:
+data_drift_score
+
+Series 1
+column=amount
+
+Series 2
+column=hour
+
+Series 3
+column=num_tx_past_day
+```
+
+This is much cleaner than creating metrics like:
+
+```
+amount_drift
+hour_drift
+num_tx_past_day_drift
+```
+
+---
+
+# What Does Grafana Receive?
+
+Prometheus returns something similar to:
+
+```
+data_drift_score{column="amount"} 0.39
+
+data_drift_score{column="hour"} 0.07
+
+data_drift_score{column="num_tx_past_day"} 0.15
+```
+
+Grafana receives three independent series.
+
+Each series has
+
+- Metric name
+- Labels
+- Timestamp
+- Value
+
+---
+
+# Why Use a Table Panel?
+
+Grafana supports many visualization types.
+
+Examples:
+
+- Time Series
+- Bar Chart
+- Pie Chart
+- Gauge
+- Heatmap
+- Stat
+- Table
+
+For data drift we care about comparing features.
+
+A table is ideal because every feature gets one row.
+
+Example
+
+| Feature | Drift |
+|----------|------:|
+| amount | 0.39 |
+| hour | 0.07 |
+| num_tx_past_day | 0.15 |
+
+Much easier to scan than multiple graphs.
+
+---
+
+# Dashboard Creation
+
+Create a new dashboard.
+
+Click
+
+```
+Dashboards
+
+↓
+
+New Dashboard
+```
+
+Then
+
+```
+Add Visualization
+```
+
+Choose
+
+```
+Prometheus
+```
+
+because Prometheus stores the metrics.
+
+---
+
+# Writing the Query
+
+The query is very simple.
+
+```prometheus
+data_drift_score
+```
+
+No aggregation is needed.
+
+No filtering is needed.
+
+No functions are required.
+
+Prometheus automatically returns all series belonging to this metric.
+
+---
+
+# Why Not Use sum()?
+
+Imagine using
+
+```prometheus
+sum(data_drift_score)
+```
+
+Output:
+
+```
+0.61
+```
+
+Now you've lost all feature information.
+
+You only know the total.
+
+You cannot identify which feature drifted.
+
+Therefore avoid aggregation.
+
+---
+
+# Why Not Use avg()?
+
+Example
+
+```
+amount = 0.5
+
+hour = 0.1
+
+transactions = 0.2
+```
+
+Average
+
+```
+0.26
+```
+
+Again,
+
+you lose feature-level visibility.
+
+---
+
+# Why Use an Instant Query?
+
+Prometheus stores history.
+
+Suppose it collected
+
+```
+10:20
+
+10:21
+
+10:22
+
+10:23
+
+10:24
+```
+
+A Range query returns
+
+```
+10:20
+
+10:21
+
+10:22
+
+10:23
+
+10:24
+```
+
+Your table becomes
+
+| Time | Value |
+|------|------:|
+|10:20|0.10|
+|10:21|0.12|
+|10:22|0.14|
+|10:23|0.18|
+
+This is not what we want.
+
+We only want the latest value.
+
+Instant Query returns
+
+```
+Latest only
+```
+
+Example
+
+```
+amount
+
+0.39
+```
+
+This is perfect for a table.
+
+---
+
+# Time Series vs Instant
+
+Range Query
+
+```
+amount
+
+10:20
+
+10:21
+
+10:22
+
+10:23
+```
+
+Instant Query
+
+```
+amount
+
+0.39
+```
+
+The task specifically wants one row per feature.
+
+Therefore
+
+```
+Instant Query
+```
+
+is the correct choice.
+
+---
+
+# Understanding Transformations
+
+Grafana transformations reshape data.
+
+They do not change Prometheus.
+
+They only change how data appears.
+
+Example
+
+Prometheus returns
+
+```
+Series
+
+amount
+
+0.39
+```
+
+Transformation
+
+```
+Labels to Fields
+```
+
+becomes
+
+| column | Value |
+|---------|------:|
+| amount |0.39|
+
+Another series
+
+```
+hour
+```
+
+becomes
+
+| column | Value |
+|---------|------:|
+| hour |0.08|
+
+Combined result
+
+| column | Value |
+|---------|------:|
+| amount |0.39|
+| hour |0.08|
+| num_tx_past_day |0.15|
+
+Exactly what we need.
+
+---
+
+# Labels to Fields
+
+This transformation converts labels into columns.
+
+Input
+
+```
+column=amount
+
+value=0.39
+```
+
+Output
+
+| column | Value |
+|---------|------:|
+| amount |0.39|
+
+Without it, Grafana simply displays
+
+```
+{column="amount"}
+```
+
+which is harder to read.
+
+---
+
+# Panel Title
+
+A descriptive title is recommended.
+
+Example
+
+```
+Feature Data Drift
+```
+
+Anyone opening the dashboard immediately understands its purpose.
+
+---
+
+# Saving the Dashboard
+
+Always save your work.
+
+Click
+
+```
+Apply
+```
+
+Then
+
+```
+Save Dashboard
+```
+
+Provide a meaningful dashboard name.
+
+Example
+
+```
+Fraud Detection Monitoring
+```
+
+---
+
+# Validation Requirements Explained
+
+The lab validates several conditions.
+
+## Requirement 1
+
+```
+GET /api/search?type=dash-db
+```
+
+This checks whether at least one user-created dashboard exists.
+
+---
+
+## Requirement 2
+
+At least one panel must have
+
+```
+type = table
+```
+
+This confirms you created a Table visualization.
+
+---
+
+## Requirement 3
+
+The panel query must reference
+
+```prometheus
+data_drift_score
+```
+
+This ensures the correct metric is being visualized.
+
+---
+
+## Requirement 4
+
+The query must return multiple series containing the
+
+```
+column
+```
+
+label.
+
+Example
+
+```
+column=amount
+
+column=hour
+
+column=num_tx_past_day
+```
+
+This proves the table can display one row for each feature.
+
+---
+
+# Expected Final Table
+
+| column | Drift Score |
+|----------|-----------:|
+| amount |0.39|
+| hour |0.08|
+| num_tx_past_day |0.15|
+
+Every row corresponds to one feature.
+
+---
+
+# Common Mistakes
+
+## Mistake 1
+
+Using Range Query.
+
+Result
+
+```
+Many timestamps
+```
+
+instead of one latest value.
+
+---
+
+## Mistake 2
+
+Using
+
+```prometheus
+sum(data_drift_score)
+```
+
+Feature information disappears.
+
+---
+
+## Mistake 3
+
+Using
+
+```prometheus
+avg(data_drift_score)
+```
+
+All features are merged.
+
+---
+
+## Mistake 4
+
+Creating a Time Series panel instead of a Table panel.
+
+The lab specifically expects a Table visualization.
+
+---
+
+## Mistake 5
+
+Forgetting to save the dashboard.
+
+Unsaved dashboards are not returned by the Grafana API.
+
+---
+
+# Real-World Importance
+
+Large organizations may have hundreds of input features.
+
+Examples include:
+
+- Banks
+- Insurance companies
+- E-commerce platforms
+- Healthcare systems
+- Recommendation engines
+
+Without a table, engineers would have to inspect each feature separately.
+
+A Table Panel provides a single overview showing every feature and its latest drift score.
+
+This makes identifying problematic inputs much faster.
+
+---
+
+# Key Takeaways
+
+- Data drift measures how production data differs from training data.
+- Prometheus stores one time series per feature using labels.
+- The `column` label identifies the feature name.
+- Query `data_drift_score` directly without aggregation.
+- Use an **Instant Query** to retrieve only the latest values.
+- Use a **Table** visualization for easy comparison.
+- Apply the **Labels to fields** transformation if needed to expose labels as columns.
+- Save the dashboard after applying changes.
+- The final table should display one row per feature and its latest drift score, enabling quick identification of which input features have drifted.
 
 ---
 
