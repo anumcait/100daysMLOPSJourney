@@ -129,3 +129,12 @@ The task is considered complete when:
 A Grafana dashboard now provides a concise per-feature data drift view, making it easy to identify which input features have drifted at a glance.
 
 ### Screenshots
+
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/6eba061d-b5d1-416c-beb7-ad94f9fe44ba" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/bdf93f85-4bff-4185-949e-e1b71285d3cd" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/8d898fe4-b43f-4b31-8221-c92470b626ba" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/1c0a8619-a004-4db0-9311-86f459ae6fdf" />
+
+
+
+
