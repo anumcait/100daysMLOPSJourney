@@ -19478,5 +19478,880 @@ This makes identifying problematic inputs much faster.
 - Save the dashboard after applying changes.
 - The final table should display one row per feature and its latest drift score, enabling quick identification of which input features have drifted.
 
+# Day 70: Enforcing ML Model Accuracy Gates with Evidently and Grafana
+
+## Introduction
+
+In a production machine learning system, deploying a model is not the end of the job. A model that performs well during development can degrade after deployment because of:
+
+- Changes in incoming data
+- Data quality problems
+- Changes in user behavior
+- Feature distribution changes
+- Model drift
+
+For this reason, ML platforms need continuous quality checks.
+
+In this task, we implement quality gates for a fraud-detection model using two different layers:
+
+1. **Evidently Quality Gates**
+   - Used before deployment.
+   - Acts as a CI/CD gate.
+   - Prevents a bad model or bad data batch from moving to production.
+
+2. **Grafana Alerting**
+   - Used after deployment.
+   - Monitors live model performance.
+   - Alerts engineers when production accuracy decreases.
+
+The important idea is:
+
+> The same accuracy requirement is enforced before deployment and during production.
+
+The accuracy threshold for this system is:
+
+```
+Accuracy > 0.80
+```
+
+---
+
+# Part 1: Evidently Test Suite
+
+## What is Evidently?
+
+Evidently is an open-source ML monitoring and testing framework.
+
+It helps teams monitor:
+
+- Data quality
+- Data drift
+- Model performance
+- Classification metrics
+- Regression metrics
+
+Evidently can generate reports and also run tests.
+
+A normal metric answers:
+
+"How good is my model?"
+
+A test answers:
+
+"Is this value acceptable?"
+
+Example:
+
+Metric:
+
+```
+Accuracy = 0.83
+```
+
+Test:
+
+```
+Accuracy must be greater than 0.80
+```
+
+Result:
+
+```
+SUCCESS
+```
+
+---
+
+# Existing Project Structure
+
+The monitoring project already contains:
+
+```
+/root/code/monitoring
+|
+├── tests
+│   ├── test_suite.py
+│   ├── current.csv
+│   └── test_results.json
+|
+├── workspace
+|
+└── drift
+    └── drift_scorer.py
+```
+
+The important files:
+
+## current.csv
+
+This is the production batch.
+
+It contains:
+
+- Features
+- Target column:
+
+```
+is_fraud
+```
+
+- Model prediction:
+
+```
+prediction
+```
+
+---
+
+## test_suite.py
+
+The file already contains:
+
+- Dataset loading
+- Data definition
+- Classification mapping
+- Evidently report execution
+- Workspace publishing
+
+Only the quality gates are missing.
+
+---
+
+# Understanding Evidently Dataset Definition
+
+The model is a binary classification model.
+
+Example:
+
+Actual value:
+
+```
+is_fraud = 1
+```
+
+Prediction:
+
+```
+prediction = 1
+```
+
+The model is correct.
+
+Evidently needs to know:
+
+- Which column is the target
+- Which column contains predictions
+
+This is configured using:
+
+```python
+BinaryClassification(
+    target="is_fraud",
+    prediction_labels="prediction"
+)
+```
+
+---
+
+# Understanding Test Metrics
+
+The two required gates are:
+
+1. Missing value gate
+2. Accuracy gate
+
+---
+
+# Gate 1: Missing Values Check
+
+## Problem
+
+Bad input data can break model predictions.
+
+Examples:
+
+```
+customer_age = NULL
+transaction_amount = NULL
+```
+
+Too many missing values indicate a data pipeline problem.
+
+The requirement:
+
+```
+Fail when missing values >= 10
+```
+
+Equivalent condition:
+
+```
+Missing values < 10
+```
+
+---
+
+## Evidently Implementation
+
+```python
+DatasetMissingValueCount(
+    tests=[lt(10)]
+)
+```
+
+Explanation:
+
+```
+DatasetMissingValueCount
+```
+
+calculates the number of missing values.
+
+The test:
+
+```
+lt(10)
+```
+
+means:
+
+```
+less than 10
+```
+
+If:
+
+```
+missing values = 5
+```
+
+Result:
+
+```
+SUCCESS
+```
+
+If:
+
+```
+missing values = 15
+```
+
+Result:
+
+```
+FAIL
+```
+
+---
+
+# Gate 2: Accuracy Check
+
+## Problem
+
+A model can continue running but become inaccurate.
+
+Example:
+
+Before deployment:
+
+```
+Accuracy = 0.87
+```
+
+After deployment:
+
+```
+Accuracy = 0.72
+```
+
+The model should not be considered healthy.
+
+Requirement:
+
+```
+Accuracy must be greater than 0.80
+```
+
+---
+
+## Evidently Implementation
+
+```python
+Accuracy(
+    tests=[gt(0.80)]
+)
+```
+
+Explanation:
+
+```
+Accuracy
+```
+
+calculates classification accuracy.
+
+The condition:
+
+```
+gt(0.80)
+```
+
+means:
+
+```
+greater than 0.80
+```
+
+Examples:
+
+```
+Accuracy = 0.85
+
+SUCCESS
+```
+
+```
+Accuracy = 0.75
+
+FAIL
+```
+
+---
+
+# Final METRICS Configuration
+
+The completed section:
+
+```python
+METRICS = []
+
+METRICS.append(
+    DatasetMissingValueCount(
+        tests=[lt(10)]
+    )
+)
+
+METRICS.append(
+    Accuracy(
+        tests=[gt(0.80)]
+    )
+)
+```
+
+---
+
+# Running the Evidently Test Suite
+
+Execute:
+
+```bash
+python3 /root/code/monitoring/tests/test_suite.py
+```
+
+The script:
+
+1. Reads the production batch
+2. Creates an Evidently dataset
+3. Runs the tests
+4. Writes results
+5. Publishes the report
+
+---
+
+# Output File
+
+After successful execution:
+
+```
+/root/code/monitoring/tests/test_results.json
+```
+
+is created.
+
+Example:
+
+```json
+{
+  "tests": [
+    {
+      "name": "DatasetMissingValueCount",
+      "status": "SUCCESS"
+    },
+    {
+      "name": "Accuracy",
+      "status": "SUCCESS"
+    }
+  ]
+}
+```
+
+---
+
+# Evidently UI Verification
+
+The script publishes the result to:
+
+```
+Evidently Workspace
+```
+
+Open:
+
+```
+http://<host>:8000
+```
+
+Navigate:
+
+```
+fraud-detector quality gates
+
+        |
+
+     Reports
+```
+
+A snapshot should be visible.
+
+The UI allows reviewers to inspect:
+
+- Metrics
+- Test results
+- Pass/fail status
+
+without opening code.
+
+---
+
+# Part 2: Grafana Production Alerting
+
+## Why Grafana?
+
+Evidently protects deployment.
+
+But after deployment, production can still degrade.
+
+Example:
+
+Morning:
+
+```
+Accuracy = 0.86
+```
+
+After several hours:
+
+```
+Accuracy = 0.78
+```
+
+The model is now unhealthy.
+
+Grafana continuously monitors this.
+
+---
+
+# Available Monitoring Metrics
+
+The monitoring stack exposes:
+
+## Prediction Accuracy
+
+Metric:
+
+```
+prediction_accuracy
+```
+
+This is a gauge metric.
+
+Example:
+
+```
+prediction_accuracy 0.85
+```
+
+---
+
+## Other Metrics
+
+Data drift:
+
+```
+data_drift_score
+```
+
+Drift percentage:
+
+```
+evidently_drift_share
+```
+
+API metrics:
+
+```
+flask_http_request_total
+```
+
+Latency:
+
+```
+model_inference_duration_seconds
+```
+
+---
+
+# Why avg_over_time?
+
+Raw accuracy values can fluctuate.
+
+Example:
+
+```
+0.84
+0.86
+0.83
+0.85
+```
+
+A moving average gives a smoother signal.
+
+Prometheus function:
+
+```promql
+avg_over_time()
+```
+
+The required query:
+
+```promql
+avg_over_time(prediction_accuracy[1m])
+```
+
+Meaning:
+
+"Calculate the average prediction accuracy over the last one minute."
+
+---
+
+# Creating Grafana Alert
+
+Open:
+
+```
+http://<host>:3000
+```
+
+Login:
+
+```
+username:
+admin
+
+password:
+grafana2026
+```
+
+---
+
+Navigate:
+
+```
+Alerting
+
+    |
+
+Alert rules
+
+    |
+
+New alert rule
+```
+
+---
+
+# Alert Name
+
+Example:
+
+```
+Prediction Accuracy Alert
+```
+
+---
+
+# Query
+
+Datasource:
+
+```
+Prometheus
+```
+
+Query:
+
+```promql
+avg_over_time(prediction_accuracy[1m])
+```
+
+---
+
+# Alert Condition
+
+The alert should trigger when:
+
+```
+accuracy < 0.80
+```
+
+Configure:
+
+```
+WHEN QUERY
+
+Is below
+
+0.80
+```
+
+Equivalent PromQL logic:
+
+```promql
+avg_over_time(prediction_accuracy[1m]) < 0.80
+```
+
+---
+
+# Folder and Evaluation
+
+Create/select a folder:
+
+```
+ml-alerts
+```
+
+Evaluation:
+
+```
+Interval:
+1m
+```
+
+The alert is checked every minute.
+
+---
+
+# Saving the Alert
+
+After saving, verify:
+
+```bash
+curl -u admin:grafana2026 \
+http://localhost:3000/api/v1/provisioning/alert-rules
+```
+
+The response must contain:
+
+- Alert rule
+- prediction_accuracy reference
+- threshold 0.80
+
+---
+
+# Complete System Flow
+
+The final architecture:
+
+```
+              Developer pushes model
+                       |
+                       |
+                 CI Pipeline
+                       |
+                       |
+              Evidently Test Suite
+                       |
+          -----------------------------
+          |                           |
+   Missing values              Accuracy check
+      < 10                      > 0.80
+          |                           |
+          -------- SUCCESS -----------
+                       |
+                Model Deployment
+                       |
+                       |
+              Production Traffic
+                       |
+                       |
+              Metric Exporter
+                       |
+                       |
+                 Prometheus
+                       |
+                       |
+                  Grafana
+                       |
+                       |
+          avg_over_time accuracy < 0.80
+                       |
+                       |
+                Alert On-call Team
+```
+
+---
+
+# Final Validation Checklist
+
+## Evidently
+
+Check:
+
+```bash
+ls /root/code/monitoring/tests/test_results.json
+```
+
+Expected:
+
+```
+File exists
+```
+
+Tests:
+
+```
+DatasetMissingValueCount SUCCESS
+
+Accuracy SUCCESS
+```
+
+---
+
+## Evidently UI
+
+Verify:
+
+```
+fraud-detector quality gates
+
+Reports
+
+Published snapshot exists
+```
+
+---
+
+## Grafana
+
+Verify:
+
+```bash
+curl -u admin:grafana2026 \
+http://localhost:3000/api/v1/provisioning/alert-rules
+```
+
+Expected:
+
+```
+Non-empty array
+```
+
+The rule contains:
+
+```
+prediction_accuracy
+```
+
+and:
+
+```
+0.80
+```
+
+---
+
+# Key Learning Points
+
+## 1. Metrics are not enough
+
+A metric tells us a value.
+
+A test creates a decision.
+
+Example:
+
+Metric:
+
+```
+Accuracy = 0.82
+```
+
+Test:
+
+```
+Is accuracy acceptable?
+```
+
+Answer:
+
+```
+SUCCESS
+```
+
+---
+
+## 2. Quality gates prevent bad deployments
+
+Evidently stops poor models before production.
+
+---
+
+## 3. Monitoring protects production
+
+Grafana catches problems after deployment.
+
+---
+
+## 4. Same threshold, two locations
+
+The same business rule:
+
+```
+Accuracy > 0.80
+```
+
+exists in two places:
+
+Before deployment:
+
+```
+Evidently CI test
+```
+
+After deployment:
+
+```
+Grafana alert
+```
+
+---
+
+# Conclusion
+
+The fraud-detection ML platform now has a complete production quality-control system.
+
+Evidently ensures that only healthy models are deployed.
+
+Grafana ensures that deployed models continue performing correctly.
+
+Together they provide:
+
+- Automated testing
+- Continuous monitoring
+- Faster incident detection
+- Reliable ML operations
+
+
 ---
 
