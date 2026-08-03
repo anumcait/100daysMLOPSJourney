@@ -96,6 +96,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 69: Build a Grafana Table Panel for Per-Feature Data Drift](./Day%2069%20-%20Build%20a%20Grafana%20Table%20Panel%20for%20Per-Feature%20Data%20Drift.md)
 
-- [Day 70: Enforce Accuracy Gates with Evidently Test Suite and Grafana Alert](./Day%2070%20-%20Enforce%20Accuracy%20Gates%20with%20Evidently%20Test%20Suite%20and%20Grafana%20Alert.md)
+- [Day 70: Enforce Accuracy Gates with Evidently Test Suite and Grafana Alert](./Day%2070%20-%20Enforce%20Accuracy%20Gates%20with%20an%20Evidently%20Test%20Suite%20and%20a%20Grafana%20Alert.md)
 
 ---
