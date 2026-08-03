@@ -358,3 +358,15 @@ Grafana continuously monitors live accuracy and alerts the on-call team when mod
 The same accuracy threshold (0.80) is enforced before deployment and during production operation.
 
 ### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/9b437adb-ab54-4535-b885-e3e2f3a66178" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/cba8e5b2-795e-4fdb-bf68-7a62c765258b" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/65d53627-cc47-46f7-821d-63810f513071" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/a5ee9b28-fdd1-4a1b-8d1b-0f9949fc11ec" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/3bdbda41-1012-4974-aba7-16c750e3b26e" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/87505754-66ad-488d-93eb-5d0312152994" />
+
+
+
+
+
+
