@@ -98,4 +98,5 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 70: Enforce Accuracy Gates with Evidently Test Suite and Grafana Alert](./Day%2070%20-%20Enforce%20Accuracy%20Gates%20with%20an%20Evidently%20Test%20Suite%20and%20a%20Grafana%20Alert.md)
 
+- [Day 71: Build a 4-Panel Model-Overview Grafana Dashboard](./Day%2071%20-%20Build%20a%204-Panel%20Model-Overview%20Grafana%20Dashboard.md)
 ---

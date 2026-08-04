@@ -20352,6 +20352,757 @@ Together they provide:
 - Faster incident detection
 - Reliable ML operations
 
+# Day 71 Notes
+# Build a 4-Panel Model-Overview Grafana Dashboard
+
+---
+
+# Introduction
+
+Modern Machine Learning systems require continuous monitoring after deployment. A model that performs well during training can gradually degrade in production due to changes in incoming data, infrastructure issues, or application bugs.
+
+Grafana is one of the most widely used visualization platforms for monitoring systems. It allows engineers to visualize metrics collected by Prometheus and quickly identify performance issues.
+
+In this project, we build a **Model Overview Dashboard** containing four essential metrics that help an on-call ML engineer understand the health of a deployed model in just a few seconds.
+
+---
+
+# Architecture
+
+```
+Application
+      │
+      │
+      ▼
+ Flask Metric Exporter
+      │
+      ▼
+ Prometheus
+      │
+      ▼
+ Grafana Dashboard
+
+Evidently
+      │
+      ▼
+ Drift Scores
+      │
+      ▼
+ Flask Exporter
+      │
+      ▼
+ Prometheus
+      │
+      ▼
+ Grafana
+```
+
+---
+
+# Components Used
+
+## 1. Flask Metric Exporter
+
+The Flask application exposes metrics in Prometheus format.
+
+Example metrics:
+
+- HTTP request count
+- Model inference latency
+- Prediction accuracy
+- Feature drift scores
+
+Prometheus periodically scrapes these metrics.
+
+---
+
+## 2. Prometheus
+
+Prometheus is a monitoring database.
+
+Its responsibilities are:
+
+- Scrape metrics
+- Store time-series data
+- Execute PromQL queries
+- Provide data to Grafana
+
+Every metric becomes a time series inside Prometheus.
+
+---
+
+## 3. Grafana
+
+Grafana is only a visualization layer.
+
+Grafana does **not** collect metrics.
+
+Instead, it:
+
+- Connects to Prometheus
+- Executes PromQL queries
+- Draws graphs
+- Creates dashboards
+- Supports alerts
+
+---
+
+## 4. Evidently
+
+Evidently monitors machine learning models.
+
+It computes:
+
+- Feature drift
+- Target drift
+- Prediction drift
+- Data quality
+- Model quality
+
+In this project Evidently computes **Population Stability Index (PSI)** every few seconds and exports it.
+
+---
+
+# Understanding Each Metric
+
+---
+
+# 1. Request Rate
+
+Metric
+
+```
+flask_http_request_total
+```
+
+Type
+
+```
+Counter
+```
+
+A Counter only increases.
+
+Example
+
+```
+0
+5
+20
+25
+40
+```
+
+Since it always increases, we calculate requests per second using `rate()`.
+
+Query
+
+```promql
+sum(rate(flask_http_request_total[5m]))
+```
+
+Explanation
+
+```
+rate()
+```
+
+Calculates how quickly the counter increases.
+
+```
+[5m]
+```
+
+Uses the last five minutes.
+
+```
+sum()
+```
+
+Adds together all HTTP requests.
+
+Without `sum()` you would get one graph per endpoint.
+
+---
+
+Example
+
+Requests
+
+```
+Login API
+
+100
+120
+150
+
+Predict API
+
+500
+550
+600
+```
+
+Using
+
+```promql
+sum(rate(flask_http_request_total[5m]))
+```
+
+produces
+
+```
+Total Request Rate
+```
+
+instead of separate graphs.
+
+---
+
+# Why Time Series?
+
+Request rate changes continuously.
+
+A time-series graph shows
+
+- spikes
+- traffic increases
+- traffic drops
+- outages
+
+which are impossible to understand from a single number.
+
+---
+
+# 2. Model Inference Latency
+
+Metric
+
+```
+model_inference_duration_seconds_bucket
+```
+
+This is a Histogram.
+
+---
+
+# What is a Histogram?
+
+Suppose inference takes
+
+```
+0.02 sec
+0.05 sec
+0.07 sec
+0.10 sec
+0.25 sec
+0.50 sec
+```
+
+Prometheus stores them inside buckets.
+
+Example
+
+```
+<=0.05
+
+2 requests
+
+<=0.10
+
+4 requests
+
+<=0.25
+
+5 requests
+
+<=0.50
+
+6 requests
+```
+
+Each bucket has an **le** label.
+
+Example
+
+```
+le="0.05"
+
+le="0.10"
+
+le="0.25"
+```
+
+---
+
+# Why Buckets?
+
+Instead of storing every request individually, Prometheus counts how many requests fall into each latency bucket.
+
+This saves memory while allowing percentile calculations.
+
+---
+
+# Why P95?
+
+Average latency can hide slow requests.
+
+Example
+
+Requests
+
+```
+10 ms
+10 ms
+10 ms
+10 ms
+900 ms
+```
+
+Average
+
+```
+188 ms
+```
+
+This average doesn't show that one request took almost one second.
+
+P95 means:
+
+95% of requests finished faster than this value.
+
+Only the slowest 5% are excluded.
+
+This is much more useful in production.
+
+---
+
+Query
+
+```promql
+histogram_quantile(
+  0.95,
+  sum by (le)(
+    rate(model_inference_duration_seconds_bucket[5m])
+  )
+)
+```
+
+---
+
+Breakdown
+
+### rate()
+
+Converts bucket counters into per-second values.
+
+---
+
+### sum by(le)
+
+Groups buckets while preserving the bucket boundary.
+
+Without
+
+```
+by(le)
+```
+
+Prometheus cannot compute percentiles.
+
+---
+
+### histogram_quantile()
+
+Calculates
+
+```
+P50
+P90
+P95
+P99
+```
+
+depending on the first argument.
+
+Example
+
+```
+0.95
+```
+
+means
+
+```
+95th percentile
+```
+
+---
+
+Why use a Stat visualization?
+
+Latency is usually monitored as a single important value.
+
+A large number is easier to notice than a graph.
+
+---
+
+# 3. Prediction Accuracy
+
+Metric
+
+```
+prediction_accuracy
+```
+
+Type
+
+```
+Gauge
+```
+
+---
+
+# Gauge
+
+Unlike counters,
+
+Gauge values can increase or decrease.
+
+Example
+
+```
+0.91
+0.92
+0.90
+0.89
+0.93
+```
+
+No rate calculation is needed.
+
+Query
+
+```promql
+prediction_accuracy
+```
+
+---
+
+Why Gauge Visualization?
+
+A Gauge instantly communicates whether the value is within an acceptable range.
+
+Example
+
+```
+Green
+
+0.95
+
+Yellow
+
+0.90
+
+Red
+
+0.75
+```
+
+It is easy for an operator to interpret.
+
+---
+
+# 4. Feature Drift
+
+Metric
+
+```
+data_drift_score
+```
+
+Type
+
+```
+Gauge
+```
+
+Each feature has a label.
+
+Example
+
+```
+column="amount"
+
+column="hour"
+
+column="merchant"
+
+column="balance"
+```
+
+Prometheus stores
+
+```
+amount
+
+0.18
+
+hour
+
+0.07
+
+merchant
+
+0.29
+```
+
+---
+
+Query
+
+```promql
+data_drift_score
+```
+
+---
+
+What is Feature Drift?
+
+Suppose the model was trained on
+
+```
+Age
+
+18-35
+```
+
+Today the incoming data becomes
+
+```
+55-80
+```
+
+The feature distribution has changed.
+
+This is called feature drift.
+
+---
+
+Population Stability Index (PSI)
+
+PSI measures how different two distributions are.
+
+Reference data
+
+↓
+
+Production data
+
+↓
+
+Difference
+
+↓
+
+PSI Score
+
+---
+
+Typical Interpretation
+
+| PSI | Meaning |
+|------|----------|
+| <0.1 | No drift |
+| 0.1–0.2 | Moderate drift |
+| >0.2 | Significant drift |
+
+---
+
+Why Bar Gauge?
+
+Each feature has its own score.
+
+Bars make it easy to compare features side by side.
+
+Example
+
+```
+amount
+
+█████████
+
+0.24
+
+hour
+
+██
+
+0.05
+
+merchant
+
+██████
+
+0.17
+```
+
+The tallest bar indicates the feature with the most drift.
+
+---
+
+# PromQL Used
+
+Request Rate
+
+```promql
+sum(rate(flask_http_request_total[5m]))
+```
+
+Latency
+
+```promql
+histogram_quantile(
+0.95,
+sum by(le)(
+rate(model_inference_duration_seconds_bucket[5m])
+)
+)
+```
+
+Prediction Accuracy
+
+```promql
+prediction_accuracy
+```
+
+Feature Drift
+
+```promql
+data_drift_score
+```
+
+---
+
+# Visualization Choices
+
+| Metric | Visualization | Reason |
+|---------|--------------|--------|
+| Request Rate | Time Series | Shows traffic over time |
+| Latency | Stat | Displays one important value |
+| Prediction Accuracy | Gauge | Easy health indicator |
+| Drift Score | Bar Gauge | Compare multiple features |
+
+---
+
+# Dashboard Layout
+
+```
++----------------------+----------------------+
+| Request Rate         | P95 Latency          |
++----------------------+----------------------+
+| Prediction Accuracy  | Drift by Column      |
++----------------------+----------------------+
+```
+
+This layout allows an engineer to understand system health in seconds.
+
+---
+
+# Why These Four Metrics?
+
+Together they answer four critical questions:
+
+### Is traffic reaching the service?
+
+Request Rate
+
+---
+
+### Is the model responding quickly?
+
+P95 Latency
+
+---
+
+### Is the model making correct predictions?
+
+Prediction Accuracy
+
+---
+
+### Has the incoming data changed?
+
+Feature Drift
+
+---
+
+# Advantages of This Dashboard
+
+- Quick health overview
+- Detects traffic spikes
+- Detects slow inference
+- Detects accuracy degradation
+- Detects feature drift
+- Helps reduce incident response time
+- Easy for on-call engineers to monitor
+
+---
+
+# Key Prometheus Concepts Learned
+
+- Counter
+- Gauge
+- Histogram
+- Histogram Buckets
+- Labels
+- Time Series
+- PromQL
+- `rate()`
+- `sum()`
+- `sum by()`
+- `histogram_quantile()`
+
+---
+
+# Key Grafana Concepts Learned
+
+- Dashboard
+- Panel
+- Visualization
+- Time Series Panel
+- Stat Panel
+- Gauge Panel
+- Bar Gauge Panel
+- Prometheus Data Source
+- Query Editor
+
+---
+
+# Key Machine Learning Monitoring Concepts Learned
+
+- Model Monitoring
+- Feature Drift
+- Population Stability Index (PSI)
+- Prediction Accuracy
+- Inference Latency
+- Request Rate
+- Evidently AI Integration
+
+---
+
+# Summary
+
+In this project, we created a comprehensive **Model Overview Dashboard** in Grafana using Prometheus as the data source. The dashboard combines infrastructure metrics and machine learning metrics into a single interface.
+
+The dashboard displays:
+
+- Request Rate (traffic monitoring)
+- P95 Inference Latency (performance monitoring)
+- Prediction Accuracy (model quality)
+- Feature Drift (data quality)
+
+By combining these four signals with multiple visualization types, an on-call engineer can quickly determine whether the deployed ML model is healthy, performant, accurate, and receiving data that matches its training distribution.
 
 ---
 
