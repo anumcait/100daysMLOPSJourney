@@ -107,3 +107,10 @@ The dashboard references all required Prometheus metrics:
 The dashboard is saved and available through the Grafana dashboard search API (`/api/search?type=dash-db`).
 
 ### Screenshots
+
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/51198b98-4a8d-44db-88cd-6930f8819c9b" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/13c76664-1974-42d6-99be-4c8b71ea0a7b" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/250fef13-2da1-4fce-8c05-0a5a0192885b" />
+
+
+
