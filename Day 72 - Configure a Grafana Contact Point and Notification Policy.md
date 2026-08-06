@@ -159,3 +159,16 @@ Expected output:
 Successfully configured Grafana Alerting to route all alerts labeled `severity=high` to the webhook endpoint via a dedicated webhook contact point and notification policy.
 
 ### Screenshots
+
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/1026027b-d2c0-4e36-ba29-fac81bbba81c" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/ab64806d-a045-43d9-833b-f964534fa930" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/6c3f9137-93c2-4a74-a90a-28eacdc74760" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/76fd5322-5beb-410e-a407-51c2097ba6fe" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/24d050f7-7591-4101-8ec0-eb336aeb7586" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/def9cae3-792c-43ca-9998-55522c983ff0" />
+
+
+
+
+
+
