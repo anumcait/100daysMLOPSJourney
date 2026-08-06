@@ -21104,5 +21104,941 @@ The dashboard displays:
 
 By combining these four signals with multiple visualization types, an on-call engineer can quickly determine whether the deployed ML model is healthy, performant, accurate, and receiving data that matches its training distribution.
 
+# Day 72 Notes
+# Grafana Contact Points & Notification Policies (Complete Lecture Notes)
+
+---
+
+# Introduction
+
+Grafana Alerting is used to monitor systems and notify people when something goes wrong.
+
+Creating an alert rule alone **does not send notifications**.
+
+Many beginners think:
+
+```
+Alert Rule
+     ↓
+Notification
+```
+
+This is incorrect.
+
+The actual flow is
+
+```
+Metrics
+   │
+   ▼
+Prometheus
+   │
+   ▼
+Alert Rule
+   │
+   ▼
+Notification Policy
+   │
+   ▼
+Contact Point
+   │
+   ▼
+Webhook / Slack / Email / PagerDuty
+```
+
+Every piece is required.
+
+If even one piece is missing, no notification will ever be sent.
+
+---
+
+# The Alerting Pipeline
+
+Grafana Alerting works in multiple stages.
+
+```
+Prometheus
+      │
+      ▼
+Alert Rule evaluates metrics
+      │
+      ▼
+Alert becomes "Firing"
+      │
+      ▼
+Notification Policy checks labels
+      │
+      ▼
+Policy selects Contact Point
+      │
+      ▼
+Contact Point sends notification
+```
+
+Without a Notification Policy...
+
+```
+Alert Rule
+      │
+      ▼
+Nothing happens
+```
+
+Without a Contact Point...
+
+```
+Policy
+     │
+     ▼
+Nowhere to send notification
+```
+
+---
+
+# Understanding Alert Labels
+
+Every Grafana alert contains labels.
+
+Example
+
+```yaml
+alertname: HighCPU
+instance: node1
+job: node-exporter
+severity: high
+team: ml
+environment: production
+```
+
+Labels are simply key-value pairs.
+
+```
+severity = high
+team = ml
+environment = production
+```
+
+Notification Policies use these labels to decide where alerts should go.
+
+Think of labels like tags attached to alerts.
+
+---
+
+# Real World Example
+
+Suppose your company has different teams.
+
+```
+ML Team
+Database Team
+Security Team
+Networking Team
+```
+
+If a database alert occurs,
+
+it should not notify the ML team.
+
+Instead,
+
+Database alerts should go to Database engineers.
+
+Example:
+
+```
+team=db
+```
+
+Another example
+
+```
+severity=critical
+```
+
+should page on-call engineers immediately.
+
+Low severity alerts
+
+```
+severity=low
+```
+
+may only send an email.
+
+This routing is performed by Notification Policies.
+
+---
+
+# Components of Grafana Alerting
+
+There are four major components.
+
+## 1. Data Source
+
+Example
+
+```
+Prometheus
+Loki
+InfluxDB
+Graphite
+```
+
+The datasource stores metrics.
+
+---
+
+## 2. Alert Rule
+
+The Alert Rule asks
+
+"WHEN should an alert fire?"
+
+Example
+
+```
+CPU > 90%
+```
+
+or
+
+```
+Memory > 80%
+```
+
+Example
+
+```
+sum(rate(http_requests_total[5m])) > 100
+```
+
+The Alert Rule decides
+
+```
+Healthy
+
+or
+
+Firing
+```
+
+---
+
+## 3. Notification Policy
+
+Notification Policies ask
+
+```
+WHO should receive this alert?
+```
+
+Example
+
+```
+severity=critical
+```
+
+↓
+
+```
+PagerDuty
+```
+
+Example
+
+```
+team=backend
+```
+
+↓
+
+```
+Backend Slack Channel
+```
+
+Example
+
+```
+environment=dev
+```
+
+↓
+
+```
+Developer Email
+```
+
+---
+
+## 4. Contact Point
+
+A Contact Point answers
+
+```
+WHERE should the notification go?
+```
+
+Examples
+
+```
+Slack
+
+Email
+
+Webhook
+
+Microsoft Teams
+
+Discord
+
+Telegram
+
+PagerDuty
+
+OpsGenie
+
+VictorOps
+```
+
+Contact Points only define destinations.
+
+They never decide which alert goes there.
+
+---
+
+# Difference Between Contact Point and Notification Policy
+
+This is one of the most important interview questions.
+
+---
+
+## Contact Point
+
+Stores
+
+```
+Destination
+```
+
+Example
+
+```
+Slack URL
+
+Webhook URL
+
+Email Address
+```
+
+---
+
+## Notification Policy
+
+Stores
+
+```
+Routing Logic
+```
+
+Example
+
+```
+severity=critical
+```
+
+↓
+
+```
+Slack
+```
+
+Example
+
+```
+team=security
+```
+
+↓
+
+```
+PagerDuty
+```
+
+---
+
+Think of it like postal mail.
+
+Contact Point
+
+```
+Address
+```
+
+Notification Policy
+
+```
+Who receives the letter
+```
+
+---
+
+# Why We Need Both
+
+Suppose you create only a Contact Point.
+
+```
+Webhook
+```
+
+Does Grafana know which alert should use it?
+
+No.
+
+Suppose you create only a Notification Policy.
+
+```
+severity=high
+```
+
+Does Grafana know where to send alerts?
+
+No.
+
+Therefore,
+
+both are mandatory.
+
+---
+
+# Contact Point Types
+
+Grafana supports many notification integrations.
+
+Examples
+
+```
+Webhook
+
+Email
+
+Slack
+
+Microsoft Teams
+
+Discord
+
+Telegram
+
+PagerDuty
+
+OpsGenie
+
+VictorOps
+
+Amazon SNS
+```
+
+All are Contact Points.
+
+---
+
+# Webhook
+
+Webhook is one of the simplest notification methods.
+
+Instead of sending an email,
+
+Grafana performs an HTTP request.
+
+Example
+
+```
+POST http://webhook-sink:5000/hook
+```
+
+The receiving application processes the alert.
+
+---
+
+# Why Companies Use Webhooks
+
+Imagine a company has its own incident platform.
+
+Instead of Slack,
+
+Grafana sends
+
+```
+POST
+```
+
+to
+
+```
+https://company.com/alerts
+```
+
+The internal platform
+
+- opens incidents
+- creates tickets
+- sends SMS
+- triggers automation
+- updates dashboards
+
+Everything begins from the webhook.
+
+---
+
+# Notification Policy Matching
+
+Suppose an alert contains
+
+```yaml
+severity: high
+team: ml
+environment: production
+```
+
+Policy
+
+```
+severity=high
+```
+
+Matches?
+
+YES
+
+---
+
+Policy
+
+```
+team=db
+```
+
+Matches?
+
+NO
+
+---
+
+Policy
+
+```
+environment=production
+```
+
+Matches?
+
+YES
+
+---
+
+Policy
+
+```
+severity=critical
+```
+
+Matches?
+
+NO
+
+---
+
+# Matchers
+
+Notification Policies use matchers.
+
+Example
+
+```
+severity = high
+```
+
+Operator
+
+```
+=
+```
+
+means exact match.
+
+Other operators include
+
+```
+!=
+
+=~
+
+!~
+```
+
+Example
+
+```
+team =~ backend|frontend
+```
+
+Matches
+
+```
+backend
+
+frontend
+```
+
+---
+
+# Notification Policy Tree
+
+Grafana stores policies as a tree.
+
+Example
+
+```
+Default Policy
+        │
+        ├──────── severity=high
+        │
+        ├──────── team=security
+        │
+        ├──────── team=db
+        │
+        └──────── environment=dev
+```
+
+Each child is called a route.
+
+---
+
+# Default Policy
+
+Every alert starts here.
+
+```
+Default Policy
+```
+
+If no child matches,
+
+Grafana uses the default receiver.
+
+---
+
+# Route
+
+A Route is simply a child policy.
+
+Example
+
+```
+severity=high
+```
+
+↓
+
+```
+Webhook
+```
+
+---
+
+Another route
+
+```
+team=database
+```
+
+↓
+
+```
+PagerDuty
+```
+
+---
+
+# Lab Scenario
+
+Requirement
+
+```
+severity=high
+```
+
+↓
+
+```
+Webhook
+```
+
+That's all.
+
+Nothing else is needed.
+
+---
+
+# Contact Point Configuration
+
+Name
+
+```
+high-severity-webhook
+```
+
+Type
+
+```
+Webhook
+```
+
+URL
+
+```
+http://webhook-sink:5000/hook
+```
+
+---
+
+# Notification Policy
+
+Matcher
+
+```
+severity = high
+```
+
+Receiver
+
+```
+high-severity-webhook
+```
+
+---
+
+# API Verification
+
+Grafana exposes Provisioning APIs.
+
+Contact Points
+
+```
+GET
+
+/api/v1/provisioning/contact-points
+```
+
+Example
+
+```json
+[
+  {
+    "name":"high-severity-webhook",
+    "type":"webhook",
+    "settings":{
+      "url":"http://webhook-sink:5000/hook"
+    }
+  }
+]
+```
+
+---
+
+Notification Policies
+
+```
+GET
+
+/api/v1/provisioning/policies
+```
+
+Example
+
+```json
+{
+  "receiver":"empty",
+  "routes":[
+    {
+      "receiver":"high-severity-webhook",
+      "object_matchers":[
+        [
+          "severity",
+          "=",
+          "high"
+        ]
+      ]
+    }
+  ]
+}
+```
+
+---
+
+# Why API Verification Matters
+
+The UI may show unsaved changes.
+
+The API always shows the actual configuration stored in Grafana.
+
+Labs usually validate using these APIs.
+
+---
+
+# Common Mistakes
+
+## Forgetting to Save
+
+Most common issue.
+
+Always click
+
+```
+Save Policy
+```
+
+---
+
+## Wrong Label
+
+Correct
+
+```
+severity
+```
+
+Incorrect
+
+```
+Severity
+
+SEVERITY
+
+priority
+```
+
+Labels are case-sensitive.
+
+---
+
+## Wrong Value
+
+Correct
+
+```
+high
+```
+
+Incorrect
+
+```
+High
+
+HIGH
+```
+
+---
+
+## Wrong Contact Point Type
+
+Correct
+
+```
+Webhook
+```
+
+Incorrect
+
+```
+Email
+```
+
+---
+
+## Wrong URL
+
+Correct
+
+```
+http://webhook-sink:5000/hook
+```
+
+Incorrect
+
+```
+http://localhost:5000
+
+http://webhook
+
+https://webhook-sink
+```
+
+---
+
+## No Notification Policy
+
+Even if the Contact Point exists,
+
+nothing will be sent.
+
+---
+
+## No Contact Point
+
+Even if the Notification Policy exists,
+
+there is nowhere to deliver alerts.
+
+---
+
+# Interview Questions
+
+## What is a Contact Point?
+
+A Contact Point defines **where notifications are delivered** (Webhook, Email, Slack, PagerDuty, Teams, etc.).
+
+---
+
+## What is a Notification Policy?
+
+A Notification Policy defines **which alerts are routed to which Contact Point** based on alert labels.
+
+---
+
+## Can an Alert Rule send notifications directly?
+
+No.
+
+Alert Rules only determine **when** an alert fires. Notification Policies and Contact Points determine **how** and **where** notifications are sent.
+
+---
+
+## Why use labels?
+
+Labels allow Grafana to categorize alerts and route them to the appropriate team or destination.
+
+---
+
+## What is a Webhook?
+
+A Webhook is an HTTP endpoint that receives alert notifications as HTTP requests, enabling integration with custom applications or automation workflows.
+
+---
+
+# Key Takeaways
+
+- Alert Rules decide **when** an alert fires.
+- Contact Points define **where** notifications are sent.
+- Notification Policies define **which** alerts go to **which** Contact Point.
+- Labels are used for routing.
+- `severity=high` matches alerts labeled with high severity.
+- Webhooks allow Grafana to integrate with external systems using HTTP.
+- The Notification Policy tree starts with the Default Policy, and child routes handle specific matching conditions.
+- Always verify your configuration using Grafana Provisioning APIs, as many labs and automation tools rely on these endpoints.
+
+
+
+
 ---
 
