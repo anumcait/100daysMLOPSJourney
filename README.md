@@ -102,4 +102,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 72: Configure a Grafana Contact Point and Notification Policy](./Day%2072%20-%20Configure%20a%20Grafana%20Contact%20Point%20and%20Notification%20Policy.md)
 
+- [Day 73: Promote a Retrained Model via a Champion/Challenger Gate](./Day%2073%20-%20Promote%20a%20Retrained%20Model%20via%20a%20Champion-Challenger%20Gate.md)
+
 ---

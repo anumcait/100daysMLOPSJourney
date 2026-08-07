@@ -22039,6 +22039,842 @@ A Webhook is an HTTP endpoint that receives alert notifications as HTTP requests
 
 
 
+# Day 73 Notes
+# Champion/Challenger Model Promotion using MLflow Model Aliases
+
+---
+
+# Introduction
+
+In any Machine Learning system, training a model once is **not enough**.
+
+After deployment, the data entering the system changes over time.
+
+This phenomenon is called **Data Drift**.
+
+When data drift occurs, the existing production model may no longer perform well because it was trained on older data.
+
+To solve this problem, organizations build **automated retraining pipelines**.
+
+The pipeline periodically:
+
+1. Detects drift
+2. Retrains the model
+3. Evaluates it
+4. Registers the new model version
+
+However...
+
+There is a very dangerous mistake many beginners make.
+
+They automatically deploy every newly trained model.
+
+That is a terrible idea.
+
+Why?
+
+Because...
+
+**A newly trained model is not guaranteed to be better.**
+
+Sometimes it becomes worse.
+
+Sometimes the new data contains noise.
+
+Sometimes the retraining dataset is imbalanced.
+
+Sometimes hyperparameters are poor.
+
+If we blindly replace production with every new model, users may suddenly experience lower prediction quality.
+
+That is why almost every ML platform follows the
+
+> Champion / Challenger pattern.
+
+---
+
+# What is the Champion?
+
+The Champion is the model currently serving production traffic.
+
+Think of it as the "current winner."
+
+Users are making predictions using this model.
+
+Example
+
+```
+fraud-detector
+Version 1
+Alias: production
+F1 Score = 0.71
+```
+
+This model is trusted.
+
+It has already passed evaluation.
+
+It is currently serving real users.
+
+---
+
+# What is the Challenger?
+
+Whenever retraining finishes, a new model is created.
+
+Example
+
+```
+fraud-detector
+Version 2
+```
+
+This model is called the
+
+**Challenger**
+
+It challenges the production model.
+
+But it is NOT production yet.
+
+It must first prove itself.
+
+Example
+
+```
+Version 2
+F1 Score = 0.82
+```
+
+Only after comparison can it replace Version 1.
+
+---
+
+# Why Compare Models?
+
+Imagine this situation.
+
+Current Production
+
+```
+Accuracy = 95%
+```
+
+Retrained Model
+
+```
+Accuracy = 91%
+```
+
+If we deploy it automatically...
+
+Users immediately receive worse predictions.
+
+Nothing broke technically.
+
+The deployment succeeded.
+
+But business performance became worse.
+
+This is called
+
+**Model Regression**
+
+Machine Learning engineers spend a lot of time preventing this.
+
+---
+
+# Champion vs Challenger Workflow
+
+```
+                 Production Model
+                  (Champion)
+
+                      │
+                      │
+             New Data Arrives
+                      │
+                      ▼
+            Drift Detection System
+                      │
+          Drift exceeds threshold?
+                      │
+              Yes
+                      │
+                      ▼
+             Retraining Pipeline
+                      │
+                      ▼
+             Register Version 2
+                      │
+                      ▼
+             Evaluate New Model
+                      │
+                      ▼
+         Compare Champion vs Challenger
+                      │
+        ┌─────────────┴─────────────┐
+        │                           │
+ Better Model                 Worse Model
+        │                           │
+        ▼                           ▼
+ Promote to Production        Reject Model
+```
+
+---
+
+# What Changed in MLflow 3.x?
+
+Older MLflow versions used
+
+```
+Stages
+```
+
+Like
+
+```
+None
+
+Staging
+
+Production
+
+Archived
+```
+
+Example
+
+```
+Version 1
+
+Stage = Production
+```
+
+Promotion meant changing stages.
+
+Example
+
+```
+Staging
+↓
+
+Production
+```
+
+This system had limitations.
+
+Only one stage existed.
+
+It wasn't flexible.
+
+---
+
+# MLflow 3.x Introduced Aliases
+
+Instead of stages,
+
+MLflow now recommends
+
+Aliases.
+
+Aliases are simply names pointing to versions.
+
+Example
+
+```
+production
+```
+
+points to
+
+```
+Version 1
+```
+
+Tomorrow,
+
+the same alias can point to
+
+```
+Version 2
+```
+
+Nothing else changes.
+
+The application always loads
+
+```
+models:/fraud-detector@production
+```
+
+Notice something important.
+
+The application never loads
+
+```
+Version 1
+```
+
+or
+
+```
+Version 2
+```
+
+It loads the alias.
+
+Therefore changing production is simply
+
+moving the alias.
+
+---
+
+# Why are Aliases Better?
+
+Suppose today
+
+```
+production → Version 1
+```
+
+Tomorrow
+
+```
+production → Version 2
+```
+
+Next week
+
+```
+production → Version 5
+```
+
+The application code never changes.
+
+Only the alias changes.
+
+This is much cleaner.
+
+---
+
+# Project Structure
+
+```
+monitoring/
+
+│
+├── retrain_pipeline.py
+│
+└── promote.py
+```
+
+---
+
+# What retrain_pipeline.py Does
+
+This script has already done its work.
+
+It
+
+Registered
+
+```
+Version 1
+```
+
+Then
+
+Registered
+
+```
+Version 2
+```
+
+Each version has
+
+```
+Run ID
+
+Metrics
+
+Artifacts
+
+Parameters
+```
+
+Our task is only promotion.
+
+---
+
+# What promote.py Does
+
+This script decides
+
+Should Version 2 become production?
+
+Yes or No.
+
+Nothing more.
+
+---
+
+# Understanding the Code
+
+---
+
+## Creating the Client
+
+```python
+client = MlflowClient(
+    tracking_uri="http://localhost:5000"
+)
+```
+
+This client communicates with the MLflow Tracking Server.
+
+Every registry operation goes through this object.
+
+Examples
+
+Get model
+
+Get run
+
+Read metrics
+
+Move aliases
+
+Everything.
+
+---
+
+# Reading Metrics
+
+```python
+def f1_of(version):
+```
+
+This helper function returns the F1 score of a model version.
+
+Inside it,
+
+First
+
+```
+client.get_model_version()
+```
+
+returns metadata.
+
+Example
+
+```
+Run ID
+
+Version
+
+Creation Time
+```
+
+Then
+
+```
+client.get_run()
+```
+
+opens the associated MLflow run.
+
+From that run we read
+
+```
+metrics["f1_score"]
+```
+
+So
+
+```
+Version
+
+↓
+
+Run
+
+↓
+
+Metrics
+
+↓
+
+F1 Score
+```
+
+---
+
+# Step 1
+
+Find Current Production
+
+```python
+champion = client.get_model_version_by_alias(
+    MODEL,
+    PROD_ALIAS
+)
+```
+
+This asks
+
+"What version is production currently pointing to?"
+
+Answer
+
+```
+Version 1
+```
+
+---
+
+# Step 2
+
+Read Champion Score
+
+```python
+champion_f1 = f1_of(champion.version)
+```
+
+Returns
+
+```
+0.71
+```
+
+---
+
+# Step 3
+
+Read Challenger Score
+
+```python
+challenger_f1 = f1_of("2")
+```
+
+Returns
+
+```
+0.82
+```
+
+---
+
+# Step 4
+
+Compare
+
+```python
+if challenger_f1 > champion_f1:
+```
+
+This is the promotion gate.
+
+Only one condition exists.
+
+Strictly greater.
+
+Not greater than or equal.
+
+Not latest version.
+
+Only
+
+Better model.
+
+---
+
+# Why Strictly Greater?
+
+Suppose
+
+```
+Champion = 0.82
+
+Challenger = 0.82
+```
+
+Should we replace it?
+
+No.
+
+There is no improvement.
+
+Changing production introduces unnecessary deployment risk.
+
+Therefore
+
+```
+>
+```
+
+is preferred.
+
+Not
+
+```
+>=
+```
+
+---
+
+# Step 5
+
+Move Production Alias
+
+```python
+client.set_registered_model_alias(
+    MODEL,
+    "production",
+    "2"
+)
+```
+
+This is the actual deployment.
+
+Notice
+
+No files move.
+
+No artifacts copy.
+
+No retraining happens.
+
+No model upload happens.
+
+Only the alias changes.
+
+Before
+
+```
+production
+
+↓
+
+Version 1
+```
+
+After
+
+```
+production
+
+↓
+
+Version 2
+```
+
+Done.
+
+Deployment completed.
+
+---
+
+# Output
+
+```
+Champion: v1 (0.71)
+
+Challenger: v2 (0.82)
+
+Promoted Version 2
+```
+
+Exactly what happened.
+
+---
+
+# Visual Representation
+
+Before
+
+```
+production
+
+↓
+
+Version 1
+```
+
+After
+
+```
+production
+
+↓
+
+Version 2
+```
+
+---
+
+# APIs Used
+
+## get_model_version()
+
+Returns metadata about a specific version.
+
+---
+
+## get_run()
+
+Returns metrics, parameters and artifacts associated with a run.
+
+---
+
+## get_model_version_by_alias()
+
+Returns the version pointed to by an alias.
+
+Example
+
+```
+production
+
+↓
+
+Version 1
+```
+
+---
+
+## set_registered_model_alias()
+
+Moves an alias.
+
+Example
+
+```
+production
+
+↓
+
+Version 2
+```
+
+---
+
+# Why Not Use Version Numbers?
+
+Suppose your application loads
+
+```
+Version 1
+```
+
+Tomorrow
+
+Version 7 becomes best.
+
+You must modify code.
+
+Redeploy application.
+
+Restart services.
+
+Instead,
+
+Load
+
+```
+models:/fraud-detector@production
+```
+
+Now only the alias changes.
+
+Applications never change.
+
+---
+
+# Real Industry Workflow
+
+```
+Users
+
+      │
+
+      ▼
+
+Production Model
+
+      │
+
+Prediction Requests
+
+      │
+
+      ▼
+
+Monitor Performance
+
+      │
+
+Detect Drift
+
+      │
+
+Retrain
+
+      │
+
+Evaluate
+
+      │
+
+Register Version
+
+      │
+
+Champion vs Challenger
+
+      │
+
+      ▼
+
+Promote?
+
+      │
+
+   Yes / No
+
+      │
+
+      ▼
+
+Production Alias Updated
+```
+
+---
+
+# Best Practices
+
+- Never deploy a retrained model without evaluation.
+- Always compare the new model against the production model.
+- Use aliases instead of hardcoded version numbers.
+- Load models using aliases (for example, `models:/fraud-detector@production`).
+- Keep production stable by promoting only when there is a measurable improvement.
+- Store evaluation metrics in MLflow runs so they can be used for automated promotion decisions.
+- Make promotion logic deterministic and reproducible.
+
+---
+
+# Key Takeaways
+
+- Data drift can reduce model performance over time.
+- Retraining creates a challenger model, not an automatic replacement.
+- The production model is called the champion.
+- MLflow 3.x recommends aliases instead of stages.
+- Applications should load models using aliases, not version numbers.
+- A Champion/Challenger gate prevents worse models from reaching production.
+- In this lab, Version 2 (F1 = 0.82) correctly replaced Version 1 (F1 = 0.71) by moving the `production` alias after passing the evaluation gate.
+
+
 
 ---
 
