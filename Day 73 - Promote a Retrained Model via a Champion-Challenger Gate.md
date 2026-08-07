@@ -1,4 +1,20 @@
 # Day 73: Promote a Retrained Model via a Champion/Challenger Gate
+The xFusionCorp Industries ML platform team operates a drift-triggered retraining pipeline. When data drift exceeds the alert threshold, the pipeline automatically retrains the fraud-detection model and registers it as a new version of fraud-detector. Currently, there is an incumbent version 1 serving production traffic under the production alias, along with a newly retrained challenger version 2, which has not yet been promoted. It is essential to avoid promoting the retrained model to production without evaluation, as this could result in a subpar model reaching users. Your task is to implement the promotion gate in promote.py, ensuring that the challenger is only promoted to production if it surpasses the incumbent's performance on the designated evaluation metric. After completing this task, proceed to execute the promotion.
+
+
+The MLflow tracking server is on port 5000; the MLflow UI button opens it. Under Models → fraud-detector you can see version 1 (alias production, f1_score 0.71) and version 2 (no alias yet, f1_score 0.82).
+
+The project is at /root/code/monitoring/:
+
+retrain_pipeline.py – the startup setup that registered v1 and v2. Correct; do not edit.
+promote.py – the promotion-gate scaffold. Its f1_of(version) helper (reads a version's logged f1_score) is wired; the gate logic is a # TODO naming the MLflow client calls to use.
+The gate must read the version the production alias currently points at (the champion) and its f1_score, read the challenger's f1_score (version 2), and re-point production at the challenger only if the challenger's is strictly greater—otherwise leave the alias unchanged.
+
+The end state must include:
+
+The production alias on fraud-detector resolves to version 2 (the challenger).
+The version now serving production has a higher f1_score than the incumbent v1 — the gate promoted the better model, not a blind version bump.
+MLflow 3.x replaced stage-based promotion (Staging/Production) with aliases — named pointers like production that decouple a label from a version, so downstream code loads models:/fraud-detector@production and promotion is just re-pointing the alias. A champion/challenger gate is the guardrail: never re-point production at a retrained model without first confirming it actually beats what is live.
 
 ## Objective
 
