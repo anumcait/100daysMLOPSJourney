@@ -189,3 +189,11 @@ Final registry:
 
 
 ### Screenshots
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/ddd790ea-43fc-4aa5-9905-46dff5ae744c" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/8bff47f1-7d76-46fe-b9e8-9da2b6dee2e4" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/42a6438d-536a-4f68-bcd5-79ef20a6978e" />
+<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/f2598121-4927-4af1-9fd0-07f578f86d01" />
+
+
+
+
