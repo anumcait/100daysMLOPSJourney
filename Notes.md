@@ -24144,5 +24144,7 @@ from a single Grafana dashboard panel.
 
 This completes the Counter → labelled series → Prometheus → `label_values()` → Grafana variable → `$version` workflow.
 
+
+
 ---
 
