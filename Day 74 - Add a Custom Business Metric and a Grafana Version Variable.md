@@ -391,18 +391,18 @@ The final setup supports:
 - Prometheus-backed business metrics for ML model monitoring
 
 ### Screenshots
-<img width="500" height="400" alt="image" src="https://github.com/user-attachments/assets/0fa35368-64c9-44f1-8926-9bc76289e7ae" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/0fa35368-64c9-44f1-8926-9bc76289e7ae" />
 
-<img width="500" height="400" alt="image" src="https://github.com/user-attachments/assets/36a20edc-21fd-4f31-b093-8f463a21145e" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/36a20edc-21fd-4f31-b093-8f463a21145e" />
 
-<img width="500" height="400" alt="image" src="https://github.com/user-attachments/assets/d6010560-b5bc-4c68-921c-2327d97c65e4" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/d6010560-b5bc-4c68-921c-2327d97c65e4" />
 
-<img width="500" height="400" alt="image" src="https://github.com/user-attachments/assets/2da49cce-d814-4414-a4b0-89af3f8cb7be" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/2da49cce-d814-4414-a4b0-89af3f8cb7be" />
 
-<img width="500" height="400" alt="image" src="https://github.com/user-attachments/assets/0f9193ff-6fab-4523-b187-564acb9de68c" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/0f9193ff-6fab-4523-b187-564acb9de68c" />
 
-<img width="500" height="400" alt="image" src="https://github.com/user-attachments/assets/8525d8d3-71c1-4f22-9872-f6d866323fe4" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/8525d8d3-71c1-4f22-9872-f6d866323fe4" />
 
-<img width="500" height="400" alt="image" src="https://github.com/user-attachments/assets/f28aa054-1298-4cac-a953-161a33b7dc6b" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/f28aa054-1298-4cac-a953-161a33b7dc6b" />
 
 
