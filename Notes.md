@@ -22875,6 +22875,1274 @@ Production Alias Updated
 - In this lab, Version 2 (F1 = 0.82) correctly replaced Version 1 (F1 = 0.71) by moving the `production` alias after passing the evaluation gate.
 
 
+# Day 74 — Custom Business Metric and Grafana Version Variable
+
+## 1. What We Are Building
+
+In this lab, we extend an existing ML monitoring stack with a custom business metric.
+
+The monitoring stack already contains:
+
+- Flask metric emitter
+- Prometheus
+- Grafana
+
+The existing application exposes standard ML-serving metrics such as:
+
+- HTTP request count
+- Prediction accuracy
+- Data drift
+- Model inference latency
+
+The requirement is to add one more business-level metric:
+
+`fraud_amount_usd_total`
+
+This metric tracks the cumulative dollar amount of fraudulent transactions.
+
+The important requirement is that the metric must be separated by model version.
+
+For example:
+
+    fraud_amount_usd_total{version="v1"}
+    fraud_amount_usd_total{version="v2"}
+
+Grafana will then use a dashboard variable called `version` so that a user can select:
+
+- `v1`
+- `v2`
+- `All`
+
+The final flow is:
+
+    Flask Metric Emitter
+            |
+            | fraud_amount_usd_total{version="v1"}
+            | fraud_amount_usd_total{version="v2"}
+            v
+        Prometheus
+            |
+            | label_values(...)
+            v
+       Grafana Variable
+            |
+            | $version
+            v
+       Grafana Panel
+
+This is a common monitoring pattern:
+
+    Metric
+      ↓
+    Label
+      ↓
+    Prometheus
+      ↓
+    Grafana Variable
+      ↓
+    Dashboard Filter
+
+
+# 2. Understanding the Existing Application
+
+The metric emitter is located at:
+
+    /root/code/monitoring/app/metric_emitter.py
+
+The application uses the Prometheus Python client.
+
+The important imports are:
+
+    from prometheus_client import (
+        CollectorRegistry,
+        Counter,
+        Gauge,
+        Histogram,
+        generate_latest,
+    )
+
+The application creates its own Prometheus registry:
+
+    REGISTRY = CollectorRegistry()
+
+Using a custom registry is important because the application explicitly controls which metrics are exposed.
+
+The existing request counter is:
+
+    REQUEST_TOTAL = Counter(
+        "flask_http_request_total",
+        "Total HTTP requests handled, labelled by model version.",
+        labelnames=["version", "endpoint", "method"],
+        registry=REGISTRY,
+    )
+
+The existing counter already demonstrates how labels work.
+
+For example:
+
+    REQUEST_TOTAL.labels(
+        version="v1",
+        endpoint="/predict",
+        method="POST",
+    ).inc()
+
+This creates a series similar to:
+
+    flask_http_request_total{
+        version="v1",
+        endpoint="/predict",
+        method="POST"
+    }
+
+
+# 3. Understanding Prometheus Counters
+
+A Counter represents a value that normally increases over time.
+
+Examples include:
+
+- Number of requests
+- Number of errors
+- Number of transactions
+- Total amount of money processed
+
+Our business metric is also cumulative, so a Counter is appropriate.
+
+The metric is:
+
+    fraud_amount_usd_total
+
+The `_total` suffix is conventional for Prometheus counters.
+
+The metric represents:
+
+    Total fraudulent transaction amount in USD
+
+It is not a current balance.
+
+It is a cumulative amount that increases as fraudulent transactions are simulated.
+
+
+# 4. Why We Need a Version Label
+
+The ML platform contains multiple model versions.
+
+In this lab there are:
+
+    v1
+    v2
+
+If we created the metric without a label:
+
+    fraud_amount_usd_total
+
+we would only have one value.
+
+That would make it impossible to answer:
+
+    How much fraudulent transaction value was processed by v1?
+
+or:
+
+    How much fraudulent transaction value was processed by v2?
+
+Instead, we create a labelled metric:
+
+    fraud_amount_usd_total{version="v1"}
+
+    fraud_amount_usd_total{version="v2"}
+
+Prometheus treats these as separate time series.
+
+This is one of the most important concepts in Prometheus.
+
+The metric name is the same:
+
+    fraud_amount_usd_total
+
+The label value differentiates the series:
+
+    version="v1"
+
+and:
+
+    version="v2"
+
+
+# 5. Adding the Custom Counter
+
+Add the following metric definition to the Python application:
+
+    FRAUD_AMOUNT_USD_TOTAL = Counter(
+        "fraud_amount_usd_total",
+        "Total fraudulent transaction amount in USD, labelled by model version.",
+        labelnames=["version"],
+        registry=REGISTRY,
+    )
+
+There are several important parts.
+
+## Metric name
+
+    "fraud_amount_usd_total"
+
+This is the name that Prometheus and Grafana will query.
+
+## Description
+
+    "Total fraudulent transaction amount in USD, labelled by model version."
+
+This appears in the `/metrics` endpoint as the HELP text.
+
+## Label
+
+    labelnames=["version"]
+
+This tells Prometheus that every series of this metric will have a `version` label.
+
+## Registry
+
+    registry=REGISTRY
+
+This ensures that the metric is exposed through the application's custom registry.
+
+
+# 6. Updating `_nudge_metrics()`
+
+The application has a background function:
+
+    def _nudge_metrics() -> None:
+
+This function continuously simulates activity.
+
+It runs:
+
+    while True:
+
+Inside the loop, requests are simulated for two model versions:
+
+    for version in ("v1", "v1", "v1", "v2"):
+
+There are three simulated requests for `v1` and one for `v2` during each iteration.
+
+The existing request metric is incremented:
+
+    REQUEST_TOTAL.labels(
+        version=version,
+        endpoint="/predict",
+        method="POST",
+    ).inc()
+
+The inference latency is also recorded:
+
+    INFERENCE_LATENCY.observe(random.uniform(0.005, 0.15))
+
+
+# 7. Generating Fraudulent Transaction Amounts
+
+We need a value to add to the fraudulent amount counter.
+
+A simulated amount can be generated with:
+
+    fraud_amount = random.uniform(25.0, 500.0)
+
+This generates a random floating-point value between:
+
+    $25.00
+
+and:
+
+    $500.00
+
+The amount is then added to the counter for the current model version:
+
+    FRAUD_AMOUNT_USD_TOTAL.labels(version=version).inc(fraud_amount)
+
+This is the key line.
+
+For example, if:
+
+    version = "v1"
+
+and:
+
+    fraud_amount = 250.50
+
+the operation is effectively:
+
+    fraud_amount_usd_total{version="v1"} += 250.50
+
+If the next simulated transaction is:
+
+    version = "v2"
+
+and:
+
+    fraud_amount = 100.25
+
+then:
+
+    fraud_amount_usd_total{version="v2"} += 100.25
+
+Because this happens inside the loop, every iteration advances the totals.
+
+
+# 8. Complete Relevant `_nudge_metrics()` Logic
+
+The important section looks like:
+
+    def _nudge_metrics() -> None:
+        random.seed(42)
+        accuracy = 0.85
+        drift = {
+            "amount": 0.10,
+            "hour": 0.12,
+            "num_tx_past_day": 0.08,
+        }
+
+        while True:
+            for version in ("v1", "v1", "v1", "v2"):
+                REQUEST_TOTAL.labels(
+                    version=version,
+                    endpoint="/predict",
+                    method="POST",
+                ).inc()
+
+                INFERENCE_LATENCY.observe(
+                    random.uniform(0.005, 0.15)
+                )
+
+                fraud_amount = random.uniform(25.0, 500.0)
+                FRAUD_AMOUNT_USD_TOTAL.labels(
+                    version=version
+                ).inc(fraud_amount)
+
+            accuracy = max(
+                0.70,
+                min(
+                    0.95,
+                    accuracy + random.uniform(-0.02, 0.02),
+                ),
+            )
+
+            PREDICTION_ACCURACY.set(accuracy)
+
+            for column, base in drift.items():
+                drift[column] = max(
+                    0.01,
+                    min(
+                        0.60,
+                        drift[column] + random.uniform(-0.02, 0.03),
+                    ),
+                )
+
+                DATA_DRIFT_SCORE.labels(
+                    column=column
+                ).set(drift[column])
+
+            time.sleep(5)
+
+The important addition is:
+
+    fraud_amount = random.uniform(25.0, 500.0)
+
+followed by:
+
+    FRAUD_AMOUNT_USD_TOTAL.labels(version=version).inc(fraud_amount)
+
+
+# 9. Checking Python Syntax
+
+After editing the file, it is good practice to check the Python syntax:
+
+    python3 -m py_compile /root/code/monitoring/app/metric_emitter.py
+
+If there is no output, the syntax check succeeded.
+
+If Python reports an error, fix the error before restarting the container.
+
+
+# 10. Understanding the Docker Setup
+
+The monitoring containers are:
+
+    mon-grafana
+    mon-prometheus
+    metric-emitter
+
+The containers can be viewed with:
+
+    docker ps
+
+The metric emitter container is:
+
+    metric-emitter
+
+The ports are:
+
+    Grafana      3000
+    Prometheus   9090
+    Flask        5000
+
+
+# 11. Restarting the Metric Emitter
+
+The metric emitter file is bind-mounted into the container.
+
+This means changes made on the host are available to the container.
+
+After changing the Python file, restart the container:
+
+    docker restart metric-emitter
+
+Then verify that it is running:
+
+    docker ps
+
+Check the logs:
+
+    docker logs --tail 50 metric-emitter
+
+The Flask application should start without a Python traceback.
+
+The application normally reports that it is listening on:
+
+    0.0.0.0:5000
+
+
+# 12. Prometheus Scraping
+
+Prometheus periodically requests:
+
+    /metrics
+
+from the metric emitter.
+
+The logs showed requests such as:
+
+    GET /metrics HTTP/1.1" 200
+
+The `200` status means the metrics endpoint is responding successfully.
+
+Repeated requests every few seconds indicate that Prometheus is scraping the application.
+
+For example:
+
+    172.18.0.3 - - [08/Aug/2026 04:30:09] "GET /metrics HTTP/1.1" 200 -
+    172.18.0.3 - - [08/Aug/2026 04:30:14] "GET /metrics HTTP/1.1" 200 -
+    172.18.0.3 - - [08/Aug/2026 04:30:19] "GET /metrics HTTP/1.1" 200 -
+
+This confirms the scrape endpoint is working.
+
+
+# 13. Checking the Metric Directly
+
+Before checking Prometheus, verify that Flask itself exposes the metric.
+
+Run:
+
+    curl http://localhost:5000/metrics | grep fraud_amount_usd_total
+
+The expected output looks like:
+
+    # HELP fraud_amount_usd_total Total fraudulent transaction amount in USD, labelled by model version.
+    # TYPE fraud_amount_usd_total counter
+    fraud_amount_usd_total{version="v1"} 18876.64438329985
+    fraud_amount_usd_total{version="v2"} 6047.097498702644
+
+The exact values will change.
+
+The important requirement is that there are two non-empty series:
+
+    fraud_amount_usd_total{version="v1"}
+
+and:
+
+    fraud_amount_usd_total{version="v2"}
+
+
+# 14. Why the Values Increase
+
+The metric is a Counter.
+
+Every five seconds, `_nudge_metrics()` runs another iteration.
+
+For each version, a random fraudulent amount is generated.
+
+The counter is incremented:
+
+    .inc(fraud_amount)
+
+Therefore, the values should continue increasing.
+
+For example:
+
+    v1 = 1000
+    v2 = 500
+
+After another iteration:
+
+    v1 = 1700
+    v2 = 850
+
+After another iteration:
+
+    v1 = 2500
+    v2 = 1200
+
+The exact values are not important.
+
+What matters is that they are non-empty and cumulative.
+
+
+# 15. Checking Prometheus
+
+Prometheus is available on port `9090`.
+
+A direct API query can be used:
+
+    curl -s 'http://localhost:9090/api/v1/query?query=fraud_amount_usd_total'
+
+A successful response contains the metric series.
+
+The verified response contained:
+
+    version="v1"
+
+and:
+
+    version="v2"
+
+with:
+
+    instance="metric-emitter:5000"
+
+and:
+
+    job="metric-emitter"
+
+This confirms the complete path:
+
+    Flask
+      ↓
+    /metrics
+      ↓
+    Prometheus scrape
+      ↓
+    Prometheus time series
+
+
+# 16. Querying Prometheus Directly
+
+The Prometheus expression for the metric is:
+
+    fraud_amount_usd_total
+
+Running this query in the Prometheus UI should return the two series:
+
+    fraud_amount_usd_total{version="v1"}
+
+    fraud_amount_usd_total{version="v2"}
+
+The metric is therefore ready for Grafana.
+
+
+# 17. Understanding Grafana Template Variables
+
+A Grafana template variable allows dashboard users to dynamically choose values.
+
+Instead of creating separate panels for:
+
+    v1
+
+and:
+
+    v2
+
+we create one panel and let the user choose the model version.
+
+The variable is named:
+
+    version
+
+The user can then select:
+
+    v1
+    v2
+    All
+
+The panel query references:
+
+    $version
+
+This makes the dashboard dynamic.
+
+
+# 18. Creating the Grafana Dashboard
+
+Grafana is available on port:
+
+    3000
+
+The login credentials are:
+
+    Username: admin
+    Password: grafana2026
+
+There was initially no dashboard, so a new dashboard was created.
+
+The dashboard was named:
+
+    ML Fraud Monitoring
+
+The variable and panel must be on the same dashboard.
+
+
+# 19. Creating the `version` Variable
+
+Open the dashboard.
+
+Go to:
+
+    Dashboard Settings
+        ↓
+    Variables
+        ↓
+    Add variable
+
+Choose:
+
+    Query variable
+
+Set the name:
+
+    version
+
+The datasource should be:
+
+    Prometheus
+
+The query type should be:
+
+    Classic query
+
+
+# 20. The Important Variable Query
+
+The variable query is:
+
+    label_values(fraud_amount_usd_total, version)
+
+This query asks Prometheus:
+
+    Give me all the values of the `version` label
+    from the `fraud_amount_usd_total` metric.
+
+Because Prometheus contains:
+
+    fraud_amount_usd_total{version="v1"}
+
+and:
+
+    fraud_amount_usd_total{version="v2"}
+
+the query returns:
+
+    v1
+    v2
+
+
+# 21. Understanding `label_values()`
+
+The syntax is:
+
+    label_values(metric, label)
+
+For this lab:
+
+    label_values(fraud_amount_usd_total, version)
+
+The first argument is the metric:
+
+    fraud_amount_usd_total
+
+The second argument is the label:
+
+    version
+
+Therefore, Grafana dynamically discovers the available model versions.
+
+This is better than manually typing:
+
+    v1
+    v2
+
+because if another model version is added later, such as:
+
+    v3
+
+the variable can discover it automatically.
+
+
+# 22. Variable Preview
+
+After entering:
+
+    label_values(fraud_amount_usd_total, version)
+
+the Grafana variable preview returned:
+
+    v1
+    v2
+
+This confirms that the query is working.
+
+
+# 23. Enabling the All Option
+
+Under the variable's Selection options, enable:
+
+    Include All value
+
+This adds an option representing all available versions.
+
+The variable can then be used as:
+
+    v1
+    v2
+    All
+
+The All option is useful because the same panel can display all model versions.
+
+
+# 24. Creating the Fraud Amount Panel
+
+Create a panel on the same dashboard.
+
+The panel title can be:
+
+    Fraud Amount USD
+
+Select the Prometheus datasource.
+
+The query should be:
+
+    fraud_amount_usd_total{version=~"$version"}
+
+This query is the most important Grafana query in the lab.
+
+
+# 25. Understanding the Panel Query
+
+The basic metric is:
+
+    fraud_amount_usd_total
+
+The label filter is:
+
+    version=~"$version"
+
+Therefore:
+
+    fraud_amount_usd_total{version=~"$version"}
+
+means:
+
+    Return fraud_amount_usd_total where the version label
+    matches the value selected in the Grafana version variable.
+
+
+# 26. Why Use `=~` Instead of `=`
+
+A simple equality matcher would be:
+
+    version="$version"
+
+A regular-expression matcher is:
+
+    version=~"$version"
+
+The regular-expression form is useful for Grafana's All selection because Grafana can expand the variable into a pattern that matches multiple values.
+
+Therefore:
+
+    fraud_amount_usd_total{version=~"$version"}
+
+works well for:
+
+    v1
+
+    v2
+
+    All
+
+
+# 27. Testing the Dashboard
+
+After saving the variable and panel, the dashboard should show a `version` dropdown.
+
+Test:
+
+    version = v1
+
+The panel should show the v1 series.
+
+Then test:
+
+    version = v2
+
+The panel should show the v2 series.
+
+Finally test:
+
+    version = All
+
+The panel should show both versions.
+
+
+# 28. Final Grafana Configuration
+
+The variable should be:
+
+    Name:
+    version
+
+    Type:
+    Query
+
+    Datasource:
+    Prometheus
+
+    Query:
+    label_values(fraud_amount_usd_total, version)
+
+The panel should use:
+
+    fraud_amount_usd_total{version=~"$version"}
+
+
+# 29. Complete End-to-End Flow
+
+The complete system works like this:
+
+    1. Flask simulates transactions.
+
+    2. A model version is associated with each transaction.
+
+    3. A fraudulent transaction amount is generated.
+
+    4. The amount is added to the Counter:
+
+       FRAUD_AMOUNT_USD_TOTAL.labels(
+           version=version
+       ).inc(fraud_amount)
+
+    5. Flask exposes the metric at:
+
+       /metrics
+
+    6. Prometheus scrapes the endpoint.
+
+    7. Prometheus stores separate series:
+
+       fraud_amount_usd_total{version="v1"}
+
+       fraud_amount_usd_total{version="v2"}
+
+    8. Grafana queries the available version labels:
+
+       label_values(fraud_amount_usd_total, version)
+
+    9. Grafana creates the `$version` dashboard variable.
+
+   10. The dashboard panel uses:
+
+       fraud_amount_usd_total{version=~"$version"}
+
+   11. The user selects v1, v2, or All.
+
+   12. The panel dynamically displays the selected series.
+
+
+# 30. Important Prometheus Concepts Learned
+
+## Metric
+
+A metric represents a measurable value.
+
+Example:
+
+    fraud_amount_usd_total
+
+## Counter
+
+A Counter represents a cumulative value that normally increases.
+
+Example:
+
+    fraud_amount_usd_total
+
+## Label
+
+A label provides dimensions for a metric.
+
+Example:
+
+    version="v1"
+
+## Time Series
+
+A metric combined with a unique set of labels represents a time series.
+
+For example:
+
+    fraud_amount_usd_total{version="v1"}
+
+is one time series.
+
+And:
+
+    fraud_amount_usd_total{version="v2"}
+
+is another time series.
+
+## Scraping
+
+Prometheus periodically requests a metrics endpoint.
+
+In this lab:
+
+    Flask
+      ↓
+    /metrics
+      ↓
+    Prometheus
+
+## Template Variable
+
+Grafana uses template variables to dynamically change dashboard queries.
+
+Example:
+
+    $version
+
+## `label_values()`
+
+Grafana uses:
+
+    label_values(fraud_amount_usd_total, version)
+
+to dynamically discover available versions.
+
+
+# 31. Important Grafana Concepts Learned
+
+## Query Variable
+
+A Query variable gets its values from a datasource.
+
+In this lab:
+
+    Datasource = Prometheus
+
+## Classic Query
+
+The variable uses the classic query format:
+
+    label_values(fraud_amount_usd_total, version)
+
+## Include All
+
+The Include All option allows the user to select all versions.
+
+## Variable Reference
+
+Grafana variables are referenced with:
+
+    $version
+
+## Dynamic Filtering
+
+The panel uses:
+
+    fraud_amount_usd_total{version=~"$version"}
+
+This allows one panel to work for multiple versions.
+
+
+# 32. Troubleshooting
+
+## Problem: Metric does not appear
+
+Check the application:
+
+    curl http://localhost:5000/metrics | grep fraud_amount_usd_total
+
+If nothing appears, check the Python file and restart:
+
+    docker restart metric-emitter
+
+Then check:
+
+    docker logs --tail 50 metric-emitter
+
+
+## Problem: Prometheus does not show the metric
+
+First verify Flask:
+
+    curl http://localhost:5000/metrics | grep fraud_amount_usd_total
+
+Then query Prometheus:
+
+    curl -s 'http://localhost:9090/api/v1/query?query=fraud_amount_usd_total'
+
+If Flask exposes the metric but Prometheus does not, check the Prometheus target configuration and target health.
+
+
+## Problem: Grafana variable preview shows zero values
+
+Verify the query:
+
+    label_values(fraud_amount_usd_total, version)
+
+Make sure the datasource is:
+
+    Prometheus
+
+Then verify Prometheus directly with:
+
+    fraud_amount_usd_total
+
+
+## Problem: Grafana panel says No data
+
+First test the metric without the variable:
+
+    fraud_amount_usd_total
+
+If that works, test:
+
+    fraud_amount_usd_total{version="v1"}
+
+Then:
+
+    fraud_amount_usd_total{version="v2"}
+
+Finally use:
+
+    fraud_amount_usd_total{version=~"$version"}
+
+
+# 33. Useful Commands
+
+Check all containers:
+
+    docker ps
+
+Restart the metric emitter:
+
+    docker restart metric-emitter
+
+View emitter logs:
+
+    docker logs --tail 50 metric-emitter
+
+Check the Flask metrics:
+
+    curl http://localhost:5000/metrics
+
+Filter the new metric:
+
+    curl http://localhost:5000/metrics | grep fraud_amount_usd_total
+
+Query Prometheus:
+
+    curl -s 'http://localhost:9090/api/v1/query?query=fraud_amount_usd_total'
+
+Prometheus web interface:
+
+    http://localhost:9090
+
+Grafana web interface:
+
+    http://localhost:3000
+
+
+# 34. Final Validation Checklist
+
+## Metric Emitter
+
+- [x] `FRAUD_AMOUNT_USD_TOTAL` is defined.
+- [x] Metric name is `fraud_amount_usd_total`.
+- [x] Metric is a Counter.
+- [x] Counter has a `version` label.
+- [x] Counter is registered with the custom `REGISTRY`.
+- [x] Counter is incremented inside `_nudge_metrics()`.
+- [x] A fraudulent amount is generated for each simulated request.
+- [x] The metric increases over time.
+- [x] Flask exposes the metric at `/metrics`.
+
+## Prometheus
+
+- [x] Prometheus scrapes the metric emitter.
+- [x] `/metrics` returns HTTP 200.
+- [x] `fraud_amount_usd_total` exists in Prometheus.
+- [x] `v1` series exists.
+- [x] `v2` series exists.
+- [x] Both series have non-empty values.
+- [x] Each series contains the `version` label.
+
+## Grafana
+
+- [x] Grafana dashboard was created.
+- [x] Dashboard is named `ML Fraud Monitoring`.
+- [x] Variable is named `version`.
+- [x] Variable type is Query.
+- [x] Prometheus is the datasource.
+- [x] Query type is Classic query.
+- [x] Variable query is `label_values(fraud_amount_usd_total, version)`.
+- [x] Variable preview returns `v1`.
+- [x] Variable preview returns `v2`.
+- [x] Include All option is enabled.
+- [x] Fraud Amount USD panel exists.
+- [x] Panel references `fraud_amount_usd_total`.
+- [x] Panel uses `$version`.
+- [x] Dashboard is saved.
+
+
+# 35. Final Architecture Diagram
+
+    +-----------------------------+
+    |       Flask Application      |
+    |     metric_emitter.py       |
+    +-------------+---------------+
+                  |
+                  | /metrics
+                  |
+                  v
+    +-----------------------------+
+    |          Prometheus         |
+    |                             |
+    | fraud_amount_usd_total      |
+    |   version="v1"              |
+    |   version="v2"              |
+    +-------------+---------------+
+                  |
+                  | label_values(...)
+                  |
+                  v
+    +-----------------------------+
+    |      Grafana Variable       |
+    |                             |
+    | Name: version               |
+    | Values: v1, v2, All         |
+    +-------------+---------------+
+                  |
+                  | $version
+                  |
+                  v
+    +-----------------------------+
+    |       Grafana Panel         |
+    |                             |
+    | fraud_amount_usd_total      |
+    | {version=~"$version"}       |
+    +-----------------------------+
+
+
+# 36. Core Pattern to Remember
+
+The most important concept from this lab is:
+
+    Counter
+        ↓
+    Labelled Series
+        ↓
+    Prometheus
+        ↓
+    label_values(...)
+        ↓
+    Grafana Template Variable
+        ↓
+    $version
+        ↓
+    Dynamic Dashboard Panel
+
+
+# 37. Why This Pattern Matters
+
+This pattern is not limited to ML model versions.
+
+The same approach can be used for:
+
+- Model versions
+- Tenants
+- Regions
+- Environments
+- Services
+- Applications
+- Teams
+- Customers
+- Deployment versions
+
+For example, instead of:
+
+    version
+
+we could have:
+
+    tenant
+
+and use:
+
+    label_values(metric_name, tenant)
+
+Or:
+
+    region
+
+with:
+
+    label_values(metric_name, region)
+
+The same Prometheus and Grafana design pattern can therefore support multi-tenant and multi-dimensional monitoring.
+
+
+# 38. Final Result
+
+The ML monitoring platform now supports a custom business metric:
+
+    fraud_amount_usd_total
+
+The metric is separated by model version:
+
+    fraud_amount_usd_total{version="v1"}
+
+    fraud_amount_usd_total{version="v2"}
+
+Prometheus successfully collects the metric.
+
+Grafana dynamically discovers the available versions using:
+
+    label_values(fraud_amount_usd_total, version)
+
+The dashboard variable is:
+
+    version
+
+The Grafana panel uses:
+
+    fraud_amount_usd_total{version=~"$version"}
+
+The user can therefore select:
+
+    v1
+    v2
+    All
+
+from a single Grafana dashboard panel.
+
+This completes the Counter → labelled series → Prometheus → `label_values()` → Grafana variable → `$version` workflow.
 
 ---
 

@@ -104,4 +104,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 73: Promote a Retrained Model via a Champion/Challenger Gate](./Day%2073%20-%20Promote%20a%20Retrained%20Model%20via%20a%20Champion-Challenger%20Gate.md)
 
+- [Day 74: Add a Custom Business Metric and a Grafana Version Variable](./Day%2074%20-%20Add%20a%20Custom%20Business%20Metric%20and%20a%20Grafana%20Version%20Variable.md)
+
 ---
