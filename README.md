@@ -106,6 +106,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 74: Add a Custom Business Metric and a Grafana Version Variable](./Day%2074%20-%20Add%20a%20Custom%20Business%20Metric%20and%20a%20Grafana%20Version%20Variable.md)
 
-- [Day 75: Fix and Complete an End-to-End Monitoring Stack — Prometheus, Grafana, Evidently](./Day%2075%20-%20Fix%20and%20Complete%20an%20End-to-End%20Monitoring%20Stack%20-%20Prometheus,%20Grafana,%20Evidently.md)
+- [Day 75: Fix and Complete an End-to-End Monitoring Stack — Prometheus, Grafana, Evidently](./Day%2075%20-%20Fix%20and%20Complete%20an%20End-to-End%20Monitoring%20Stack-Prometheus%2C%20Grafana%2C%20Evidently.md)
 
 ---
