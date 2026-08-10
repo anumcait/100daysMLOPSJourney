@@ -628,3 +628,14 @@ evidently_drift_share
 are also available through Prometheus.
 
 ### Screenshots
+
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/b9ee8ea3-1046-4305-b7df-a39f9cf496ef" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/59d49a31-ebf0-495f-933b-dd971b841bb5" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/d5a5a85d-2247-40c0-a123-962224646966" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/5a6c16af-b3cd-4590-acfe-09b815004bf2" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/3f412db1-ef88-489c-9572-96af8a0b6523" />
+
+
+
+
+
