@@ -108,4 +108,5 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 75: Fix and Complete an End-to-End Monitoring Stack — Prometheus, Grafana, Evidently](./Day%2075%20-%20Fix%20and%20Complete%20an%20End-to-End%20Monitoring%20Stack-Prometheus%2C%20Grafana%2C%20Evidently.md)
 
+- [Day 76: Create CI Pipeline for ML Code Linting and Testing](./Day%2076%20-%20Create%20CI%20Pipeline%20for%20ML%20Code%20Linting%20and%20Testing.md)
 ---

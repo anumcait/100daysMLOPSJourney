@@ -24144,6 +24144,1690 @@ from a single Grafana dashboard panel.
 
 This completes the Counter → labelled series → Prometheus → `label_values()` → Grafana variable → `$version` workflow.
 
+# Day 76 — CI Pipeline for ML Code Linting and Testing
+
+> **Topic:** Gitea Actions, CI workflows, Git branches, pull requests, automated linting, automated testing, self-hosted runners, and merging a validated feature into `main`.
+
+---
+
+# 1. What Is This Task About?
+
+In this task, we are working on an ML repository called:
+
+```text
+fraud-detector
+```
+
+The goal is to build a **Continuous Integration (CI) pipeline**.
+
+The CI pipeline must automatically run:
+
+1. **Linting** using Ruff
+2. **Unit tests** using pytest
+
+whenever a pull request is opened against the `main` branch.
+
+The complete development flow is:
+
+```text
+main
+  │
+  ├── create feature branch: add-ci
+  │
+  ├── create CI workflow
+  │
+  ├── commit changes
+  │
+  ├── push add-ci
+  │
+  ├── create Pull Request
+  │
+  ├── Gitea Actions runs
+  │      ├── lint
+  │      └── test
+  │
+  ├── both checks pass
+  │
+  └── merge add-ci → main
+```
+
+The important lesson is that **CI should validate changes before they are merged into the main branch**.
+
+---
+
+# 2. What Is CI?
+
+CI stands for:
+
+```text
+Continuous Integration
+```
+
+Continuous Integration means developers frequently integrate their changes into a shared repository, while automated systems verify that the changes do not break the project.
+
+A typical CI pipeline performs tasks such as:
+
+```text
+Checkout code
+      ↓
+Install dependencies
+      ↓
+Lint code
+      ↓
+Run tests
+      ↓
+Build/package application
+      ↓
+Report result
+```
+
+For this task, we only need:
+
+```text
+Checkout code
+      ↓
+Install Ruff
+      ↓
+Run Ruff
+      ↓
+Install pytest
+      ↓
+Run pytest
+```
+
+---
+
+# 3. Why Do We Need CI?
+
+Imagine a developer changes:
+
+```text
+src/train.py
+```
+
+and accidentally introduces invalid Python syntax or breaks an existing function.
+
+Without CI, the broken code could be merged into `main`.
+
+With CI:
+
+```text
+Developer creates PR
+        ↓
+CI automatically runs
+        ↓
+Lint fails / tests fail
+        ↓
+PR is not ready to merge
+```
+
+This gives the team an automated safety mechanism.
+
+The important principle is:
+
+> **Never rely only on a developer manually checking whether code works. Automate repeatable validation.**
+
+---
+
+# 4. What Is Linting?
+
+Linting is static analysis of source code.
+
+A linter looks for problems such as:
+
+- Invalid syntax
+- Unused imports
+- Bad formatting
+- Undefined names
+- Common programming mistakes
+- Code-quality issues
+
+This project uses:
+
+```text
+Ruff
+```
+
+Ruff is a very fast Python linter and formatter.
+
+The command used by this project is:
+
+```bash
+ruff check .
+```
+
+The `.` means:
+
+```text
+Check the current directory and project files.
+```
+
+---
+
+# 5. What Is Testing?
+
+Testing verifies that the application behaves as expected.
+
+This project uses:
+
+```text
+pytest
+```
+
+The tests are located under:
+
+```text
+tests/
+```
+
+Specifically:
+
+```text
+tests/test_train.py
+```
+
+The project contains three unit tests.
+
+Running:
+
+```bash
+pytest
+```
+
+executes the test suite.
+
+Expected result:
+
+```text
+3 passed
+```
+
+---
+
+# 6. Repository Structure
+
+The repository initially looks approximately like this:
+
+```text
+fraud-detector/
+├── src/
+│   └── train.py
+├── tests/
+│   └── test_train.py
+├── pyproject.toml
+└── .gitea/
+    └── workflows/
+        └── ci.yml.template
+```
+
+Let's understand each part.
+
+## `src/train.py`
+
+This is the ML training code.
+
+The task description says it is a deterministic synthetic training script.
+
+---
+
+## `tests/test_train.py`
+
+This contains unit tests for the training code.
+
+There are three passing tests.
+
+---
+
+## `pyproject.toml`
+
+This contains Python project configuration.
+
+It includes configuration for:
+
+```text
+Ruff
+pytest
+```
+
+---
+
+## `.gitea/workflows/ci.yml.template`
+
+This is the CI workflow template.
+
+It is intentionally named:
+
+```text
+ci.yml.template
+```
+
+rather than:
+
+```text
+ci.yml
+```
+
+because Gitea Actions only schedules files ending in:
+
+```text
+.yml
+.yaml
+```
+
+Therefore:
+
+```text
+ci.yml.template
+```
+
+is inert.
+
+It does not execute.
+
+We must rename it to:
+
+```text
+ci.yml
+```
+
+to activate the workflow.
+
+---
+
+# 7. What Is Gitea?
+
+Gitea is a self-hosted Git service.
+
+It provides functionality similar to GitHub, including:
+
+- Git repositories
+- Branches
+- Pull requests
+- Issues
+- Actions/CI
+- Code review
+- Repository management
+
+The local Gitea server in this task is running on:
+
+```text
+http://localhost:3000
+```
+
+The repository is:
+
+```text
+http://localhost:3000/gitea-admin/fraud-detector
+```
+
+---
+
+# 8. Gitea Credentials
+
+The task provides:
+
+```text
+Username: gitea-admin
+Password: gitea2026
+```
+
+These credentials are used to access the local Gitea server.
+
+---
+
+# 9. What Are Gitea Actions?
+
+Gitea Actions is Gitea's automation system.
+
+It is conceptually similar to:
+
+```text
+GitHub Actions
+```
+
+A workflow describes:
+
+```text
+When should CI run?
+        ↓
+What jobs should run?
+        ↓
+What commands should each job execute?
+```
+
+The workflow uses YAML syntax.
+
+---
+
+# 10. GitHub Actions Compatibility
+
+One important lesson from this task is:
+
+> Gitea Actions uses the same general workflow syntax as GitHub Actions.
+
+For example:
+
+```yaml
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+```
+
+This type of workflow can also be used in a GitHub repository with appropriate GitHub Actions configuration.
+
+Therefore, learning Gitea Actions workflow syntax is also useful for GitHub Actions.
+
+---
+
+# 11. Understanding the Workflow
+
+The final workflow is:
+
+```yaml
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ruff
+        run: pip install --break-system-packages ruff
+      - name: Run ruff
+        run: ruff check .
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pytest
+        run: pip install --break-system-packages pytest
+      - name: Run pytest
+        run: pytest
+```
+
+Let's understand every important part.
+
+---
+
+# 12. Workflow Name
+
+```yaml
+name: CI
+```
+
+This gives the workflow a human-readable name.
+
+Gitea displays this name in the Actions interface.
+
+---
+
+# 13. Workflow Triggers
+
+The workflow contains:
+
+```yaml
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+```
+
+This defines when the workflow runs.
+
+There are two triggers.
+
+## Pull Request Trigger
+
+```yaml
+pull_request:
+  branches: [main]
+```
+
+This means the workflow runs for pull requests targeting:
+
+```text
+main
+```
+
+For example:
+
+```text
+add-ci → main
+```
+
+will trigger the workflow.
+
+---
+
+## Push Trigger
+
+```yaml
+push:
+  branches: [main]
+```
+
+This means the workflow also runs when changes are pushed directly to `main`.
+
+Therefore, the workflow provides validation for both:
+
+```text
+Pull Requests → main
+```
+
+and:
+
+```text
+Pushes → main
+```
+
+---
+
+# 14. What Is a Job?
+
+A job is a group of steps that executes on a runner.
+
+This workflow has two jobs:
+
+```yaml
+jobs:
+  lint:
+```
+
+and:
+
+```yaml
+jobs:
+  test:
+```
+
+Therefore the task requires:
+
+```text
+lint job
+test job
+```
+
+---
+
+# 15. The Lint Job
+
+The lint job is:
+
+```yaml
+lint:
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
+    - name: Install ruff
+      run: pip install --break-system-packages ruff
+    - name: Run ruff
+      run: ruff check .
+```
+
+It performs three major actions.
+
+### Step 1 — Checkout
+
+```yaml
+- uses: actions/checkout@v4
+```
+
+This checks out the repository code into the runner.
+
+Without checking out the repository, the runner would not have the source code to analyze.
+
+---
+
+### Step 2 — Install Ruff
+
+```yaml
+- name: Install ruff
+  run: pip install --break-system-packages ruff
+```
+
+This installs Ruff into the runner environment.
+
+---
+
+### Step 3 — Run Ruff
+
+```yaml
+- name: Run ruff
+  run: ruff check .
+```
+
+This runs the linter.
+
+If Ruff finds a problem, the job fails.
+
+If Ruff finds no problems, the job succeeds.
+
+---
+
+# 16. The Test Job
+
+The test job is:
+
+```yaml
+test:
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
+    - name: Install pytest
+      run: pip install --break-system-packages pytest
+    - name: Run pytest
+      run: pytest
+```
+
+Again, there are three major steps.
+
+### Step 1 — Checkout
+
+```yaml
+- uses: actions/checkout@v4
+```
+
+The repository is downloaded into the runner.
+
+---
+
+### Step 2 — Install pytest
+
+```yaml
+- name: Install pytest
+  run: pip install --break-system-packages pytest
+```
+
+This installs pytest.
+
+---
+
+### Step 3 — Run pytest
+
+```yaml
+- name: Run pytest
+  run: pytest
+```
+
+This executes the project's tests.
+
+If any test fails:
+
+```text
+test job → failed
+```
+
+If all tests pass:
+
+```text
+test job → successful
+```
+
+---
+
+# 17. What Is a Runner?
+
+A runner is the machine that executes CI jobs.
+
+The task provides a:
+
+```text
+self-hosted Actions runner
+```
+
+That runner is already registered with Gitea.
+
+When a workflow is triggered:
+
+```text
+Gitea
+  ↓
+Creates workflow job
+  ↓
+Runner receives job
+  ↓
+Runner executes commands
+  ↓
+Runner reports result
+```
+
+The runner is therefore the machine where commands such as:
+
+```bash
+ruff check .
+```
+
+and:
+
+```bash
+pytest
+```
+
+actually execute.
+
+---
+
+# 18. Why Did the Checks Initially Say "Waiting to Run"?
+
+After creating the PR, the Gitea page showed:
+
+```text
+CI / lint     Waiting to run
+CI / test     Waiting to run
+```
+
+This is normal.
+
+The workflow had been detected, but the Actions runner had not yet executed the jobs.
+
+Eventually the runner picked them up.
+
+The workflow then showed:
+
+```text
+lint
+10s
+
+test
+11s
+```
+
+and the lint job showed:
+
+```text
+Success
+```
+
+The test job also eventually became successful.
+
+---
+
+# 19. Git Branches
+
+Git branches allow us to develop changes independently.
+
+The repository has:
+
+```text
+main
+```
+
+as the primary branch.
+
+Instead of modifying `main` directly, we create:
+
+```text
+add-ci
+```
+
+The development flow becomes:
+
+```text
+main
+  │
+  └── add-ci
+```
+
+We make our changes on `add-ci`.
+
+---
+
+# 20. Why Use a Feature Branch?
+
+Feature branches protect the main branch.
+
+Instead of:
+
+```text
+Developer → directly modifies main
+```
+
+we use:
+
+```text
+Developer
+   ↓
+Feature branch
+   ↓
+Pull Request
+   ↓
+CI
+   ↓
+Review
+   ↓
+Merge
+   ↓
+main
+```
+
+This is a standard software engineering workflow.
+
+---
+
+# 21. Create the Feature Branch
+
+Start from the repository:
+
+```bash
+cd /root/code/fraud-detector
+```
+
+Check the current state:
+
+```bash
+git status
+```
+
+Create the feature branch:
+
+```bash
+git checkout -b add-ci
+```
+
+The current branch should become:
+
+```text
+add-ci
+```
+
+You can verify:
+
+```bash
+git branch --show-current
+```
+
+Expected:
+
+```text
+add-ci
+```
+
+---
+
+# 22. Rename the Workflow
+
+The template is:
+
+```text
+.gitea/workflows/ci.yml.template
+```
+
+Rename it:
+
+```bash
+mv .gitea/workflows/ci.yml.template .gitea/workflows/ci.yml
+```
+
+This is important because Gitea only recognizes:
+
+```text
+*.yml
+*.yaml
+```
+
+as workflow files.
+
+---
+
+# 23. Edit the TODO Commands
+
+The template already contains the workflow structure.
+
+We do not need to write the workflow from scratch.
+
+The two project-specific commands are:
+
+```yaml
+run: ruff check .
+```
+
+and:
+
+```yaml
+run: pytest
+```
+
+This demonstrates an important real-world CI engineering principle:
+
+> CI engineers often inherit templates and customize only the commands that are specific to the project.
+
+---
+
+# 24. Validate Locally Before Pushing
+
+Always run the same commands locally before depending on CI.
+
+Run:
+
+```bash
+ruff check .
+```
+
+Then:
+
+```bash
+pytest
+```
+
+Expected:
+
+```text
+Ruff → successful
+pytest → 3 passed
+```
+
+This prevents obvious failures from being pushed to the repository.
+
+---
+
+# 25. Stage the Changes
+
+After renaming the file, Git may show:
+
+```text
+deleted: .gitea/workflows/ci.yml.template
+```
+
+This is because the old filename disappeared.
+
+Stage both paths:
+
+```bash
+git add .gitea/workflows/ci.yml.template .gitea/workflows/ci.yml
+```
+
+Then:
+
+```bash
+git status
+```
+
+Git should detect the rename.
+
+Conceptually:
+
+```text
+ci.yml.template
+       ↓
+     rename
+       ↓
+ci.yml
+```
+
+---
+
+# 26. Commit the Change
+
+Create a Git commit:
+
+```bash
+git commit -m "Add CI pipeline for linting and tests"
+```
+
+A commit records the change in Git history.
+
+The commit contains the new workflow:
+
+```text
+.gitea/workflows/ci.yml
+```
+
+---
+
+# 27. Push the Feature Branch
+
+Push the branch to the Gitea server:
+
+```bash
+git push -u origin add-ci
+```
+
+The branch now exists remotely:
+
+```text
+local add-ci
+      ↓
+remote add-ci
+```
+
+---
+
+# 28. Verify the Push
+
+Run:
+
+```bash
+git status
+```
+
+A clean result should look like:
+
+```text
+On branch add-ci
+Your branch is up to date with 'origin/add-ci'.
+
+nothing to commit, working tree clean
+```
+
+This means:
+
+- The branch exists
+- Changes have been committed
+- Changes have been pushed
+- There are no uncommitted changes
+
+---
+
+# 29. Create the Pull Request
+
+Now open Gitea.
+
+Repository:
+
+```text
+gitea-admin/fraud-detector
+```
+
+Create a new pull request.
+
+The branches must be:
+
+```text
+Base: main
+Head: add-ci
+```
+
+This means:
+
+```text
+add-ci → main
+```
+
+The direction matters.
+
+We are proposing to merge the feature branch into the main branch.
+
+---
+
+# 30. What Is a Pull Request?
+
+A Pull Request, or PR, is a request to merge changes from one branch into another.
+
+In this task:
+
+```text
+Source:
+add-ci
+```
+
+and:
+
+```text
+Target:
+main
+```
+
+The PR allows CI to validate the proposed changes before they become part of `main`.
+
+---
+
+# 31. CI Runs Automatically
+
+Once the PR is created, the workflow trigger:
+
+```yaml
+pull_request:
+  branches: [main]
+```
+
+matches the PR.
+
+Gitea therefore starts:
+
+```text
+CI / lint
+CI / test
+```
+
+The Checks page may initially show:
+
+```text
+Waiting to run
+```
+
+This means the jobs are queued.
+
+---
+
+# 32. Successful Checks
+
+Eventually the checks should show:
+
+```text
+CI / lint (pull_request) Successful
+CI / test (pull_request) Successful
+```
+
+Both are required.
+
+Do not merge if one of them has failed.
+
+The desired state is:
+
+```text
+lint  → Success
+test  → Success
+```
+
+---
+
+# 33. Why Checks Matter
+
+The checks prove that the code satisfies the automated quality gates.
+
+For this project:
+
+```text
+Ruff
+  ↓
+Code quality validation
+
+pytest
+  ↓
+Behavior validation
+```
+
+Together they provide two different forms of protection.
+
+---
+
+# 34. Merge the Pull Request
+
+After both checks pass, merge the PR.
+
+Click:
+
+```text
+Merge Pull Request
+```
+
+Then confirm the merge.
+
+The PR should change from:
+
+```text
+Open
+```
+
+to:
+
+```text
+Merged
+```
+
+The page should say:
+
+```text
+Pull request successfully merged and closed
+```
+
+---
+
+# 35. Why the Merge Step Is Critical
+
+This was the most important failure point in the first attempt.
+
+Having:
+
+```text
+PR created
+```
+
+and:
+
+```text
+CI successful
+```
+
+is not enough.
+
+The task explicitly requires:
+
+```text
+PR merged into main
+```
+
+The grader checks the PR's merged state.
+
+Conceptually, it expects:
+
+```json
+{
+  "merged": true
+}
+```
+
+Therefore:
+
+```text
+PR open + checks successful
+```
+
+is incomplete.
+
+The final required state is:
+
+```text
+PR merged + checks successful
+```
+
+---
+
+# 36. Merge Commit
+
+After merging, Gitea creates a merge commit.
+
+In the completed run, the merge commit was:
+
+```text
+3d3503d52d
+```
+
+The important point is that the changes from:
+
+```text
+add-ci
+```
+
+are now incorporated into:
+
+```text
+main
+```
+
+---
+
+# 37. Verify Main Locally
+
+After the merge:
+
+```bash
+git checkout main
+git pull
+```
+
+Then:
+
+```bash
+git log --oneline -3
+```
+
+The merge commit should appear in the history.
+
+This confirms that the local `main` branch has been updated.
+
+---
+
+# 38. API Verification
+
+The task also specifies API-level requirements.
+
+The repository status endpoint is:
+
+```text
+GET /api/v1/repos/gitea-admin/fraud-detector/commits/{sha}/status
+```
+
+The combined status for the PR's head commit must be:
+
+```text
+success
+```
+
+The PR API is:
+
+```text
+GET /api/v1/repos/gitea-admin/fraud-detector/pulls
+```
+
+The relevant PR must have:
+
+```text
+merged: true
+```
+
+These API checks are useful because they verify the actual repository state rather than relying only on the UI.
+
+---
+
+# 39. Example API Commands
+
+To list pull requests:
+
+```bash
+curl -u gitea-admin:gitea2026 \
+  http://localhost:3000/api/v1/repos/gitea-admin/fraud-detector/pulls
+```
+
+After obtaining the PR head SHA:
+
+```bash
+curl -u gitea-admin:gitea2026 \
+  http://localhost:3000/api/v1/repos/gitea-admin/fraud-detector/commits/<SHA>/status
+```
+
+The status should report a successful combined result.
+
+---
+
+# 40. Complete Git Workflow
+
+The complete command-line portion is:
+
+```bash
+cd /root/code/fraud-detector
+
+git status
+
+git checkout -b add-ci
+
+mv .gitea/workflows/ci.yml.template .gitea/workflows/ci.yml
+
+ruff check .
+pytest
+
+git add .gitea/workflows/ci.yml.template .gitea/workflows/ci.yml
+
+git commit -m "Add CI pipeline for linting and tests"
+
+git push -u origin add-ci
+```
+
+Then:
+
+```text
+Open Gitea
+    ↓
+Create PR
+    ↓
+add-ci → main
+    ↓
+Wait for CI
+    ↓
+lint successful
+    ↓
+test successful
+    ↓
+Merge PR
+```
+
+Finally:
+
+```bash
+git checkout main
+git pull
+```
+
+---
+
+# 41. Final Architecture
+
+The final repository workflow looks like:
+
+```text
+                    ┌──────────────────┐
+                    │   Developer      │
+                    └────────┬─────────┘
+                             │
+                             ▼
+                    ┌──────────────────┐
+                    │    add-ci        │
+                    │  feature branch  │
+                    └────────┬─────────┘
+                             │
+                             │ Pull Request
+                             ▼
+                    ┌──────────────────┐
+                    │      Gitea       │
+                    └────────┬─────────┘
+                             │
+                 ┌───────────┴───────────┐
+                 ▼                       ▼
+        ┌────────────────┐      ┌────────────────┐
+        │     lint       │      │      test      │
+        │  ruff check .  │      │     pytest     │
+        └───────┬────────┘      └───────┬────────┘
+                │                       │
+                └───────────┬───────────┘
+                            │
+                       Both pass
+                            │
+                            ▼
+                    ┌──────────────────┐
+                    │  Merge Pull      │
+                    │    Request       │
+                    └────────┬─────────┘
+                             │
+                             ▼
+                    ┌──────────────────┐
+                    │       main       │
+                    │   merged code    │
+                    └──────────────────┘
+```
+
+---
+
+# 42. Important Concepts Learned
+
+## Continuous Integration
+
+Automatically validates changes when developers push code or create pull requests.
+
+## Linting
+
+Static code analysis that detects potential code-quality problems.
+
+Tool:
+
+```text
+Ruff
+```
+
+Command:
+
+```bash
+ruff check .
+```
+
+## Unit Testing
+
+Tests individual pieces of application behavior.
+
+Tool:
+
+```text
+pytest
+```
+
+Command:
+
+```bash
+pytest
+```
+
+## Workflow
+
+A YAML file describing CI automation.
+
+Location:
+
+```text
+.gitea/workflows/ci.yml
+```
+
+## Job
+
+A collection of steps executed by a runner.
+
+This workflow has:
+
+```text
+lint
+test
+```
+
+## Runner
+
+The machine that executes workflow jobs.
+
+This task uses a self-hosted runner.
+
+## Branch
+
+An independent line of Git development.
+
+Feature branch:
+
+```text
+add-ci
+```
+
+Main branch:
+
+```text
+main
+```
+
+## Pull Request
+
+A request to merge changes from one branch into another.
+
+```text
+add-ci → main
+```
+
+## Checks
+
+Automated CI results associated with a pull request.
+
+Required:
+
+```text
+lint → success
+test → success
+```
+
+## Merge
+
+The operation that incorporates the feature branch into `main`.
+
+Required final state:
+
+```text
+merged: true
+```
+
+---
+
+# 43. Common Mistakes
+
+## Mistake 1 — Leaving `.template`
+
+Wrong:
+
+```text
+.gitea/workflows/ci.yml.template
+```
+
+Correct:
+
+```text
+.gitea/workflows/ci.yml
+```
+
+Gitea Actions will not schedule the `.template` file.
+
+---
+
+## Mistake 2 — Forgetting the `lint` job
+
+The workflow must contain:
+
+```yaml
+jobs:
+  lint:
+```
+
+---
+
+## Mistake 3 — Forgetting the `test` job
+
+The workflow must contain:
+
+```yaml
+jobs:
+  test:
+```
+
+---
+
+## Mistake 4 — Using the Wrong Ruff Command
+
+Required:
+
+```bash
+ruff check .
+```
+
+---
+
+## Mistake 5 — Using the Wrong Test Command
+
+Required:
+
+```bash
+pytest
+```
+
+---
+
+## Mistake 6 — Creating the PR in the Wrong Direction
+
+Correct:
+
+```text
+add-ci → main
+```
+
+Not:
+
+```text
+main → add-ci
+```
+
+---
+
+## Mistake 7 — Merging Before Checks Finish
+
+Wait for:
+
+```text
+CI / lint → Successful
+CI / test → Successful
+```
+
+---
+
+## Mistake 8 — Forgetting to Merge
+
+This is especially important.
+
+The task is not complete when:
+
+```text
+PR created
+```
+
+or even when:
+
+```text
+CI successful
+```
+
+The final requirement is:
+
+```text
+PR merged into main
+```
+
+---
+
+# 44. Final Task Checklist
+
+```text
+[✓] Repository cloned
+[✓] Feature branch add-ci created
+[✓] ci.yml.template renamed to ci.yml
+[✓] lint job configured
+[✓] test job configured
+[✓] ruff check . configured
+[✓] pytest configured
+[✓] Ruff passes locally
+[✓] Pytest passes locally
+[✓] Changes committed
+[✓] add-ci pushed to Gitea
+[✓] Pull request created
+[✓] PR target is main
+[✓] PR head is add-ci
+[✓] CI lint successful
+[✓] CI test successful
+[✓] Pull request merged
+[✓] Merge commit exists on main
+[✓] Final PR state is merged
+```
+
+---
+
+# 45. Key Takeaway
+
+The most important CI/CD lesson from this task is:
+
+```text
+Code
+  ↓
+Feature Branch
+  ↓
+Pull Request
+  ↓
+Automated CI
+  ├── Lint
+  └── Test
+  ↓
+Successful Checks
+  ↓
+Code Review / Approval
+  ↓
+Merge
+  ↓
+main
+```
+
+A CI pipeline creates a repeatable quality gate between development and the main branch.
+
+For this ML project, the quality gate is simple:
+
+```text
+Ruff must pass
+AND
+pytest must pass
+```
+
+Only after both checks succeed should the pull request be merged.
+
+The final state is not merely "CI works." The complete task is:
+
+```text
+CI workflow exists
++
+CI checks succeed
++
+Pull Request exists
++
+Pull Request targets main
++
+Pull Request is merged
+```
+
 
 
 ---
