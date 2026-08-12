@@ -115,3 +115,18 @@ The fix:
     + run: python3 -m pytest tests/test_data_quality.py -v
 
 ### Screenshots
+
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/0db9362f-143e-49a6-a1ec-4313c70013ba" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/50b9ee8d-b148-43ea-963a-2d47cbe86879" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/5790dc8a-bf32-46cb-8540-c1fff0ce1541" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/cdb6cf7c-6beb-4e71-8163-d56c94cf05ae" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/438748c3-88d8-4d9c-94e1-c8305ee4289d" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/6ff5737f-c5f9-438e-9e30-e62a7ccc3dab" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/9e554977-fbcb-4334-bfc9-d38c980461ae" />
+
+
+
+
+
+
+
