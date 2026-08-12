@@ -25827,7 +25827,925 @@ Pull Request targets main
 +
 Pull Request is merged
 ```
+# Day 77 Notes — Fixing a Failing Data-Quality Job in Gitea Actions
 
+## 1. What This Task Is About
+
+This task is about debugging a failed CI/CD pipeline in Gitea Actions.
+
+The ML platform team wants data-schema validation tests to run automatically as a CI gate for every pull request. The purpose is to catch bad or unexpected training data before it reaches the machine-learning pipeline.
+
+A pull request named **Add data-quality CI gate** was created in the `fraud-detector` repository.
+
+The pull request contains three CI jobs:
+
+1. `lint`
+2. `test`
+3. `data-quality`
+
+The first two jobs are already passing.
+
+The newly added `data-quality` job is failing.
+
+The objective is to:
+
+1. Open the failed CI run.
+2. Read the actual failure log.
+3. Determine why the job failed.
+4. Fix the workflow.
+5. Keep the `data-quality` job.
+6. Make sure its pytest command references a real `.py` file.
+7. Commit the fix.
+8. Push the fix to the PR branch.
+9. Verify that all three CI jobs become green.
+10. Confirm that the PR's combined status is `success`.
+
+---
+
+# 2. Important Repository Information
+
+Repository:
+
+    fraud-detector
+
+Repository URL:
+
+    http://localhost:3000/gitea-admin/fraud-detector
+
+Working clone:
+
+    /root/code/fraud-detector
+
+Branch:
+
+    add-data-validation
+
+Target branch:
+
+    main
+
+Pull request:
+
+    Add data-quality CI gate
+
+PR number:
+
+    #1
+
+Gitea username:
+
+    gitea-admin
+
+Gitea password:
+
+    gitea2026
+
+Gitea is running on port:
+
+    3000
+
+The workflow file is:
+
+    .gitea/workflows/ci.yml
+
+---
+
+# 3. Understanding the Pull Request
+
+The pull request is trying to add a new CI gate for data quality.
+
+The PR initially contains one commit:
+
+    ci: add data-quality job (pre-review -- may be buggy)
+
+The important point is that the workflow itself can appear perfectly reasonable when reading it, but the CI runner can still fail when it actually executes the commands.
+
+This is why the CI log is important.
+
+Do not assume that a workflow is correct just because the YAML syntax looks valid.
+
+---
+
+# 4. What Is Gitea Actions?
+
+Gitea Actions is Gitea's CI/CD system.
+
+It allows repositories to automatically execute workflows when events occur.
+
+For example:
+
+- Pull requests
+- Pushes
+- Releases
+- Other configured repository events
+
+A workflow is normally stored inside the repository.
+
+In this task, the workflow is:
+
+    .gitea/workflows/ci.yml
+
+The workflow defines jobs.
+
+Each job contains steps.
+
+For example:
+
+    jobs:
+      test:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v4
+          - name: Install pytest
+            run: pip install --break-system-packages pytest
+          - name: Run pytest
+            run: python3 -m pytest tests/test_train.py -v
+
+The runner executes those steps in order.
+
+If one step fails, the job fails.
+
+---
+
+# 5. Understanding the Workflow
+
+The workflow begins with:
+
+    name: CI
+
+This gives the workflow its name.
+
+The workflow is configured to run for pull requests targeting `main`:
+
+    on:
+      pull_request:
+        branches: [main]
+
+It also runs when code is pushed directly to `main`:
+
+    push:
+      branches: [main]
+
+The workflow contains three jobs:
+
+    jobs:
+      lint:
+      test:
+      data-quality:
+
+---
+
+# 6. The Lint Job
+
+The lint job checks code quality using Ruff.
+
+It checks:
+
+    src
+
+and:
+
+    tests
+
+The relevant command is:
+
+    ruff check src tests
+
+This job was already passing.
+
+Therefore, there was no need to modify the lint job.
+
+General lesson:
+
+When debugging CI, avoid changing jobs that are already working unless there is a clear reason.
+
+---
+
+# 7. The Test Job
+
+The test job runs the normal training-related tests.
+
+It installs pytest:
+
+    pip install --break-system-packages pytest
+
+Then runs:
+
+    python3 -m pytest tests/test_train.py -v
+
+This job was also already passing.
+
+Again, there was no reason to modify it.
+
+---
+
+# 8. The Data-Quality Job
+
+The new job is:
+
+    data-quality:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+        - name: Install pytest + pandas
+          run: pip install --break-system-packages pytest pandas
+        - name: Run data-quality tests
+          run: python3 -m pytest tests/test_data_validation.py -v
+
+This job is designed to execute the data-quality/schema tests.
+
+It performs three important things.
+
+First, it checks out the repository:
+
+    actions/checkout@v4
+
+Second, it installs the required Python packages:
+
+    pytest
+    pandas
+
+Third, it runs the data-quality tests using pytest.
+
+The problem is in the third step.
+
+---
+
+# 9. Reading the CI Failure
+
+The pull request Checks page showed:
+
+    CI / lint — Successful
+
+    CI / test — Successful
+
+    CI / data-quality — Failing
+
+The important debugging rule is:
+
+> Do not stop at the red status. Open the failed job and read the log.
+
+A red CI job only tells us that something failed.
+
+The actual log tells us what failed.
+
+---
+
+# 10. Identifying the Root Cause
+
+The data-quality job attempted to execute:
+
+    tests/test_data_validation.py
+
+However, the branch contains:
+
+    tests/test_data_quality.py
+
+The workflow therefore points pytest at the wrong file.
+
+The incorrect command is:
+
+    python3 -m pytest tests/test_data_validation.py -v
+
+The correct command is:
+
+    python3 -m pytest tests/test_data_quality.py -v
+
+This is the root cause of the failure.
+
+---
+
+# 11. Why the Error Matters
+
+Pytest needs the path supplied to it to refer to a real test file or test location.
+
+The workflow tells pytest:
+
+    tests/test_data_validation.py
+
+But that file is not present on the branch.
+
+The actual test file is:
+
+    tests/test_data_quality.py
+
+Therefore, the runner cannot execute the intended data-quality tests.
+
+This is a classic CI failure caused by a mismatch between:
+
+- the filename referenced by the workflow
+- the filename that actually exists in the repository
+
+---
+
+# 12. The Required Fix
+
+Only the incorrect test path needs to be changed.
+
+Before:
+
+    run: python3 -m pytest tests/test_data_validation.py -v
+
+After:
+
+    run: python3 -m pytest tests/test_data_quality.py -v
+
+The job itself must NOT be deleted.
+
+The requirement explicitly says that the `data-quality` job must remain declared.
+
+Therefore, do not solve the problem by removing:
+
+    data-quality:
+
+Instead, fix the command inside the existing job.
+
+---
+
+# 13. Correct Data-Quality Job
+
+The corrected job is:
+
+    data-quality:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+        - name: Install pytest + pandas
+          run: pip install --break-system-packages pytest pandas
+        - name: Run data-quality tests
+          run: python3 -m pytest tests/test_data_quality.py -v
+
+Notice that everything else remains unchanged.
+
+Only the test filename was corrected.
+
+---
+
+# 14. Correct Complete Workflow
+
+The final `.gitea/workflows/ci.yml` should be:
+
+    name: CI
+
+    on:
+      pull_request:
+        branches: [main]
+      push:
+        branches: [main]
+
+    jobs:
+      lint:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v4
+          - name: Install ruff
+            run: pip install --break-system-packages ruff
+          - name: Run ruff
+            run: ruff check src tests
+
+      test:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v4
+          - name: Install pytest
+            run: pip install --break-system-packages pytest
+          - name: Run pytest
+            run: python3 -m pytest tests/test_train.py -v
+
+      data-quality:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v4
+          - name: Install pytest + pandas
+            run: pip install --break-system-packages pytest pandas
+          - name: Run data-quality tests
+            run: python3 -m pytest tests/test_data_quality.py -v
+
+---
+
+# 15. Making the Change Locally
+
+The working clone is already available at:
+
+    /root/code/fraud-detector
+
+Move into the repository:
+
+    cd /root/code/fraud-detector
+
+Check the current branch:
+
+    git branch --show-current
+
+The expected branch is:
+
+    add-data-validation
+
+You can inspect the workflow with:
+
+    cat .gitea/workflows/ci.yml
+
+---
+
+# 16. Editing the Workflow
+
+The simplest change is to replace:
+
+    tests/test_data_validation.py
+
+with:
+
+    tests/test_data_quality.py
+
+For example:
+
+    sed -i 's#tests/test_data_validation.py#tests/test_data_quality.py#' .gitea/workflows/ci.yml
+
+Then inspect the file:
+
+    cat .gitea/workflows/ci.yml
+
+Confirm that the data-quality step now contains:
+
+    run: python3 -m pytest tests/test_data_quality.py -v
+
+---
+
+# 17. Verify the Test File Exists
+
+Before committing, verify that the referenced file actually exists.
+
+Run:
+
+    ls tests/
+
+You should see:
+
+    test_data_quality.py
+
+You can also check directly:
+
+    test -f tests/test_data_quality.py && echo "File exists"
+
+Expected output:
+
+    File exists
+
+This is an important habit.
+
+Whenever a CI command references a file, verify that the file exists in the branch.
+
+---
+
+# 18. Check the Git Diff
+
+Before committing, inspect exactly what changed:
+
+    git diff -- .gitea/workflows/ci.yml
+
+The important diff should look like:
+
+    - run: python3 -m pytest tests/test_data_validation.py -v
+    + run: python3 -m pytest tests/test_data_quality.py -v
+
+Ideally, there should be no unnecessary changes.
+
+This is good CI debugging practice because small, focused changes are easier to understand and less likely to introduce new problems.
+
+---
+
+# 19. Commit the Fix
+
+Stage the workflow:
+
+    git add .gitea/workflows/ci.yml
+
+Commit it:
+
+    git commit -m "fix: correct data-quality test path"
+
+The commit records the fix in Git.
+
+---
+
+# 20. Push the Fix
+
+Push the branch:
+
+    git push origin add-data-validation
+
+The new commit is now pushed to the branch used by the pull request.
+
+Because the PR is based on `add-data-validation`, pushing to this branch updates the PR.
+
+The Gitea Actions workflow should automatically run again because the pull request has received a new commit.
+
+---
+
+# 21. Verify the New CI Run
+
+Return to the pull request in Gitea.
+
+Open:
+
+    Add data-quality CI gate
+
+Then open the:
+
+    Checks
+
+section.
+
+The new workflow run should appear.
+
+There should be three jobs:
+
+    CI / lint
+    CI / test
+    CI / data-quality
+
+Wait for all jobs to finish.
+
+---
+
+# 22. Expected Final Result
+
+The desired result is:
+
+    CI / lint          Successful
+    CI / test          Successful
+    CI / data-quality  Successful
+
+The pull request should then show:
+
+    All checks have passed
+
+or an equivalent successful combined status.
+
+The key requirement is that the PR head commit's combined status reaches:
+
+    success
+
+---
+
+# 23. What Must Be True at the End
+
+The final state must satisfy all of these conditions.
+
+### Requirement 1 — Keep the data-quality job
+
+The workflow must still contain:
+
+    data-quality:
+
+Do not delete it.
+
+### Requirement 2 — Use an existing Python file
+
+The pytest step must reference:
+
+    tests/test_data_quality.py
+
+This file exists on the `add-data-validation` branch.
+
+### Requirement 3 — Push the fix
+
+The corrected workflow must be committed and pushed to:
+
+    add-data-validation
+
+### Requirement 4 — All CI jobs pass
+
+The final PR must show:
+
+    lint — green
+    test — green
+    data-quality — green
+
+### Requirement 5 — Combined status is successful
+
+The PR's latest head commit must have:
+
+    success
+
+---
+
+# 24. Why We Did Not Change the Other Jobs
+
+It is tempting to modify the entire workflow when debugging CI.
+
+That is unnecessary here.
+
+The evidence shows:
+
+    lint → passed
+    test → passed
+    data-quality → failed
+
+Therefore, the investigation should focus on `data-quality`.
+
+Changing working jobs creates unnecessary risk.
+
+A good debugging approach is:
+
+1. Identify the failing component.
+2. Read its log.
+3. Find the smallest cause.
+4. Make the smallest safe correction.
+5. Run CI again.
+6. Verify the complete result.
+
+---
+
+# 25. Why the CI Log Is Important
+
+Static inspection can tell you what the workflow is supposed to do.
+
+The runtime log tells you what actually happened.
+
+For example, a workflow can contain:
+
+    python3 -m pytest tests/test_data_validation.py -v
+
+and look syntactically correct.
+
+YAML syntax is not the problem.
+
+The command itself is valid shell syntax.
+
+But the referenced file does not exist.
+
+Therefore, the workflow can be syntactically valid while still failing at runtime.
+
+This is why CI debugging requires looking at the execution log.
+
+---
+
+# 26. Important Git Concepts Used in This Task
+
+## Working Tree
+
+The files currently present in your local repository.
+
+## Branch
+
+A separate line of development.
+
+The relevant branch is:
+
+    add-data-validation
+
+## Commit
+
+A recorded snapshot of changes.
+
+Example:
+
+    git commit -m "fix: correct data-quality test path"
+
+## Push
+
+Uploads your local commit to the remote repository.
+
+Example:
+
+    git push origin add-data-validation
+
+## Pull Request
+
+A request to merge changes from one branch into another.
+
+Here:
+
+    add-data-validation → main
+
+## CI
+
+Continuous Integration.
+
+CI automatically builds, tests, and checks code when repository events occur.
+
+---
+
+# 27. Important Git Commands
+
+Check current directory:
+
+    pwd
+
+Move to repository:
+
+    cd /root/code/fraud-detector
+
+Check branch:
+
+    git branch --show-current
+
+Check status:
+
+    git status
+
+View workflow:
+
+    cat .gitea/workflows/ci.yml
+
+View changed files:
+
+    git diff
+
+Stage workflow:
+
+    git add .gitea/workflows/ci.yml
+
+Commit:
+
+    git commit -m "fix: correct data-quality test path"
+
+Push:
+
+    git push origin add-data-validation
+
+View recent commits:
+
+    git log --oneline -5
+
+---
+
+# 28. One-Line Fix
+
+The entire technical fix can be summarized as:
+
+    - run: python3 -m pytest tests/test_data_validation.py -v
+    + run: python3 -m pytest tests/test_data_quality.py -v
+
+Everything else in the workflow can remain unchanged.
+
+---
+
+# 29. Complete Troubleshooting Thought Process
+
+When you encounter a similar CI failure, think through it systematically.
+
+### Step 1 — Find the failing job
+
+Look at the PR Checks page.
+
+Example:
+
+    lint → green
+    test → green
+    data-quality → red
+
+Focus on the red job.
+
+### Step 2 — Open the job details
+
+Do not guess from the workflow file.
+
+Read the actual runtime output.
+
+### Step 3 — Identify the failing command
+
+Find the command that returned a failure.
+
+Here it was the pytest command.
+
+### Step 4 — Inspect the referenced resource
+
+The command referenced:
+
+    tests/test_data_validation.py
+
+Check whether the file exists.
+
+### Step 5 — Compare with the repository
+
+The actual file is:
+
+    tests/test_data_quality.py
+
+### Step 6 — Make the smallest correction
+
+Change only the incorrect filename.
+
+### Step 7 — Commit and push
+
+Use Git to record and publish the correction.
+
+### Step 8 — Re-run CI
+
+The push should trigger a new PR workflow.
+
+### Step 9 — Verify every job
+
+Do not stop when `data-quality` becomes green.
+
+Confirm all three jobs are green.
+
+### Step 10 — Confirm the PR status
+
+The final combined status must be:
+
+    success
+
+---
+
+# 30. Common Mistakes to Avoid
+
+## Mistake 1 — Deleting the failing job
+
+Do not remove:
+
+    data-quality:
+
+The purpose of the task is to fix the job, not eliminate the CI gate.
+
+## Mistake 2 — Changing the wrong branch
+
+The PR comes from:
+
+    add-data-validation
+
+Make sure the fix is pushed to that branch.
+
+## Mistake 3 — Guessing the failure
+
+Always inspect the job log first.
+
+## Mistake 4 — Using a nonexistent test file
+
+Always verify the test path:
+
+    test -f tests/test_data_quality.py
+
+## Mistake 5 — Changing unrelated jobs
+
+`lint` and `test` were already successful.
+
+Do not introduce unnecessary modifications.
+
+## Mistake 6 — Forgetting to push
+
+A local commit does not update the remote PR.
+
+You need:
+
+    git push origin add-data-validation
+
+## Mistake 7 — Not waiting for the new run
+
+After pushing, Gitea Actions needs to execute the workflow again.
+
+Check the latest run rather than relying on the old failed run.
+
+---
+
+# 31. Final Checklist
+
+Before considering Day 77 complete, verify:
+
+- [ ] Repository is `fraud-detector`
+- [ ] Branch is `add-data-validation`
+- [ ] Workflow is `.gitea/workflows/ci.yml`
+- [ ] `data-quality` job still exists
+- [ ] `tests/test_data_quality.py` exists
+- [ ] pytest references `tests/test_data_quality.py`
+- [ ] Workflow change is committed
+- [ ] Commit is pushed to `add-data-validation`
+- [ ] New CI run has completed
+- [ ] `CI / lint` is green
+- [ ] `CI / test` is green
+- [ ] `CI / data-quality` is green
+- [ ] PR combined status is `success`
+
+---
+
+# 32. Final Takeaway
+
+The central lesson from Day 77 is:
+
+> When CI fails, investigate the runtime log instead of assuming the workflow is correct.
+
+The workflow was structurally valid, and two jobs were working correctly.
+
+The failure was caused by a simple filename mismatch:
+
+    tests/test_data_validation.py
+
+versus the actual file:
+
+    tests/test_data_quality.py
+
+The correct solution was a minimal one-line workflow change.
+
+After committing and pushing that change, Gitea Actions should rerun the PR checks and all three jobs should pass.
+
+Final expected state:
+
+    lint          ✅
+    test          ✅
+    data-quality  ✅
+    PR status     success
 
 
 ---
