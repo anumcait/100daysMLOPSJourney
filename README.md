@@ -112,4 +112,5 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 77: Fix a Failing Data-Quality Job in Gitea Actions](./Day%2077%20-%20Fix%20a%20Failing%20Data-Quality%20Job%20in%20Gitea%20Actions.md)
 
+- [Day 78: Parallelise Tests via a Gitea Actions Matrix Strategy](./Day%2078%20-%20Parallelise%20Tests%20via%20a%20Gitea%20Actions%20Matrix%20Strategy.md)
 ---

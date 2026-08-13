@@ -26747,6 +26747,1738 @@ Final expected state:
     data-quality  ✅
     PR status     success
 
+# Day 78 Notes: Parallelise Tests via a Gitea Actions Matrix Strategy
 
+## 1. What This Task Is About
+
+This task is about improving a CI/CD pipeline by running multiple test suites in parallel instead of running them one after another.
+
+The repository is:
+
+```text
+fraud-detector
+```
+
+The CI workflow is:
+
+```text
+.gitea/workflows/ci.yml
+```
+
+The branch used for the task is:
+
+```text
+add-test-matrix
+```
+
+There are three separate test suites:
+
+```text
+tests/test_train.py
+tests/test_data_quality.py
+tests/test_model_contract.py
+```
+
+Originally, all three test suites were executed inside one `test` job.
+
+The goal is to use a Gitea Actions matrix strategy so that each test suite gets its own CI job.
+
+---
+
+# 2. Why Do We Need a Matrix?
+
+Imagine we have three test suites:
+
+```text
+test_train.py
+test_data_quality.py
+test_model_contract.py
+```
+
+If we run:
+
+```bash
+python3 -m pytest tests -v
+```
+
+pytest executes all the tests together.
+
+From a CI perspective, this means:
+
+```text
+                 TEST JOB
+                    |
+          ---------------------
+          |         |         |
+        train    data       model
+                  quality    contract
+```
+
+But they are all inside the same job and therefore execute serially.
+
+For example:
+
+```text
+Start
+  |
+  +--> train tests
+  |
+  +--> data quality tests
+  |
+  +--> model contract tests
+  |
+Finish
+```
+
+If each suite takes 2 minutes, the total can approach:
+
+```text
+2 + 2 + 2 = 6 minutes
+```
+
+As the test suites grow, this becomes a CI bottleneck.
+
+---
+
+# 3. What Is a Matrix Strategy?
+
+A matrix strategy allows us to define one job and execute it multiple times with different values.
+
+Think of a matrix as a loop in CI.
+
+For example, in a programming language:
+
+```python
+for suite in ["train", "data_quality", "model_contract"]:
+    run_tests(suite)
+```
+
+The CI equivalent is:
+
+```yaml
+strategy:
+  matrix:
+    suite:
+      - train
+      - data_quality
+      - model_contract
+```
+
+Gitea Actions expands this into separate job executions.
+
+Conceptually:
+
+```text
+                 test job
+                    |
+        +-----------+-----------+
+        |           |           |
+        v           v           v
+      train     data_quality  model_contract
+        |           |           |
+        v           v           v
+   test_train   test_data    test_model
+      .py       _quality.py   _contract.py
+```
+
+These matrix jobs can run independently and in parallel.
+
+---
+
+# 4. The Existing CI Workflow
+
+Before the change, the workflow looked like this:
+
+```yaml
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ruff
+        run: pip install --break-system-packages ruff
+      - name: Run ruff
+        run: ruff check src tests
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pytest + runtime deps
+        run: pip install --break-system-packages pytest pandas numpy scikit-learn joblib
+      - name: Run all tests
+        run: python3 -m pytest tests -v
+```
+
+There are two jobs:
+
+```text
+jobs:
+├── lint
+└── test
+```
+
+The `lint` job checks code quality using Ruff.
+
+The `test` job runs the Python test suite.
+
+---
+
+# 5. Understanding the Lint Job
+
+The lint job is:
+
+```yaml
+lint:
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
+    - name: Install ruff
+      run: pip install --break-system-packages ruff
+    - name: Run ruff
+      run: ruff check src tests
+```
+
+## `runs-on`
+
+```yaml
+runs-on: ubuntu-latest
+```
+
+This tells Gitea Actions to run the job on an Ubuntu runner.
+
+## Checkout
+
+```yaml
+- uses: actions/checkout@v4
+```
+
+This checks out the repository code so the runner can access the source files.
+
+## Install Ruff
+
+```yaml
+- name: Install ruff
+  run: pip install --break-system-packages ruff
+```
+
+Ruff is installed using pip.
+
+## Run Ruff
+
+```yaml
+- name: Run ruff
+  run: ruff check src tests
+```
+
+Ruff checks the `src` and `tests` directories.
+
+The important requirement for this task is:
+
+```text
+DO NOT CHANGE THE LINT JOB
+```
+
+Only the `test` job needs to be converted to a matrix.
+
+---
+
+# 6. Understanding the Original Test Job
+
+The original test job was:
+
+```yaml
+test:
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
+    - name: Install pytest + runtime deps
+      run: pip install --break-system-packages pytest pandas numpy scikit-learn joblib
+    - name: Run all tests
+      run: python3 -m pytest tests -v
+```
+
+Let's understand each part.
+
+## Job name
+
+```yaml
+test:
+```
+
+This defines the CI job called `test`.
+
+## Runner
+
+```yaml
+runs-on: ubuntu-latest
+```
+
+The test job runs on an Ubuntu runner.
+
+## Checkout
+
+```yaml
+- uses: actions/checkout@v4
+```
+
+The repository is checked out onto the runner.
+
+## Install dependencies
+
+```yaml
+- name: Install pytest + runtime deps
+  run: pip install --break-system-packages pytest pandas numpy scikit-learn joblib
+```
+
+This installs:
+
+```text
+pytest
+pandas
+numpy
+scikit-learn
+joblib
+```
+
+These packages are required to run the tests.
+
+## Run all tests
+
+```yaml
+- name: Run all tests
+  run: python3 -m pytest tests -v
+```
+
+This command tells pytest to discover and run tests throughout:
+
+```text
+tests/
+```
+
+The problem is that all three suites are executed together.
+
+---
+
+# 7. The Three Test Files
+
+The repository contains:
+
+```text
+tests/
+├── test_train.py
+├── test_data_quality.py
+└── test_model_contract.py
+```
+
+The matrix values need to correspond exactly to these files.
+
+The required mapping is:
+
+```text
+train
+    |
+    v
+tests/test_train.py
+```
+
+```text
+data_quality
+    |
+    v
+tests/test_data_quality.py
+```
+
+```text
+model_contract
+    |
+    v
+tests/test_model_contract.py
+```
+
+This is why the matrix values are:
+
+```yaml
+- train
+- data_quality
+- model_contract
+```
+
+---
+
+# 8. Adding the Matrix
+
+The first change is to add:
+
+```yaml
+strategy:
+  matrix:
+    suite:
+      - train
+      - data_quality
+      - model_contract
+```
+
+inside the `test` job.
+
+The resulting structure is:
+
+```yaml
+test:
+  runs-on: ubuntu-latest
+  strategy:
+    matrix:
+      suite:
+        - train
+        - data_quality
+        - model_contract
+```
+
+---
+
+# 9. Understanding `strategy`
+
+The keyword:
+
+```yaml
+strategy:
+```
+
+controls how a job is executed.
+
+One of the most useful features of `strategy` is:
+
+```yaml
+matrix:
+```
+
+A matrix allows us to create multiple versions of the same job.
+
+---
+
+# 10. Understanding `matrix`
+
+The matrix is:
+
+```yaml
+matrix:
+  suite:
+    - train
+    - data_quality
+    - model_contract
+```
+
+Here:
+
+```text
+suite
+```
+
+is the matrix variable.
+
+Its possible values are:
+
+```text
+train
+data_quality
+model_contract
+```
+
+Gitea Actions creates one job for each value.
+
+Therefore:
+
+```text
+suite = train
+```
+
+creates:
+
+```text
+test (train)
+```
+
+Then:
+
+```text
+suite = data_quality
+```
+
+creates:
+
+```text
+test (data_quality)
+```
+
+And:
+
+```text
+suite = model_contract
+```
+
+creates:
+
+```text
+test (model_contract)
+```
+
+---
+
+# 11. Matrix as a Loop
+
+A very useful way to remember this is:
+
+```yaml
+matrix:
+  suite:
+    - train
+    - data_quality
+    - model_contract
+```
+
+is conceptually similar to:
+
+```python
+for suite in ["train", "data_quality", "model_contract"]:
+    ...
+```
+
+The CI system takes the same job definition and changes the value of:
+
+```text
+matrix.suite
+```
+
+for every execution.
+
+---
+
+# 12. Accessing the Matrix Value
+
+Inside the job, we can access the current matrix value with:
+
+```text
+${{ matrix.suite }}
+```
+
+For example:
+
+```yaml
+- name: Run ${{ matrix.suite }} tests
+```
+
+When the current matrix value is:
+
+```text
+train
+```
+
+the step name becomes conceptually:
+
+```text
+Run train tests
+```
+
+When the value is:
+
+```text
+data_quality
+```
+
+it becomes:
+
+```text
+Run data_quality tests
+```
+
+When the value is:
+
+```text
+model_contract
+```
+
+it becomes:
+
+```text
+Run model_contract tests
+```
+
+---
+
+# 13. Dynamically Selecting the Test File
+
+The most important command is:
+
+```yaml
+run: python3 -m pytest "tests/test_${{ matrix.suite }}.py" -v
+```
+
+This combines a fixed filename pattern with the matrix value.
+
+The pattern is:
+
+```text
+tests/test_<matrix-value>.py
+```
+
+## For `train`
+
+The matrix value is:
+
+```text
+train
+```
+
+So the command becomes:
+
+```bash
+python3 -m pytest "tests/test_train.py" -v
+```
+
+## For `data_quality`
+
+The matrix value is:
+
+```text
+data_quality
+```
+
+So the command becomes:
+
+```bash
+python3 -m pytest "tests/test_data_quality.py" -v
+```
+
+## For `model_contract`
+
+The matrix value is:
+
+```text
+model_contract
+```
+
+So the command becomes:
+
+```bash
+python3 -m pytest "tests/test_model_contract.py" -v
+```
+
+This is why it is important that the matrix values match the test filenames.
+
+---
+
+# 14. Why We Do Not Duplicate the Job
+
+A bad approach would be:
+
+```yaml
+test_train:
+  ...
+
+test_data_quality:
+  ...
+
+test_model_contract:
+  ...
+```
+
+This duplicates the same configuration three times.
+
+If we later need to change:
+
+```yaml
+pip install ...
+```
+
+we would need to change it in three places.
+
+A matrix avoids this duplication.
+
+We define the job once:
+
+```yaml
+test:
+```
+
+and define the variable values:
+
+```yaml
+matrix:
+  suite:
+    - train
+    - data_quality
+    - model_contract
+```
+
+This gives us three executions without copying the entire job.
+
+---
+
+# 15. Parallel Execution
+
+The main benefit is that matrix jobs are independent.
+
+Conceptually, before:
+
+```text
+                 test
+                  |
+              train tests
+                  |
+          data quality tests
+                  |
+         model contract tests
+```
+
+After:
+
+```text
+              test matrix
+             /     |      \
+            /      |       \
+        train    data      model
+                 quality   contract
+```
+
+The matrix cells can execute concurrently, subject to the available runners and CI configuration.
+
+If the suites take roughly:
+
+```text
+train = 2 minutes
+data_quality = 2 minutes
+model_contract = 2 minutes
+```
+
+Serial execution could take approximately:
+
+```text
+2 + 2 + 2 = 6 minutes
+```
+
+Parallel execution can approach:
+
+```text
+max(2, 2, 2) = 2 minutes
+```
+
+There is some setup and scheduling overhead, so the actual time will not necessarily be exactly 2 minutes.
+
+The important idea is that the suites no longer have to wait for each other.
+
+---
+
+# 16. Final Test Job
+
+The completed test job is:
+
+```yaml
+test:
+  runs-on: ubuntu-latest
+  strategy:
+    matrix:
+      suite:
+        - train
+        - data_quality
+        - model_contract
+
+  steps:
+    - uses: actions/checkout@v4
+    - name: Install pytest + runtime deps
+      run: pip install --break-system-packages pytest pandas numpy scikit-learn joblib
+    - name: Run ${{ matrix.suite }} tests
+      run: python3 -m pytest "tests/test_${{ matrix.suite }}.py" -v
+```
+
+Notice that the setup is still shared.
+
+Each matrix cell:
+
+1. Gets its own runner/job execution.
+2. Checks out the repository.
+3. Installs the required dependencies.
+4. Runs only its assigned test suite.
+
+---
+
+# 17. Complete Final Workflow
+
+The complete `.gitea/workflows/ci.yml` is:
+
+```yaml
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ruff
+        run: pip install --break-system-packages ruff
+      - name: Run ruff
+        run: ruff check src tests
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        suite:
+          - train
+          - data_quality
+          - model_contract
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pytest + runtime deps
+        run: pip install --break-system-packages pytest pandas numpy scikit-learn joblib
+      - name: Run ${{ matrix.suite }} tests
+        run: python3 -m pytest "tests/test_${{ matrix.suite }}.py" -v
+```
+
+---
+
+# 18. Important YAML Indentation
+
+YAML indentation is significant.
+
+The correct hierarchy is:
+
+```text
+jobs
+└── test
+    ├── runs-on
+    ├── strategy
+    │   └── matrix
+    │       └── suite
+    │           ├── train
+    │           ├── data_quality
+    │           └── model_contract
+    └── steps
+```
+
+Therefore:
+
+```yaml
+test:
+  runs-on: ubuntu-latest
+  strategy:
+    matrix:
+      suite:
+        - train
+        - data_quality
+        - model_contract
+```
+
+is correct.
+
+Do not accidentally put `strategy` outside the `test` job.
+
+---
+
+# 19. Common Mistakes
+
+## Mistake 1: Using the wrong matrix values
+
+Incorrect:
+
+```yaml
+matrix:
+  suite:
+    - test_train
+    - test_data
+    - test_model
+```
+
+This would produce incorrect filenames when combined with:
+
+```text
+tests/test_${{ matrix.suite }}.py
+```
+
+The required values are:
+
+```yaml
+- train
+- data_quality
+- model_contract
+```
+
+---
+
+## Mistake 2: Running the entire tests directory
+
+If we keep:
+
+```yaml
+run: python3 -m pytest tests -v
+```
+
+every matrix cell will run all tests.
+
+That defeats the purpose of the matrix.
+
+Instead use:
+
+```yaml
+run: python3 -m pytest "tests/test_${{ matrix.suite }}.py" -v
+```
+
+Each matrix cell then runs only one suite.
+
+---
+
+## Mistake 3: Changing the lint job
+
+The task specifically requires the `lint` job to remain unchanged.
+
+Do not modify:
+
+```yaml
+lint:
+```
+
+The matrix is only for:
+
+```yaml
+test:
+```
+
+---
+
+## Mistake 4: Creating three separate jobs
+
+Avoid manually creating:
+
+```yaml
+test_train:
+test_data_quality:
+test_model_contract:
+```
+
+The point of the task is to demonstrate the matrix strategy.
+
+Use:
+
+```yaml
+test:
+  strategy:
+    matrix:
+      suite:
+        - train
+        - data_quality
+        - model_contract
+```
+
+---
+
+## Mistake 5: Incorrect filename
+
+The actual files are:
+
+```text
+tests/test_train.py
+tests/test_data_quality.py
+tests/test_model_contract.py
+```
+
+The command must generate exactly these filenames.
+
+---
+
+# 20. Git Workflow Used
+
+After modifying the workflow:
+
+```bash
+cd /root/code/fraud-detector
+```
+
+Check the current branch:
+
+```bash
+git branch --show-current
+```
+
+Expected:
+
+```text
+add-test-matrix
+```
+
+Check the changes:
+
+```bash
+git diff -- .gitea/workflows/ci.yml
+```
+
+Stage the workflow:
+
+```bash
+git add .gitea/workflows/ci.yml
+```
+
+Commit:
+
+```bash
+git commit -m "Convert test job to matrix strategy"
+```
+
+Push:
+
+```bash
+git push origin add-test-matrix
+```
+
+---
+
+# 21. Commit Created
+
+The workflow change was committed as:
+
+```text
+ca36d40
+```
+
+Commit message:
+
+```text
+Convert test job to matrix strategy
+```
+
+The branch was successfully pushed:
+
+```text
+add-test-matrix -> origin/add-test-matrix
+```
+
+---
+
+# 22. Pull Request
+
+The existing PR was:
+
+```text
+Convert test job to matrix strategy
+```
+
+The latest workflow run was triggered by commit:
+
+```text
+ca36d40
+```
+
+The workflow run was:
+
+```text
+#4
+```
+
+This confirmed that the new workflow was picked up by Gitea Actions.
+
+---
+
+# 23. CI Verification
+
+The latest Gitea Actions run created these jobs:
+
+```text
+lint
+test (data_quality)
+test (model_contract)
+test (train)
+```
+
+All four jobs were successful.
+
+The result was:
+
+```text
+lint                    SUCCESS
+test (data_quality)     SUCCESS
+test (model_contract)   SUCCESS
+test (train)            SUCCESS
+```
+
+This satisfies the requirement that the latest PR head commit reports a combined successful status with at least three `test` status entries.
+
+---
+
+# 24. How to Read the Gitea Actions Result
+
+When opening the workflow run, we should not just check whether the workflow exists.
+
+We need to confirm that the matrix actually expanded.
+
+Look for:
+
+```text
+test (data_quality)
+test (model_contract)
+test (train)
+```
+
+If there is only:
+
+```text
+test
+```
+
+then the matrix is not working as expected.
+
+The presence of the three separate entries proves that Gitea created three matrix cells.
+
+---
+
+# 25. Why Matrix Testing Is Useful in Real Projects
+
+As a project grows, the number of test suites can increase.
+
+For example:
+
+```text
+unit tests
+integration tests
+API tests
+data quality tests
+model tests
+security tests
+contract tests
+```
+
+Running everything serially can make CI very slow.
+
+A matrix can separate these workloads:
+
+```yaml
+strategy:
+  matrix:
+    suite:
+      - unit
+      - integration
+      - api
+      - data_quality
+      - model
+      - security
+      - contract
+```
+
+One job definition can then handle all of them.
+
+This makes the workflow easier to maintain.
+
+---
+
+# 26. Matrix Can Be Used for More Than Test Suites
+
+Matrix strategies are not limited to tests.
+
+A common example is Python versions:
+
+```yaml
+strategy:
+  matrix:
+    python-version:
+      - "3.10"
+      - "3.11"
+      - "3.12"
+```
+
+This creates separate jobs for each Python version.
+
+Conceptually:
+
+```text
+test Python 3.10
+test Python 3.11
+test Python 3.12
+```
+
+Another example is operating systems:
+
+```yaml
+strategy:
+  matrix:
+    os:
+      - ubuntu-latest
+      - windows-latest
+      - macos-latest
+```
+
+This tests the project across multiple operating systems.
+
+The same principle applies:
+
+```text
+one job definition
+        +
+multiple matrix values
+        =
+multiple independent jobs
+```
+
+---
+
+# 27. Matrix Variables
+
+A matrix can contain different dimensions.
+
+For example:
+
+```yaml
+strategy:
+  matrix:
+    python:
+      - "3.10"
+      - "3.11"
+    os:
+      - ubuntu
+      - windows
+```
+
+This can produce combinations such as:
+
+```text
+Python 3.10 + Ubuntu
+Python 3.10 + Windows
+Python 3.11 + Ubuntu
+Python 3.11 + Windows
+```
+
+This is called a multi-dimensional matrix.
+
+For this task, only one dimension is required:
+
+```yaml
+suite:
+```
+
+---
+
+# 28. Important GitHub/Gitea Actions Expression Syntax
+
+The matrix value is accessed using:
+
+```text
+${{ matrix.suite }}
+```
+
+The `${{ }}` syntax tells the Actions workflow engine to evaluate an expression.
+
+For example:
+
+```yaml
+run: echo "${{ matrix.suite }}"
+```
+
+could produce:
+
+```text
+train
+```
+
+in one matrix execution.
+
+The value changes for each matrix cell.
+
+---
+
+# 29. Why Quotes Are Used Around the Test Path
+
+The command is:
+
+```yaml
+run: python3 -m pytest "tests/test_${{ matrix.suite }}.py" -v
+```
+
+The quotes make the generated path a single shell argument.
+
+For these filenames, quotes are not strictly necessary because they do not contain spaces, but they make the command explicit and safe.
+
+The important part is:
+
+```text
+tests/test_
+```
+
+plus:
+
+```text
+${{ matrix.suite }}
+```
+
+plus:
+
+```text
+.py
+```
+
+Together:
+
+```text
+tests/test_${{ matrix.suite }}.py
+```
+
+---
+
+# 30. What Happens Internally
+
+When Gitea reads:
+
+```yaml
+strategy:
+  matrix:
+    suite:
+      - train
+      - data_quality
+      - model_contract
+```
+
+it effectively creates three executions.
+
+### Execution 1
+
+```text
+matrix.suite = train
+```
+
+Runs:
+
+```bash
+python3 -m pytest tests/test_train.py -v
+```
+
+### Execution 2
+
+```text
+matrix.suite = data_quality
+```
+
+Runs:
+
+```bash
+python3 -m pytest tests/test_data_quality.py -v
+```
+
+### Execution 3
+
+```text
+matrix.suite = model_contract
+```
+
+Runs:
+
+```bash
+python3 -m pytest tests/test_model_contract.py -v
+```
+
+The job definition itself is still only written once.
+
+---
+
+# 31. Definition of a Matrix Cell
+
+A matrix cell means one particular combination of matrix variables.
+
+In this task, there is only one matrix variable:
+
+```text
+suite
+```
+
+Therefore the cells are:
+
+```text
+suite=train
+suite=data_quality
+suite=model_contract
+```
+
+Gitea displays these as:
+
+```text
+test (train)
+test (data_quality)
+test (model_contract)
+```
+
+---
+
+# 32. CI Status Behavior
+
+Each matrix cell has its own status.
+
+For example:
+
+```text
+test (train)            SUCCESS
+test (data_quality)     SUCCESS
+test (model_contract)   SUCCESS
+```
+
+If one cell fails:
+
+```text
+test (train)            SUCCESS
+test (data_quality)     FAILURE
+test (model_contract)   SUCCESS
+```
+
+the overall test workflow/PR status can fail.
+
+This is useful because we can immediately see which suite failed.
+
+Instead of one large test job saying:
+
+```text
+test FAILED
+```
+
+we get:
+
+```text
+test (data_quality) FAILED
+```
+
+which gives much more useful information.
+
+---
+
+# 33. Benefits of the Matrix Approach
+
+## Faster CI
+
+Independent suites can run simultaneously.
+
+## Less Duplication
+
+One job definition handles all suites.
+
+## Easier Maintenance
+
+Dependencies and setup steps are written once.
+
+## Better Failure Visibility
+
+Each suite gets a separate status.
+
+## Easy Expansion
+
+Adding another test suite is simple.
+
+For example:
+
+```yaml
+- security
+```
+
+would create:
+
+```text
+test (security)
+```
+
+assuming:
+
+```text
+tests/test_security.py
+```
+
+exists.
+
+---
+
+# 34. Requirements Checklist
+
+The task required the following:
+
+### Requirement 1
+
+The `test` job must declare:
+
+```yaml
+strategy:
+  matrix:
+```
+
+Status:
+
+```text
+DONE
+```
+
+### Requirement 2
+
+The matrix must contain:
+
+```text
+train
+data_quality
+model_contract
+```
+
+Status:
+
+```text
+DONE
+```
+
+### Requirement 3
+
+Each value must map to an existing test file.
+
+Mappings:
+
+```text
+train          -> tests/test_train.py
+data_quality   -> tests/test_data_quality.py
+model_contract -> tests/test_model_contract.py
+```
+
+Status:
+
+```text
+DONE
+```
+
+### Requirement 4
+
+The lint job must remain unchanged.
+
+Status:
+
+```text
+DONE
+```
+
+### Requirement 5
+
+The latest PR head commit must report successful CI.
+
+Commit:
+
+```text
+ca36d40
+```
+
+Status:
+
+```text
+SUCCESS
+```
+
+### Requirement 6
+
+There must be at least three test status entries.
+
+Observed:
+
+```text
+test (data_quality)
+test (model_contract)
+test (train)
+```
+
+Status:
+
+```text
+DONE
+```
+
+---
+
+# 35. Final Architecture
+
+The final CI pipeline is:
+
+```text
+                         CI
+                          |
+              +-----------+-----------+
+              |                       |
+             lint                    test
+              |                       |
+         Ruff checks             Matrix strategy
+                                      |
+                    +-----------------+-----------------+
+                    |                 |                 |
+                    v                 v                 v
+              test (train)    test (data_quality)  test (model_contract)
+                    |                 |                 |
+                    v                 v                 v
+             test_train.py     test_data_quality.py  test_model_contract.py
+```
+
+This is the desired architecture.
+
+---
+
+# 36. Practical Pattern to Remember
+
+When you see multiple similar CI jobs, ask:
+
+> Can these jobs be represented as different values of a matrix variable?
+
+Instead of:
+
+```text
+job A
+job B
+job C
+```
+
+consider:
+
+```yaml
+job:
+  strategy:
+    matrix:
+      value:
+        - A
+        - B
+        - C
+```
+
+Then reference the value using:
+
+```text
+${{ matrix.value }}
+```
+
+This is one of the most useful patterns for reducing CI configuration duplication.
+
+---
+
+# 37. Quick Revision
+
+### What is a matrix?
+
+A matrix is a way to run the same CI job multiple times with different parameter values.
+
+### What is the matrix variable in this task?
+
+```text
+suite
+```
+
+### What are its values?
+
+```text
+train
+data_quality
+model_contract
+```
+
+### How do we access the current value?
+
+```text
+${{ matrix.suite }}
+```
+
+### How do we select the test file?
+
+```text
+tests/test_${{ matrix.suite }}.py
+```
+
+### What does `train` produce?
+
+```text
+tests/test_train.py
+```
+
+### What does `data_quality` produce?
+
+```text
+tests/test_data_quality.py
+```
+
+### What does `model_contract` produce?
+
+```text
+tests/test_model_contract.py
+```
+
+### Why use a matrix?
+
+To avoid duplicated CI configuration and allow independent jobs to run in parallel.
+
+### What stayed unchanged?
+
+The `lint` job.
+
+### What commit contains the solution?
+
+```text
+ca36d40
+```
+
+### Did CI pass?
+
+Yes.
+
+### What jobs were created?
+
+```text
+lint
+test (data_quality)
+test (model_contract)
+test (train)
+```
+
+---
+
+# 38. Final Result
+
+The `fraud-detector` CI pipeline was successfully converted from a serial test job into a matrix-based test strategy.
+
+The final matrix is:
+
+```yaml
+strategy:
+  matrix:
+    suite:
+      - train
+      - data_quality
+      - model_contract
+```
+
+Each matrix value maps directly to an existing test file:
+
+```text
+train          -> tests/test_train.py
+data_quality   -> tests/test_data_quality.py
+model_contract -> tests/test_model_contract.py
+```
+
+The latest CI run successfully produced three separate test jobs and one lint job.
+
+```text
+lint                    SUCCESS
+test (train)            SUCCESS
+test (data_quality)     SUCCESS
+test (model_contract)   SUCCESS
+```
+
+## Day 78 Status
+
+**COMPLETED SUCCESSFULLY** ✅
+
+The key lesson is:
+
+> A CI matrix lets you define one job once and execute it multiple times with different parameters, making CI pipelines more parallel, maintainable, and scalable.
 ---
 
