@@ -28480,5 +28480,2012 @@ test (model_contract)   SUCCESS
 The key lesson is:
 
 > A CI matrix lets you define one job once and execute it multiple times with different parameters, making CI pipelines more parallel, maintainable, and scalable.
+
+# Day 79 — Publish CI Training Artefacts via `upload-artifact`
+
+## Objective
+
+The goal of this task is to modify the CI workflow in the `fraud-detector` repository so that files produced during the machine-learning training process are preserved after the CI runner finishes.
+
+The CI system already:
+
+1. Checks out the repository.
+2. Installs the required ML/reporting dependencies.
+3. Trains the model.
+4. Produces `metrics.json`.
+5. Generates `confusion_matrix.png`.
+6. Produces `model.joblib`.
+
+However, the runner's workspace is temporary. When the job finishes, the workspace is destroyed and the generated files disappear.
+
+The solution is to use:
+
+```yaml
+actions/upload-artifact@v3
+```
+
+to upload the `artifacts/` directory as a named CI artifact:
+
+```text
+model-report
+```
+
+The final artifact must be downloadable from the Gitea Actions run page and must contain:
+
+```text
+metrics.json
+confusion_matrix.png
+```
+
+by basename.
+
+---
+
+# Background / Context
+
+## What problem are we solving?
+
+A CI runner normally creates a temporary workspace.
+
+For this project, the training job produces files such as:
+
+```text
+artifacts/model.joblib
+artifacts/metrics.json
+artifacts/confusion_matrix.png
+```
+
+These files exist while the CI job is running.
+
+At the end of the job, however, the runner workspace is cleaned up.
+
+Therefore:
+
+```text
+Training
+   |
+   v
+Files created
+   |
+   v
+CI job finishes
+   |
+   v
+Runner workspace destroyed
+   |
+   v
+Files lost
+```
+
+This is a problem because reviewers need to see what the training run actually produced.
+
+An artifact solves this problem:
+
+```text
+Training
+   |
+   v
+Files created
+   |
+   v
+upload-artifact
+   |
+   v
+model-report
+   |
+   v
+Download from Actions run page
+```
+
+The important idea is:
+
+> A green CI status tells us that the workflow succeeded. An uploaded artifact lets us inspect what the workflow actually produced.
+
+This is especially useful for machine-learning workflows where the output can include:
+
+- Metrics
+- Confusion matrices
+- Trained models
+- Evaluation reports
+- Logs
+- Generated datasets
+- Other reproducible outputs
+
+---
+
+# Repository and Environment
+
+The task provides the following environment.
+
+## Gitea
+
+Gitea is running on port `3000`.
+
+Repository:
+
+```text
+http://localhost:3000/gitea-admin/fraud-detector
+```
+
+The Gitea login credentials provided for the task are:
+
+```text
+Username: gitea-admin
+Password: gitea2026
+```
+
+The PR is already open.
+
+## Local repository
+
+The working clone is:
+
+```text
+/root/code/fraud-detector
+```
+
+The working branch is:
+
+```text
+add-artifact-upload
+```
+
+## Workflow file
+
+The CI configuration is located at:
+
+```text
+.gitea/workflows/ci.yml
+```
+
+---
+
+# Existing Configuration
+
+The original workflow provided in the task is:
+
+```yaml
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ruff
+        run: pip install --break-system-packages ruff
+      - name: Run ruff
+        run: ruff check src tests
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pytest + runtime deps
+        run: pip install --break-system-packages pytest pandas numpy scikit-learn joblib
+      - name: Run all tests
+        run: python3 -m pytest tests -v
+
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install report deps
+        run: pip install --break-system-packages numpy scikit-learn joblib matplotlib
+      - name: Train
+        run: python3 -m src.train
+      - name: Plot confusion matrix
+        run: python3 -m src.plot
+      - name: List produced artefacts
+        run: ls -la artifacts/
+```
+
+The important part for this task is the `report` job.
+
+---
+
+# Understanding the Workflow
+
+## Workflow name
+
+```yaml
+name: CI
+```
+
+This gives the workflow the name:
+
+```text
+CI
+```
+
+The name appears in the Actions interface.
+
+---
+
+# Workflow Triggers
+
+The workflow contains:
+
+```yaml
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+```
+
+This means the workflow runs when:
+
+- A pull request targets `main`.
+- Code is pushed to `main`.
+
+Because the task says the PR is already open, modifying and pushing the PR branch should cause the pull-request workflow to run.
+
+---
+
+# Jobs
+
+The workflow contains three jobs:
+
+```text
+lint
+test
+report
+```
+
+Each job has a separate purpose.
+
+---
+
+## `lint`
+
+```yaml
+lint:
+  runs-on: ubuntu-latest
+```
+
+This job checks code quality.
+
+It installs Ruff:
+
+```yaml
+- name: Install ruff
+  run: pip install --break-system-packages ruff
+```
+
+Then runs:
+
+```yaml
+- name: Run ruff
+  run: ruff check src tests
+```
+
+This is not the part that needs modification for the artifact task.
+
+---
+
+# `test`
+
+The test job installs:
+
+```text
+pytest
+pandas
+numpy
+scikit-learn
+joblib
+```
+
+using:
+
+```yaml
+pip install --break-system-packages pytest pandas numpy scikit-learn joblib
+```
+
+Then it runs:
+
+```yaml
+python3 -m pytest tests -v
+```
+
+Again, this job does not need to be changed for the artifact task.
+
+---
+
+# `report`
+
+The relevant job is:
+
+```yaml
+report:
+  runs-on: ubuntu-latest
+```
+
+This is the job responsible for generating the ML training outputs.
+
+---
+
+# Understanding `runs-on`
+
+```yaml
+runs-on: ubuntu-latest
+```
+
+This tells the CI system to execute the job on an Ubuntu runner.
+
+The exact underlying runner is managed by the CI system.
+
+The important concept is that the runner provides a temporary environment in which the commands execute.
+
+---
+
+# Checkout
+
+The first step is:
+
+```yaml
+- uses: actions/checkout@v4
+```
+
+This checks out the repository source code into the runner workspace.
+
+Without this step, the runner would not have the project's source files available.
+
+---
+
+# Installing Report Dependencies
+
+The workflow contains:
+
+```yaml
+- name: Install report deps
+  run: pip install --break-system-packages numpy scikit-learn joblib matplotlib
+```
+
+The dependencies are:
+
+### NumPy
+
+```text
+numpy
+```
+
+Used for numerical/data operations.
+
+### scikit-learn
+
+```text
+scikit-learn
+```
+
+Used for machine-learning functionality and metrics.
+
+### joblib
+
+```text
+joblib
+```
+
+Used to serialize/save the trained model.
+
+The task states that the training process writes:
+
+```text
+artifacts/model.joblib
+```
+
+### Matplotlib
+
+```text
+matplotlib
+```
+
+Used to create the confusion-matrix image.
+
+---
+
+# Training Step
+
+The workflow runs:
+
+```yaml
+- name: Train
+  run: python3 -m src.train
+```
+
+This executes the Python module:
+
+```text
+src.train
+```
+
+The task states that this generates:
+
+```text
+artifacts/model.joblib
+artifacts/metrics.json
+```
+
+So after the training step, the expected artifacts directory contains at least:
+
+```text
+artifacts/
+├── model.joblib
+└── metrics.json
+```
+
+---
+
+# Plotting Step
+
+The workflow then runs:
+
+```yaml
+- name: Plot confusion matrix
+  run: python3 -m src.plot
+```
+
+This generates:
+
+```text
+artifacts/confusion_matrix.png
+```
+
+At this point, the expected directory contains:
+
+```text
+artifacts/
+├── model.joblib
+├── metrics.json
+└── confusion_matrix.png
+```
+
+---
+
+# Listing the Produced Files
+
+The existing workflow finishes with:
+
+```yaml
+- name: List produced artefacts
+  run: ls -la artifacts/
+```
+
+This is useful because it allows us to inspect the directory in the CI logs.
+
+It does **not** preserve the files.
+
+The `ls` command only lists files.
+
+It does not upload them.
+
+This distinction is important:
+
+```text
+ls
+=
+show files
+```
+
+whereas:
+
+```text
+upload-artifact
+=
+preserve files for later download
+```
+
+---
+
+# The Missing Step
+
+The missing step is:
+
+```yaml
+- name: Upload training artifacts
+  uses: actions/upload-artifact@v3
+  with:
+    name: model-report
+    path: artifacts/
+```
+
+This is the key change required by the task.
+
+---
+
+# Understanding `actions/upload-artifact`
+
+The action is:
+
+```yaml
+actions/upload-artifact@v3
+```
+
+This is a reusable GitHub Actions-compatible action used to upload files generated during a workflow.
+
+The task specifically requires version:
+
+```text
+@v3
+```
+
+## Why not `@v4`?
+
+The task explicitly states:
+
+> Gitea's runner rejects `@v4`.
+
+Therefore this task must use:
+
+```yaml
+uses: actions/upload-artifact@v3
+```
+
+and not:
+
+```yaml
+uses: actions/upload-artifact@v4
+```
+
+Using `@v4` can cause the workflow to fail even though the configuration would be valid in environments that support it.
+
+---
+
+# Understanding `name`
+
+The upload configuration contains:
+
+```yaml
+name: model-report
+```
+
+This gives the uploaded artifact its name.
+
+The task specifically requires:
+
+```text
+model-report
+```
+
+The name is important because reviewers will see this artifact on the run page.
+
+It also forms part of the expected artifact download path.
+
+---
+
+# Understanding `path`
+
+The configuration contains:
+
+```yaml
+path: artifacts/
+```
+
+This tells `upload-artifact` what files to upload.
+
+The trailing slash means the artifact source is the `artifacts/` directory.
+
+Because the task requires the generated training outputs to be preserved, uploading the entire directory is appropriate.
+
+The directory contains:
+
+```text
+artifacts/
+├── model.joblib
+├── metrics.json
+└── confusion_matrix.png
+```
+
+Therefore all three outputs can be preserved.
+
+---
+
+# Why Upload the Whole Directory?
+
+The task requires:
+
+```text
+metrics.json
+confusion_matrix.png
+```
+
+and the project also produces:
+
+```text
+model.joblib
+```
+
+Uploading:
+
+```yaml
+path: artifacts/
+```
+
+captures the complete output directory.
+
+This is better than uploading only individual files when the intention is to preserve the complete ML training output.
+
+For example, this would also be possible in some workflows:
+
+```yaml
+path: |
+  artifacts/metrics.json
+  artifacts/confusion_matrix.png
+```
+
+However, that would intentionally exclude `model.joblib`.
+
+The task explicitly describes the artifact as the model report and discusses the model as an important training output, so uploading the whole `artifacts/` directory is the required approach.
+
+---
+
+# Before vs After
+
+## Before
+
+The report job ended with:
+
+```yaml
+      - name: List produced artefacts
+        run: ls -la artifacts/
+```
+
+The files were generated but then discarded with the runner workspace.
+
+Flow:
+
+```text
+src.train
+   |
+   +--> metrics.json
+   +--> model.joblib
+   |
+src.plot
+   |
+   +--> confusion_matrix.png
+   |
+   v
+ls -la artifacts/
+   |
+   v
+Job finishes
+   |
+   v
+Workspace removed
+   |
+   v
+Files unavailable
+```
+
+---
+
+## After
+
+The report job ends with:
+
+```yaml
+      - name: List produced artefacts
+        run: ls -la artifacts/
+      - name: Upload training artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: model-report
+          path: artifacts/
+```
+
+The new flow becomes:
+
+```text
+src.train
+   |
+   +--> metrics.json
+   +--> model.joblib
+   |
+src.plot
+   |
+   +--> confusion_matrix.png
+   |
+   v
+ls -la artifacts/
+   |
+   v
+upload-artifact
+   |
+   v
+model-report
+   |
+   v
+Downloadable from CI run
+```
+
+---
+
+# Step-by-Step Solution
+
+## Step 1 — Open the repository
+
+The working clone is:
+
+```bash
+cd /root/code/fraud-detector
+```
+
+This ensures commands are executed against the provided repository.
+
+---
+
+## Step 2 — Confirm the branch
+
+The task states that the repository is already checked out on:
+
+```text
+add-artifact-upload
+```
+
+You can inspect the current branch with:
+
+```bash
+git branch --show-current
+```
+
+Expected value:
+
+```text
+add-artifact-upload
+```
+
+Do not switch branches unnecessarily if the repository is already on the required branch.
+
+---
+
+## Step 3 — Open the workflow
+
+The workflow file is:
+
+```text
+.gitea/workflows/ci.yml
+```
+
+The existing `report` job ends with:
+
+```yaml
+      - name: List produced artefacts
+        run: ls -la artifacts/
+```
+
+---
+
+## Step 4 — Add the upload step
+
+Immediately after the listing step, add:
+
+```yaml
+      - name: Upload training artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: model-report
+          path: artifacts/
+```
+
+The order is important.
+
+The upload must happen **after** the training and plotting commands because those commands create the files.
+
+Correct order:
+
+```text
+Train
+  ↓
+Plot
+  ↓
+List files
+  ↓
+Upload files
+```
+
+Incorrect order:
+
+```text
+Upload files
+  ↓
+Train
+  ↓
+Plot
+```
+
+The incorrect order would attempt to upload the directory before the required files have been generated.
+
+---
+
+# Complete Final Configuration
+
+The complete workflow after the change should be:
+
+```yaml
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ruff
+        run: pip install --break-system-packages ruff
+      - name: Run ruff
+        run: ruff check src tests
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pytest + runtime deps
+        run: pip install --break-system-packages pytest pandas numpy scikit-learn joblib
+      - name: Run all tests
+        run: python3 -m pytest tests -v
+
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install report deps
+        run: pip install --break-system-packages numpy scikit-learn joblib matplotlib
+      - name: Train
+        run: python3 -m src.train
+      - name: Plot confusion matrix
+        run: python3 -m src.plot
+      - name: List produced artefacts
+        run: ls -la artifacts/
+      - name: Upload training artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: model-report
+          path: artifacts/
+```
+
+---
+
+# Important YAML Concepts
+
+## Indentation
+
+YAML uses indentation to represent structure.
+
+For example:
+
+```yaml
+with:
+  name: model-report
+  path: artifacts/
+```
+
+Both `name` and `path` belong to `with`.
+
+The indentation must be preserved.
+
+Incorrect indentation can cause the workflow to fail before it even starts.
+
+---
+
+## `uses`
+
+This:
+
+```yaml
+uses: actions/upload-artifact@v3
+```
+
+means the workflow is invoking an external reusable action.
+
+The action is identified by:
+
+```text
+actions/upload-artifact
+```
+
+and the requested version is:
+
+```text
+v3
+```
+
+---
+
+## `with`
+
+The `with:` section supplies configuration values to the action:
+
+```yaml
+with:
+  name: model-report
+  path: artifacts/
+```
+
+The two important inputs are:
+
+```text
+name
+path
+```
+
+---
+
+# Commands Used
+
+## Enter repository
+
+```bash
+cd /root/code/fraud-detector
+```
+
+## Check branch
+
+```bash
+git branch --show-current
+```
+
+Expected:
+
+```text
+add-artifact-upload
+```
+
+## Inspect the workflow
+
+A simple command such as:
+
+```bash
+cat .gitea/workflows/ci.yml
+```
+
+can be used to inspect the file.
+
+## Check the changed file
+
+After editing:
+
+```bash
+git diff -- .gitea/workflows/ci.yml
+```
+
+This is useful for confirming that only the intended upload step was added.
+
+---
+
+# Commit the Change
+
+Once the workflow is correct:
+
+```bash
+git add .gitea/workflows/ci.yml
+```
+
+Then create a commit:
+
+```bash
+git commit -m "Publish training artifacts from CI"
+```
+
+Then push the PR branch:
+
+```bash
+git push origin add-artifact-upload
+```
+
+The task did not provide a commit ID, so no specific commit hash should be assumed or invented.
+
+---
+
+# Expected CI Behaviour
+
+After pushing the change, the PR workflow should run.
+
+The `report` job should perform these operations:
+
+```text
+1. Checkout repository
+2. Install report dependencies
+3. Run training
+4. Generate confusion matrix
+5. List artifacts
+6. Upload artifacts
+```
+
+The listing step should show files generated under:
+
+```text
+artifacts/
+```
+
+The exact timestamps, permissions, sizes, and ordering should not be assumed because they depend on the actual CI run.
+
+---
+
+# Expected Artifact Contents
+
+The uploaded artifact should be named:
+
+```text
+model-report
+```
+
+It should contain the generated files, including:
+
+```text
+metrics.json
+confusion_matrix.png
+model.joblib
+```
+
+The task specifically requires verification that:
+
+```text
+metrics.json
+```
+
+and:
+
+```text
+confusion_matrix.png
+```
+
+are present by basename.
+
+---
+
+# Artifact Download Path
+
+The task specifies the run-level artifact path format:
+
+```text
+/gitea-admin/fraud-detector/actions/runs/<id>/artifacts/model-report
+```
+
+Here:
+
+```text
+<id>
+```
+
+represents the actual CI run ID.
+
+The task does not provide a specific run ID, so a real run ID must not be invented.
+
+---
+
+# Verification
+
+Verification is an important part of this task.
+
+Adding YAML is not enough.
+
+The actual CI system must execute the workflow successfully.
+
+---
+
+## Verification 1 — Check the report job
+
+Open the Actions run associated with the PR.
+
+Confirm that:
+
+```text
+report
+```
+
+finishes successfully.
+
+The upload step should also complete successfully.
+
+---
+
+## Verification 2 — Check the artifact name
+
+The run should contain an artifact named:
+
+```text
+model-report
+```
+
+The name must not be:
+
+```text
+artifacts
+```
+
+or:
+
+```text
+model-report.zip
+```
+
+The configured artifact name is exactly:
+
+```text
+model-report
+```
+
+---
+
+## Verification 3 — Download the artifact
+
+Use the artifact download option on the run page.
+
+The resulting download should be a ZIP containing the generated files.
+
+The task specifically requires:
+
+```text
+metrics.json
+```
+
+and:
+
+```text
+confusion_matrix.png
+```
+
+by basename.
+
+---
+
+## Verification 4 — Check the PR status
+
+The PR head commit's combined status must be:
+
+```text
+success
+```
+
+This is important because the artifact feature must not break the existing CI workflow.
+
+A successful artifact upload alone is not enough if another job fails.
+
+The desired state is:
+
+```text
+lint     → success
+test     → success
+report   → success
+combined → success
+```
+
+---
+
+# What the Green Check Means
+
+A green CI check means the workflow completed successfully according to its configured checks.
+
+However, the artifact provides additional evidence.
+
+Think of the difference this way:
+
+```text
+Green check
+    =
+"The CI process passed."
+```
+
+while:
+
+```text
+Uploaded artifact
+    =
+"Here are the outputs that CI actually produced."
+```
+
+For ML workflows, both are valuable.
+
+---
+
+# Why Artifacts Matter in Machine Learning
+
+Traditional application CI might primarily test:
+
+```text
+Does the code compile?
+Do the tests pass?
+Does linting pass?
+```
+
+ML CI often needs to answer additional questions:
+
+```text
+What metrics did training produce?
+What did the confusion matrix look like?
+What model file was generated?
+What evaluation data was produced?
+```
+
+Artifacts provide a convenient way to preserve these outputs.
+
+For example:
+
+```text
+model-report
+├── metrics.json
+├── confusion_matrix.png
+└── model.joblib
+```
+
+A reviewer can inspect these outputs without rerunning the training job locally.
+
+---
+
+# Key Concepts and Terminology
+
+## CI
+
+**Continuous Integration**.
+
+A development practice where code changes are automatically built, tested, checked, and validated.
+
+---
+
+## Workflow
+
+A YAML configuration describing what CI should execute.
+
+Here:
+
+```text
+.gitea/workflows/ci.yml
+```
+
+is the workflow configuration.
+
+---
+
+## Job
+
+A logical unit inside a workflow.
+
+This workflow has:
+
+```text
+lint
+test
+report
+```
+
+jobs.
+
+---
+
+## Runner
+
+The machine/environment that executes the CI job.
+
+The workflow specifies:
+
+```yaml
+runs-on: ubuntu-latest
+```
+
+The runner's workspace is temporary.
+
+---
+
+## Artifact
+
+A file or collection of files preserved from a CI run so they can be downloaded later.
+
+Examples:
+
+```text
+model-report
+test-results
+coverage-report
+build-output
+```
+
+---
+
+## `upload-artifact`
+
+The action used to upload files generated during a workflow:
+
+```yaml
+actions/upload-artifact@v3
+```
+
+---
+
+## Artifact Name
+
+The name assigned to the uploaded artifact:
+
+```yaml
+name: model-report
+```
+
+---
+
+## Artifact Path
+
+The files/directories that should be uploaded:
+
+```yaml
+path: artifacts/
+```
+
+---
+
+## Pull Request
+
+A proposed change to a repository.
+
+This task modifies the branch:
+
+```text
+add-artifact-upload
+```
+
+which is associated with an already-open PR.
+
+---
+
+## Combined Status
+
+The overall status reported for the PR head commit.
+
+The task requires:
+
+```text
+success
+```
+
+---
+
+# Why `ls` Is Not Enough
+
+A common beginner mistake is to think:
+
+```yaml
+- name: List produced artefacts
+  run: ls -la artifacts/
+```
+
+preserves the files.
+
+It does not.
+
+`ls` only displays directory contents.
+
+For example:
+
+```bash
+ls -la artifacts/
+```
+
+might display:
+
+```text
+model.joblib
+metrics.json
+confusion_matrix.png
+```
+
+But those files still belong to the runner workspace.
+
+Once the runner is destroyed, they can disappear.
+
+The upload action creates a preserved CI artifact.
+
+---
+
+# Common Mistakes
+
+## Mistake 1 — Using `@v4`
+
+Incorrect:
+
+```yaml
+uses: actions/upload-artifact@v4
+```
+
+The task explicitly states that Gitea's runner rejects `@v4`.
+
+Correct:
+
+```yaml
+uses: actions/upload-artifact@v3
+```
+
+---
+
+## Mistake 2 — Forgetting the artifact name
+
+Incorrect:
+
+```yaml
+with:
+  path: artifacts/
+```
+
+The task requires a non-empty artifact name.
+
+Correct:
+
+```yaml
+with:
+  name: model-report
+  path: artifacts/
+```
+
+---
+
+## Mistake 3 — Empty path
+
+Incorrect:
+
+```yaml
+with:
+  name: model-report
+  path:
+```
+
+There must be a valid path.
+
+Correct:
+
+```yaml
+with:
+  name: model-report
+  path: artifacts/
+```
+
+---
+
+## Mistake 4 — Uploading before training
+
+Incorrect ordering:
+
+```yaml
+- name: Upload training artifacts
+  uses: actions/upload-artifact@v3
+  with:
+    name: model-report
+    path: artifacts/
+
+- name: Train
+  run: python3 -m src.train
+```
+
+The upload happens before the files are generated.
+
+Correct ordering:
+
+```text
+Train
+Plot
+Upload
+```
+
+---
+
+## Mistake 5 — Typing the wrong directory
+
+Incorrect:
+
+```yaml
+path: artifact/
+```
+
+The task uses:
+
+```text
+artifacts/
+```
+
+Correct:
+
+```yaml
+path: artifacts/
+```
+
+---
+
+## Mistake 6 — Changing unrelated jobs
+
+The task only requires adding the upload functionality to the `report` job.
+
+There is no need to modify:
+
+```text
+lint
+```
+
+or:
+
+```text
+test
+```
+
+unless an unrelated CI failure requires investigation.
+
+Avoid unnecessary changes because they make the PR harder to review and can introduce new failures.
+
+---
+
+## Mistake 7 — Forgetting to push
+
+Editing the local file is not enough.
+
+The CI server runs the repository version.
+
+The change must be committed and pushed:
+
+```bash
+git add .gitea/workflows/ci.yml
+git commit -m "Publish training artifacts from CI"
+git push origin add-artifact-upload
+```
+
+---
+
+## Mistake 8 — Not checking the final artifact
+
+A workflow can be syntactically valid but still fail to produce the expected artifact.
+
+Always verify:
+
+```text
+artifact exists
+artifact name is correct
+metrics.json exists
+confusion_matrix.png exists
+PR status is success
+```
+
+---
+
+# Troubleshooting
+
+## Problem: Workflow YAML fails
+
+Check indentation carefully.
+
+For example:
+
+```yaml
+      - name: Upload training artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: model-report
+          path: artifacts/
+```
+
+The `uses` and `with` keys must belong to the step.
+
+---
+
+## Problem: Artifact upload fails
+
+First check that the directory exists.
+
+The workflow already contains:
+
+```yaml
+- name: List produced artefacts
+  run: ls -la artifacts/
+```
+
+If this step fails, the training or plotting process may not have generated the expected directory.
+
+---
+
+## Problem: `metrics.json` is missing
+
+Check the training step:
+
+```yaml
+- name: Train
+  run: python3 -m src.train
+```
+
+The task states that this writes:
+
+```text
+artifacts/metrics.json
+```
+
+If the file is missing, investigate the training command and its output before changing the upload step.
+
+---
+
+## Problem: `confusion_matrix.png` is missing
+
+Check:
+
+```yaml
+- name: Plot confusion matrix
+  run: python3 -m src.plot
+```
+
+The task states that this writes:
+
+```text
+artifacts/confusion_matrix.png
+```
+
+If it is absent, investigate the plotting step.
+
+---
+
+## Problem: Artifact exists but has the wrong name
+
+Check:
+
+```yaml
+with:
+  name: model-report
+```
+
+The artifact name must be exactly:
+
+```text
+model-report
+```
+
+---
+
+## Problem: PR status is not successful
+
+Inspect all jobs:
+
+```text
+lint
+test
+report
+```
+
+The artifact change should not be assumed to be the cause of every CI failure.
+
+The task's final requirement is the PR head's combined status:
+
+```text
+success
+```
+
+---
+
+# Real-World Use Cases
+
+## ML Metrics
+
+A training workflow can upload:
+
+```text
+metrics.json
+```
+
+containing values such as model evaluation metrics.
+
+This lets reviewers inspect the results of a training run.
+
+---
+
+## Confusion Matrix
+
+The generated:
+
+```text
+confusion_matrix.png
+```
+
+can provide a visual representation of classification performance.
+
+Reviewers can download and inspect it without reproducing the entire training process.
+
+---
+
+## Model Output
+
+The workflow also produces:
+
+```text
+model.joblib
+```
+
+This is a serialized model file.
+
+In a production ML pipeline, artifacts like this can become inputs to later stages such as:
+
+```text
+validation
+    ↓
+approval
+    ↓
+model registry
+    ↓
+deployment
+```
+
+The task does not ask to perform those later steps, but artifact preservation provides a useful boundary between training and subsequent promotion.
+
+---
+
+# ML CI Pipeline Example
+
+A more complete production-style ML pipeline might look like:
+
+```text
+Code change
+    |
+    v
+Lint
+    |
+    v
+Tests
+    |
+    v
+Train model
+    |
+    v
+Evaluate model
+    |
+    +----> metrics.json
+    |
+    +----> confusion_matrix.png
+    |
+    +----> model.joblib
+    |
+    v
+Upload artifact
+    |
+    v
+Human review
+    |
+    v
+Model approval
+    |
+    v
+Model registry
+```
+
+Day 79 focuses specifically on the artifact-upload stage.
+
+---
+
+# Requirements Checklist
+
+Use this checklist to confirm the task is complete.
+
+- [ ] `.gitea/workflows/ci.yml` was updated.
+- [ ] The `report` job contains an artifact-upload step.
+- [ ] The step uses `actions/upload-artifact@v3`.
+- [ ] The artifact name is `model-report`.
+- [ ] The artifact path is non-empty.
+- [ ] The path points to `artifacts/`.
+- [ ] The upload happens after training and plotting.
+- [ ] `metrics.json` is included.
+- [ ] `confusion_matrix.png` is included.
+- [ ] `model.joblib` is preserved with the rest of the `artifacts/` directory.
+- [ ] The change is committed.
+- [ ] The branch `add-artifact-upload` is pushed.
+- [ ] The CI workflow completes.
+- [ ] The `report` job succeeds.
+- [ ] The `model-report` artifact appears on the run.
+- [ ] The downloaded artifact is a ZIP.
+- [ ] The ZIP contains `metrics.json`.
+- [ ] The ZIP contains `confusion_matrix.png`.
+- [ ] The PR head's combined status is `success`.
+
+---
+
+# Quick Revision
+
+## Q1. What problem does `upload-artifact` solve?
+
+**Answer:** It preserves files generated by a CI job so they remain downloadable after the temporary runner workspace is destroyed.
+
+---
+
+## Q2. Which job needs to be changed?
+
+**Answer:** The `report` job in:
+
+```text
+.gitea/workflows/ci.yml
+```
+
+---
+
+## Q3. Which action is required?
+
+**Answer:**
+
+```yaml
+actions/upload-artifact@v3
+```
+
+---
+
+## Q4. Why use `@v3` instead of `@v4`?
+
+**Answer:** The task specifies that the Gitea runner rejects `@v4`.
+
+---
+
+## Q5. What artifact name is required?
+
+**Answer:**
+
+```text
+model-report
+```
+
+---
+
+## Q6. What path should be uploaded?
+
+**Answer:**
+
+```text
+artifacts/
+```
+
+---
+
+## Q7. Which files must be present?
+
+**Answer:**
+
+```text
+metrics.json
+confusion_matrix.png
+```
+
+The directory also contains:
+
+```text
+model.joblib
+```
+
+which is preserved by uploading the whole `artifacts/` directory.
+
+---
+
+## Q8. What does `ls -la artifacts/` do?
+
+**Answer:** It lists the files. It does not preserve them after the CI runner is destroyed.
+
+---
+
+## Q9. When should the upload step execute?
+
+**Answer:** After the training and plotting steps have generated the files.
+
+---
+
+## Q10. What is the required PR status?
+
+**Answer:**
+
+```text
+success
+```
+
+The PR head commit's combined status must be successful.
+
+---
+
+## Q11. What command commits the workflow change?
+
+**Answer:**
+
+```bash
+git commit -m "Publish training artifacts from CI"
+```
+
+---
+
+## Q12. What command pushes the branch?
+
+**Answer:**
+
+```bash
+git push origin add-artifact-upload
+```
+
+---
+
+# Final Configuration to Remember
+
+The most important addition is:
+
+```yaml
+      - name: Upload training artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: model-report
+          path: artifacts/
+```
+
+Remember the three critical values:
+
+```text
+Action  → actions/upload-artifact@v3
+Name    → model-report
+Path    → artifacts/
+```
+
+---
+
+# Final Summary
+
+Day 79 demonstrates how to preserve ML outputs generated during CI.
+
+The existing workflow already creates:
+
+```text
+artifacts/model.joblib
+artifacts/metrics.json
+artifacts/confusion_matrix.png
+```
+
+but simply listing them with:
+
+```bash
+ls -la artifacts/
+```
+
+does not preserve them.
+
+The solution is to add:
+
+```yaml
+- name: Upload training artifacts
+  uses: actions/upload-artifact@v3
+  with:
+    name: model-report
+    path: artifacts/
+```
+
+After the change, the workflow should:
+
+```text
+Train
+  ↓
+Generate metrics.json
+  ↓
+Generate confusion_matrix.png
+  ↓
+Generate model.joblib
+  ↓
+Upload artifacts/
+  ↓
+Create model-report
+  ↓
+Make outputs downloadable from the CI run
+```
+
+The final verification must confirm that the `model-report` artifact contains `metrics.json` and `confusion_matrix.png` by basename and that the PR head's combined status is `success`.
+
+# Final Task Status / Result
+
+**Required configuration change:** Add `actions/upload-artifact@v3` to the `report` job with:
+
+```yaml
+name: model-report
+path: artifacts/
+```
+
+**Required final CI result:** The `model-report` artifact is available from the run and contains `metrics.json` and `confusion_matrix.png`, while the PR head's combined status is `success`.
+
+**Important:** The task information provided did not include an actual completed CI run ID, artifact download result, commit ID, or final combined-status result. Therefore those values are not invented here and must be confirmed from the actual Gitea run after pushing the change.
+
 ---
 
