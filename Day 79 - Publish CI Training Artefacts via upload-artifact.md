@@ -86,3 +86,8 @@ model-report.zip
 The CI run now preserves the ML training outputs instead of losing them when the runner workspace is destroyed. Reviewers can download `model-report` directly from the Gitea Actions run page.
 
 ### Screenshots
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/a0d5e274-6da5-4652-bf2b-b05a00021209" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/decf6b31-8766-4007-bd99-c1ba0c68c932" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/5cb1c673-f044-4562-8cf2-3b6bd13f46ab" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/f6d6d49b-56fc-42c4-880c-e41dffce3420" />
+
