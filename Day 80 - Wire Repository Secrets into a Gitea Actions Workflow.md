@@ -284,18 +284,6 @@ success
 curl "http://localhost:5000/api/2.0/mlflow/registered-models/get?name=fraud-detector"
 ```
 
-## Final Checklist
-
-* [x] Repository secret `MLFLOW_TRACKING_URI` created.
-* [x] Repository secret `MLFLOW_TOKEN` created.
-* [x] `register` job references `${{ secrets.MLFLOW_TRACKING_URI }}`.
-* [x] `register` job references `${{ secrets.MLFLOW_TOKEN }}`.
-* [x] Workflow change committed to `add-registry-push`.
-* [x] Workflow change pushed to Gitea.
-* [ ] `register` job confirmed successful.
-* [ ] PR combined status confirmed as `success`.
-* [ ] MLflow `fraud-detector` confirmed with at least one version.
-
 ## Key Takeaway
 
 Repository secrets allow the workflow YAML to remain identical across environments while keeping environment-specific configuration outside the source code.
@@ -324,3 +312,21 @@ This same pattern can be used for other sensitive CI configuration such as:
 * Deployment API tokens
 
 Never commit the actual secret value to the repository.
+
+### Screenshots
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/ac3d313c-4d01-4c7b-b151-323df928dfed" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/8aeb3302-63cb-42a6-afad-bb28bc450223" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/a6d00cdc-6eac-4f47-ac03-39ba52bb1274" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/93c5a80f-a74a-4450-9437-768d1d1dcf05" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/edfd83ad-3183-4935-99e0-2397ba09f40c" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/1caaf482-f459-41f6-a1b2-6cdd472ce8fd" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/3c189329-de79-4089-88a7-9f8760fbfe47" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/c44da294-e410-443a-a321-1fffb9633ab0" />
+
+
+
+
+
+
+
+
