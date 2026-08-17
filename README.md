@@ -116,5 +116,5 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 79: Publish CI Training Artefacts via upload-artifact](./Day%2079%20-%20Publish%20CI%20Training%20Artefacts%20via%20upload-artifact.md)
 
-
+- [Day 80: Wire Repository Secrets into a Gitea Actions Workflow](./Day%2080%20-%20Wire%20Repository%20Secrets%20into%20a%20Gitea%20Actions%20Workflow.md)
 ---

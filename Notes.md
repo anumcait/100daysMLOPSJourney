@@ -30487,5 +30487,1510 @@ path: artifacts/
 
 **Important:** The task information provided did not include an actual completed CI run ID, artifact download result, commit ID, or final combined-status result. Therefore those values are not invented here and must be confirmed from the actual Gitea run after pushing the change.
 
+# Day 80 — Gitea Repository Secrets and MLflow Registration
+
+## 1. What Are We Learning Today?
+
+Today we are learning how to securely pass sensitive configuration values into a **Gitea Actions workflow** using **repository secrets**.
+
+The practical scenario is an ML platform pipeline where every pull request needs to:
+
+1. Run code quality checks.
+2. Run tests.
+3. Train a machine-learning model.
+4. Register the resulting model with MLflow.
+
+The important requirement is that the MLflow tracking URL and authentication token must **not be written directly into the workflow YAML file**.
+
+Instead, we store them as repository secrets and allow the workflow to access them through Gitea Actions.
+
+The core pattern is:
+
+```yaml
+env:
+  MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+  MLFLOW_TOKEN: ${{ secrets.MLFLOW_TOKEN }}
+```
+
+---
+
+# 2. Lab Scenario
+
+The repository is:
+
+```text
+gitea-admin/fraud-detector
+```
+
+The repository contains a workflow:
+
+```text
+.gitea/workflows/ci.yml
+```
+
+The workflow has three jobs:
+
+```text
+lint
+test
+register
+```
+
+The `register` job executes:
+
+```bash
+python3 -m src.register
+```
+
+The Python registration script expects two environment variables:
+
+```text
+MLFLOW_TRACKING_URI
+MLFLOW_TOKEN
+```
+
+Initially, these variables are missing.
+
+Therefore, the registration script exits with an error instead of registering the model.
+
+---
+
+# 3. Why Does the Registration Script Need Environment Variables?
+
+The Python script uses environment variables rather than hard-coded configuration.
+
+Conceptually, it does something similar to:
+
+```python
+import os
+
+tracking_uri = os.environ.get("MLFLOW_TRACKING_URI")
+token = os.environ.get("MLFLOW_TOKEN")
+
+if not tracking_uri or not token:
+    raise SystemExit("Missing MLflow configuration")
+```
+
+The purpose is to make the application independent of the environment.
+
+The same code can run against:
+
+```text
+Development MLflow
+Staging MLflow
+Production MLflow
+```
+
+without changing the source code.
+
+Only the configuration changes.
+
+This is an important DevOps principle:
+
+> Keep application/workflow code separate from environment-specific configuration.
+
+---
+
+# 4. What Is a Repository Secret?
+
+A repository secret is a value stored securely by the CI/CD platform.
+
+Instead of putting the secret directly in the workflow:
+
+```yaml
+MLFLOW_TOKEN: fraud-detector-ci-token
+```
+
+we store it in Gitea and reference it:
+
+```yaml
+MLFLOW_TOKEN: ${{ secrets.MLFLOW_TOKEN }}
+```
+
+The workflow contains the **name of the secret**, not the secret value.
+
+The secret is supplied by Gitea when the workflow executes.
+
+---
+
+# 5. Why Should We Not Hard-Code Secrets?
+
+Suppose we write this:
+
+```yaml
+env:
+  MLFLOW_TRACKING_URI: http://localhost:5000
+  MLFLOW_TOKEN: fraud-detector-ci-token
+```
+
+There are several problems.
+
+## Problem 1: The value becomes part of Git history
+
+Anyone with repository access may be able to inspect the commit.
+
+Even if the value is deleted later, it can remain in previous Git commits.
+
+## Problem 2: The workflow is no longer environment-independent
+
+A development workflow might use:
+
+```text
+http://dev-mlflow:5000
+```
+
+Staging might use:
+
+```text
+http://staging-mlflow:5000
+```
+
+Production might use:
+
+```text
+https://mlflow.example.com
+```
+
+Hard-coding values forces us to modify the workflow for each environment.
+
+## Problem 3: Secrets can accidentally leak
+
+Tokens, passwords, API keys, and credentials should never be casually committed to source control.
+
+---
+
+# 6. The Correct Pattern
+
+The secure pattern is:
+
+```yaml
+env:
+  MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+  MLFLOW_TOKEN: ${{ secrets.MLFLOW_TOKEN }}
+```
+
+The actual values are stored separately in Gitea.
+
+This gives us:
+
+```text
+Workflow YAML
+       |
+       | references
+       v
+Gitea Repository Secrets
+       |
+       | injects values
+       v
+register job
+       |
+       v
+src.register
+       |
+       v
+MLflow
+```
+
+---
+
+# 7. Understanding `${{ secrets.NAME }}`
+
+Gitea Actions supports expression syntax.
+
+For a repository secret named:
+
+```text
+MLFLOW_TOKEN
+```
+
+the workflow references it as:
+
+```yaml
+${{ secrets.MLFLOW_TOKEN }}
+```
+
+For:
+
+```text
+MLFLOW_TRACKING_URI
+```
+
+we use:
+
+```yaml
+${{ secrets.MLFLOW_TRACKING_URI }}
+```
+
+The important distinction is:
+
+```yaml
+MLFLOW_TOKEN: ${{ secrets.MLFLOW_TOKEN }}
+```
+
+is correct.
+
+This is incorrect:
+
+```yaml
+MLFLOW_TOKEN: fraud-detector-ci-token
+```
+
+because the second version exposes the actual secret value in the workflow.
+
+---
+
+# 8. Understanding the `env:` Block
+
+Environment variables can be defined at different levels.
+
+For example, they can be defined at the job level:
+
+```yaml
+jobs:
+  register:
+    runs-on: ubuntu-latest
+    env:
+      MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+      MLFLOW_TOKEN: ${{ secrets.MLFLOW_TOKEN }}
+```
+
+When `env` is placed at the job level, the variables are available to the steps in that job.
+
+This is useful because the `register` job contains:
+
+```yaml
+- name: Train and register
+  run: python3 -m src.register
+```
+
+The Python process receives:
+
+```text
+MLFLOW_TRACKING_URI
+MLFLOW_TOKEN
+```
+
+through its environment.
+
+---
+
+# 9. Job-Level vs Step-Level Environment Variables
+
+There are two common ways to provide the secrets.
+
+## Job-level
+
+```yaml
+register:
+  runs-on: ubuntu-latest
+  env:
+    MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+    MLFLOW_TOKEN: ${{ secrets.MLFLOW_TOKEN }}
+```
+
+This makes the variables available to all steps in the job.
+
+## Step-level
+
+Alternatively:
+
+```yaml
+- name: Train and register
+  env:
+    MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+    MLFLOW_TOKEN: ${{ secrets.MLFLOW_TOKEN }}
+  run: python3 -m src.register
+```
+
+This limits the variables to that particular step.
+
+For this lab, either job-level or step-level configuration satisfies the requirement.
+
+We used the **job-level** approach.
+
+---
+
+# 10. The Original Workflow
+
+The relevant original job looked like:
+
+```yaml
+register:
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
+
+    - name: Install registration deps
+      run: pip install --break-system-packages mlflow numpy scikit-learn joblib pandas
+
+    - name: Train and register
+      run: python3 -m src.register
+```
+
+Notice something important.
+
+There is no:
+
+```yaml
+env:
+```
+
+block.
+
+Therefore, unless the runner environment already contains the variables, the Python process cannot find:
+
+```text
+MLFLOW_TRACKING_URI
+MLFLOW_TOKEN
+```
+
+---
+
+# 11. The Corrected Workflow
+
+We add:
+
+```yaml
+env:
+  MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+  MLFLOW_TOKEN: ${{ secrets.MLFLOW_TOKEN }}
+```
+
+The final job becomes:
+
+```yaml
+register:
+  runs-on: ubuntu-latest
+  env:
+    MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+    MLFLOW_TOKEN: ${{ secrets.MLFLOW_TOKEN }}
+  steps:
+    - uses: actions/checkout@v4
+
+    - name: Install registration deps
+      run: pip install --break-system-packages mlflow numpy scikit-learn joblib pandas
+
+    - name: Train and register
+      run: python3 -m src.register
+```
+
+That is the key workflow modification for this lab.
+
+---
+
+# 12. What Secrets Do We Need?
+
+The lab requires exactly two repository secrets.
+
+## Secret 1
+
+Name:
+
+```text
+MLFLOW_TRACKING_URI
+```
+
+Value:
+
+```text
+http://localhost:5000
+```
+
+This tells MLflow where the tracking server is located.
+
+## Secret 2
+
+Name:
+
+```text
+MLFLOW_TOKEN
+```
+
+Value:
+
+```text
+fraud-detector-ci-token
+```
+
+The lab's MLflow server does not enforce authentication.
+
+However, the Python script checks that the variable exists and is non-empty.
+
+Therefore, the token can be any non-empty value for this lab.
+
+---
+
+# 13. Creating Repository Secrets in Gitea
+
+Navigate to:
+
+```text
+fraud-detector
+    -> Settings
+    -> Actions
+    -> Secrets
+```
+
+Create:
+
+```text
+Name: MLFLOW_TRACKING_URI
+Value: http://localhost:5000
+```
+
+Then create:
+
+```text
+Name: MLFLOW_TOKEN
+Value: fraud-detector-ci-token
+```
+
+After creating them, Gitea should display the names.
+
+The secret values themselves should not be exposed.
+
+---
+
+# 14. Why Do We Verify the API?
+
+The lab explicitly requires:
+
+```text
+GET /api/v1/repos/gitea-admin/fraud-detector/actions/secrets
+```
+
+to list both secrets.
+
+We can verify this from the terminal:
+
+```bash
+curl -u gitea-admin:gitea2026 \
+  http://localhost:3000/api/v1/repos/gitea-admin/fraud-detector/actions/secrets
+```
+
+The response should contain:
+
+```json
+[
+  {
+    "name": "MLFLOW_TRACKING_URI",
+    "created_at": "..."
+  },
+  {
+    "name": "MLFLOW_TOKEN",
+    "created_at": "..."
+  }
+]
+```
+
+The important information is:
+
+```text
+MLFLOW_TRACKING_URI
+MLFLOW_TOKEN
+```
+
+The API does not return the secret values.
+
+This is desirable from a security perspective.
+
+---
+
+# 15. Understanding the Git Branch
+
+The lab provides a working clone:
+
+```text
+/root/code/fraud-detector
+```
+
+The PR branch is:
+
+```text
+add-registry-push
+```
+
+We must make the workflow change on this branch.
+
+First:
+
+```bash
+cd /root/code/fraud-detector
+```
+
+Then:
+
+```bash
+git checkout add-registry-push
+```
+
+Check:
+
+```bash
+git status
+```
+
+---
+
+# 16. Reviewing the Workflow Change
+
+Before committing, use:
+
+```bash
+git diff -- .gitea/workflows/ci.yml
+```
+
+We should see the new environment variables.
+
+For example:
+
+```diff
+ register:
+   runs-on: ubuntu-latest
++  env:
++    MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
++    MLFLOW_TOKEN: ${{ secrets.MLFLOW_TOKEN }}
+   steps:
+```
+
+This is a good practice.
+
+Always review a change before committing it.
+
+---
+
+# 17. Committing the Workflow
+
+Stage the file:
+
+```bash
+git add .gitea/workflows/ci.yml
+```
+
+Commit:
+
+```bash
+git commit -m "Wire MLflow secrets into register job"
+```
+
+Push:
+
+```bash
+git push origin add-registry-push
+```
+
+In this lab, the resulting commit was:
+
+```text
+0a66a366caed1b3ef17f95ac0f421cf455c21133
+```
+
+---
+
+# 18. Why Does Pushing Trigger Actions?
+
+The workflow contains:
+
+```yaml
+on:
+  pull_request:
+    branches: [main]
+
+  push:
+    branches: [main]
+```
+
+The PR is associated with the `main` target branch.
+
+Gitea Actions runs the workflow for the pull request event.
+
+After the workflow modification is pushed, a new workflow run is created.
+
+The lab produced Actions run:
+
+```text
+#4
+```
+
+---
+
+# 19. Understanding the Three Jobs
+
+The workflow has three jobs.
+
+## Job 1: lint
+
+It installs Ruff:
+
+```bash
+pip install --break-system-packages ruff
+```
+
+Then runs:
+
+```bash
+ruff check src tests
+```
+
+Its purpose is to identify code-quality problems.
+
+## Job 2: test
+
+It installs:
+
+```text
+pytest
+pandas
+numpy
+scikit-learn
+joblib
+```
+
+Then runs:
+
+```bash
+python3 -m pytest tests -v
+```
+
+Its purpose is to verify the application's behavior.
+
+## Job 3: register
+
+It installs MLflow and the ML runtime dependencies:
+
+```bash
+pip install --break-system-packages \
+  mlflow \
+  numpy \
+  scikit-learn \
+  joblib \
+  pandas
+```
+
+Then runs:
+
+```bash
+python3 -m src.register
+```
+
+This is the job that needs the repository secrets.
+
+---
+
+# 20. What Happens Inside the Register Job?
+
+The flow is:
+
+```text
+Gitea Actions
+     |
+     | inject secrets
+     v
+Environment variables
+     |
+     +-- MLFLOW_TRACKING_URI
+     |
+     +-- MLFLOW_TOKEN
+     |
+     v
+python3 -m src.register
+     |
+     v
+MLflow tracking server
+     |
+     v
+Model registration
+```
+
+The Python application reads:
+
+```text
+MLFLOW_TRACKING_URI
+MLFLOW_TOKEN
+```
+
+from the process environment.
+
+It can then communicate with MLflow and register the trained model.
+
+---
+
+# 21. Why Is the MLflow URL a Secret?
+
+Technically, a URL such as:
+
+```text
+http://localhost:5000
+```
+
+may not itself be sensitive.
+
+However, the lab intentionally stores it as a repository secret because the goal is to demonstrate a general configuration pattern.
+
+In real systems, tracking URLs may contain internal infrastructure details.
+
+More importantly, the same pattern allows us to keep related environment-specific configuration outside the workflow.
+
+The important security-sensitive value in this example is the token.
+
+---
+
+# 22. Why Is the Token a Secret?
+
+Tokens can grant access to external systems.
+
+Examples include:
+
+```text
+PyPI tokens
+AWS access keys
+Cloud API tokens
+Kubernetes credentials
+Container registry passwords
+Deployment tokens
+```
+
+If these values are committed to Git, they may be exposed to anyone who can read the repository or its history.
+
+Therefore:
+
+```text
+Secret value -> CI/CD secret store
+Workflow -> reference to secret
+```
+
+is the preferred design.
+
+---
+
+# 23. How Secret Injection Works Conceptually
+
+Suppose Gitea stores:
+
+```text
+MLFLOW_TOKEN = fraud-detector-ci-token
+```
+
+The workflow contains:
+
+```yaml
+MLFLOW_TOKEN: ${{ secrets.MLFLOW_TOKEN }}
+```
+
+When the workflow runs, Gitea resolves the expression and makes the value available to the job environment.
+
+The application effectively sees:
+
+```text
+MLFLOW_TOKEN=fraud-detector-ci-token
+```
+
+But the actual value does not need to appear in the committed workflow file.
+
+---
+
+# 24. Important Security Rule
+
+Never do this:
+
+```yaml
+env:
+  MLFLOW_TOKEN: fraud-detector-ci-token
+```
+
+Do this:
+
+```yaml
+env:
+  MLFLOW_TOKEN: ${{ secrets.MLFLOW_TOKEN }}
+```
+
+The same principle applies to passwords, API keys, access tokens, and credentials.
+
+---
+
+# 25. Verifying the Actions Run
+
+Open:
+
+```text
+fraud-detector
+    -> Actions
+```
+
+Find the latest workflow run.
+
+The run should contain:
+
+```text
+lint
+test
+register
+```
+
+Each job should eventually complete successfully.
+
+The most important job is:
+
+```text
+register
+```
+
+because it was previously failing due to missing environment variables.
+
+---
+
+# 26. What If `register` Fails?
+
+If `register` fails, open the job and inspect its logs.
+
+Common possibilities include:
+
+### Missing secret
+
+If the environment variable is empty or unavailable, the registration script can report a missing configuration error.
+
+Check:
+
+```yaml
+env:
+  MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+  MLFLOW_TOKEN: ${{ secrets.MLFLOW_TOKEN }}
+```
+
+### Wrong secret name
+
+These names must match exactly:
+
+```text
+MLFLOW_TRACKING_URI
+MLFLOW_TOKEN
+```
+
+For example, this would be wrong:
+
+```text
+MLFLOW_TRACKING_URL
+```
+
+because the Python script expects:
+
+```text
+MLFLOW_TRACKING_URI
+```
+
+### Secret created at the wrong scope
+
+The lab requires **repository secrets**.
+
+Make sure the secrets were created under:
+
+```text
+Repository Settings
+    -> Actions
+    -> Secrets
+```
+
+---
+
+# 27. Verifying the PR Status
+
+The lab requires the PR head commit's combined status to be:
+
+```text
+success
+```
+
+The commit used in this run was:
+
+```text
+0a66a366caed1b3ef17f95ac0f421cf455c21133
+```
+
+The Gitea API can be queried:
+
+```bash
+curl -u gitea-admin:gitea2026 \
+  "http://localhost:3000/api/v1/repos/gitea-admin/fraud-detector/commits/0a66a366caed1b3ef17f95ac0f421cf455c21133/status"
+```
+
+A successful result should indicate:
+
+```text
+success
+```
+
+---
+
+# 28. Verifying MLflow
+
+The second major part of the lab is proving that the workflow actually registered the model.
+
+Open the MLflow UI and find:
+
+```text
+fraud-detector
+```
+
+The model must have at least one version.
+
+Conceptually:
+
+```text
+Registered Model
+    fraud-detector
+
+Versions
+    Version 1
+```
+
+This proves that the `register` job did more than simply start successfully.
+
+It actually communicated with MLflow and registered a model.
+
+---
+
+# 29. MLflow Registered Model vs MLflow Run
+
+These are related but different concepts.
+
+An **MLflow run** records an individual training execution.
+
+For example:
+
+```text
+Run
+  parameters
+  metrics
+  artifacts
+  model
+```
+
+A **registered model** is the managed model name and its versions.
+
+For this lab, the required registered model is:
+
+```text
+fraud-detector
+```
+
+with:
+
+```text
+at least one version
+```
+
+So we need to verify the registered model, not merely that a training run occurred.
+
+---
+
+# 30. Why Does the Workflow Register on PRs?
+
+The requirement is that every PR logs a training run and registers the resulting model.
+
+This gives the ML platform team an automated CI process.
+
+A PR can therefore trigger:
+
+```text
+Code change
+    |
+    v
+Lint
+    |
+    v
+Tests
+    |
+    v
+Training
+    |
+    v
+MLflow tracking
+    |
+    v
+Model registration
+```
+
+This provides repeatability and automation.
+
+---
+
+# 31. Repository Secrets vs Environment Variables
+
+These concepts should not be confused.
+
+## Repository secret
+
+Stored securely by Gitea:
+
+```text
+MLFLOW_TOKEN
+```
+
+## Environment variable
+
+Available to a running process:
+
+```text
+MLFLOW_TOKEN=...
+```
+
+The workflow connects the two:
+
+```yaml
+env:
+  MLFLOW_TOKEN: ${{ secrets.MLFLOW_TOKEN }}
+```
+
+So the chain is:
+
+```text
+Gitea secret
+      |
+      v
+Workflow expression
+      |
+      v
+Environment variable
+      |
+      v
+Python process
+```
+
+---
+
+# 32. Repository Secret vs Git Variable
+
+A normal configuration variable may be appropriate for non-sensitive values.
+
+Secrets are intended for sensitive values.
+
+For example:
+
+```text
+Secret:
+MLFLOW_TOKEN
+```
+
+is appropriate.
+
+A non-sensitive setting could potentially be represented as a normal variable, depending on the CI platform and workflow design.
+
+The lab deliberately uses repository secrets for both values to teach a consistent secure configuration pattern.
+
+---
+
+# 33. Why Keep Configuration Outside the Workflow?
+
+Consider three environments:
+
+```text
+Development
+Staging
+Production
+```
+
+The workflow can remain:
+
+```yaml
+env:
+  MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+  MLFLOW_TOKEN: ${{ secrets.MLFLOW_TOKEN }}
+```
+
+But the secret values can differ by environment.
+
+Conceptually:
+
+```text
+Development
+  MLFLOW_TRACKING_URI -> dev MLflow
+
+Staging
+  MLFLOW_TRACKING_URI -> staging MLflow
+
+Production
+  MLFLOW_TRACKING_URI -> production MLflow
+```
+
+The application and workflow code remain unchanged.
+
+This is one of the major benefits of externalized configuration.
+
+---
+
+# 34. Extending This Pattern
+
+The exact same approach can be used for other CI/CD credentials.
+
+## PyPI
+
+```yaml
+env:
+  PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+```
+
+## AWS/S3
+
+```yaml
+env:
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+```
+
+## Kubernetes
+
+A Kubernetes credential or kubeconfig can be stored as a secret and supplied to a deployment workflow.
+
+## Container Registry
+
+```yaml
+env:
+  REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+```
+
+The principle remains the same:
+
+```text
+Do not commit credentials.
+Store credentials securely.
+Reference credentials from the workflow.
+```
+
+---
+
+# 35. Common Mistakes
+
+## Mistake 1: Putting the value directly in YAML
+
+Bad:
+
+```yaml
+MLFLOW_TOKEN: fraud-detector-ci-token
+```
+
+Correct:
+
+```yaml
+MLFLOW_TOKEN: ${{ secrets.MLFLOW_TOKEN }}
+```
+
+---
+
+## Mistake 2: Typing the secret name incorrectly
+
+Bad:
+
+```yaml
+MLFLOW_TOKEN: ${{ secrets.ML_FLOW_TOKEN }}
+```
+
+Correct:
+
+```yaml
+MLFLOW_TOKEN: ${{ secrets.MLFLOW_TOKEN }}
+```
+
+Secret names must match.
+
+---
+
+## Mistake 3: Using the wrong environment variable
+
+The Python script expects:
+
+```text
+MLFLOW_TRACKING_URI
+```
+
+Not:
+
+```text
+MLFLOW_URL
+```
+
+Not:
+
+```text
+MLFLOW_TRACKING_URL
+```
+
+The environment variable name must match what the application reads.
+
+---
+
+## Mistake 4: Creating the secret in the wrong place
+
+The lab requires repository secrets under:
+
+```text
+Settings
+    -> Actions
+    -> Secrets
+```
+
+---
+
+## Mistake 5: Forgetting to push the branch
+
+A local commit is not enough.
+
+You need:
+
+```bash
+git push origin add-registry-push
+```
+
+for Gitea to receive the workflow modification.
+
+---
+
+## Mistake 6: Checking only lint
+
+A successful lint job does not prove MLflow registration worked.
+
+We specifically need:
+
+```text
+register = Success
+```
+
+and:
+
+```text
+fraud-detector = registered model
+```
+
+with at least one version.
+
+---
+
+# 36. Useful Git Commands
+
+Check the current branch:
+
+```bash
+git branch --show-current
+```
+
+Expected:
+
+```text
+add-registry-push
+```
+
+Check working tree:
+
+```bash
+git status
+```
+
+Review changes:
+
+```bash
+git diff
+```
+
+Stage:
+
+```bash
+git add .gitea/workflows/ci.yml
+```
+
+Commit:
+
+```bash
+git commit -m "Wire MLflow secrets into register job"
+```
+
+Push:
+
+```bash
+git push origin add-registry-push
+```
+
+View recent commits:
+
+```bash
+git log --oneline -5
+```
+
+---
+
+# 37. Useful Gitea API Commands
+
+## List repository secrets
+
+```bash
+curl -u gitea-admin:gitea2026 \
+  http://localhost:3000/api/v1/repos/gitea-admin/fraud-detector/actions/secrets
+```
+
+Expected secret names:
+
+```text
+MLFLOW_TRACKING_URI
+MLFLOW_TOKEN
+```
+
+## Inspect workflow jobs
+
+For Actions run `4`:
+
+```bash
+curl -u gitea-admin:gitea2026 \
+  http://localhost:3000/api/v1/repos/gitea-admin/fraud-detector/actions/runs/4/jobs
+```
+
+This can help determine whether:
+
+```text
+lint
+test
+register
+```
+
+succeeded or failed.
+
+## Check the commit status
+
+```bash
+curl -u gitea-admin:gitea2026 \
+  "http://localhost:3000/api/v1/repos/gitea-admin/fraud-detector/commits/0a66a366caed1b3ef17f95ac0f421cf455c21133/status"
+```
+
+The target state is:
+
+```text
+success
+```
+
+---
+
+# 38. What We Have Accomplished
+
+The workflow now has:
+
+```yaml
+env:
+  MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+  MLFLOW_TOKEN: ${{ secrets.MLFLOW_TOKEN }}
+```
+
+Gitea now contains:
+
+```text
+MLFLOW_TRACKING_URI
+MLFLOW_TOKEN
+```
+
+The workflow has been committed and pushed.
+
+The relevant commit is:
+
+```text
+0a66a366caed1b3ef17f95ac0f421cf455c21133
+```
+
+The Actions workflow run is:
+
+```text
+#4
+```
+
+The remaining verification is to confirm:
+
+```text
+register -> Success
+PR combined status -> success
+MLflow -> fraud-detector with >= 1 version
+```
+
+---
+
+# 39. Final Architecture
+
+The complete solution looks like this:
+
+```text
+                     Gitea
+                       |
+                       |
+             Repository Secrets
+                       |
+             +---------+---------+
+             |                   |
+             v                   v
+   MLFLOW_TRACKING_URI      MLFLOW_TOKEN
+             |                   |
+             +---------+---------+
+                       |
+                       v
+                Gitea Actions
+                       |
+                       v
+                 register job
+                       |
+                       v
+             python3 -m src.register
+                       |
+                       v
+                 MLflow Server
+                       |
+                       v
+              fraud-detector model
+                       |
+                       v
+                  Model Version
+```
+
+---
+
+# 40. The Core DevOps Lesson
+
+The most important lesson from this exercise is **separation of code and configuration**.
+
+The workflow should describe **what to do**:
+
+```yaml
+run: python3 -m src.register
+```
+
+The repository secret store should contain **environment-specific or sensitive values**:
+
+```text
+MLFLOW_TRACKING_URI
+MLFLOW_TOKEN
+```
+
+The workflow connects them:
+
+```yaml
+env:
+  MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+  MLFLOW_TOKEN: ${{ secrets.MLFLOW_TOKEN }}
+```
+
+This makes the workflow reusable, safer, and easier to manage.
+
+The same principle applies when introducing:
+
+```text
+PyPI tokens
+S3 credentials
+Cloud credentials
+Kubernetes credentials
+Container registry credentials
+Deployment API tokens
+```
+
+The value belongs in the secret store.
+
+The reference belongs in the workflow.
+
+The actual credential should never be committed to Git.
+
+
+
 ---
 
