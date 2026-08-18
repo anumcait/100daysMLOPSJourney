@@ -31990,6 +31990,1905 @@ The reference belongs in the workflow.
 
 The actual credential should never be committed to Git.
 
+# Day 81: Tag a Release and Publish to the Gitea Package Registry
+
+## 1. Introduction
+
+Today we are working with **Gitea Actions**, Git tags, releases, Docker images, and the Gitea Container/Package Registry.
+
+The main goal is to understand how a source-code release can become a complete, reproducible release artifact.
+
+For this task, the `fraud-detector` project needs every release to contain:
+
+1. A Git release tag.
+2. The exact commit associated with that tag.
+3. A Docker image built from that commit.
+4. The Docker image pushed to Gitea's integrated container registry.
+5. A `metrics.json` file describing the model's performance.
+6. The `metrics.json` file attached to the Gitea release.
+
+The important idea is:
+
+> A release should provide everything needed to identify exactly what was released and what is running in production.
+
+Instead of having the source code, Docker image, model metrics, and commit information scattered across different places, the Gitea release becomes the single source of truth.
+
+---
+
+# 2. Project Environment
+
+The repository used in this task is:
+
+```text
+gitea-admin/fraud-detector
+```
+
+The local working copy is:
+
+```text
+/root/code/fraud-detector
+```
+
+The Gitea server is running on port:
+
+```text
+3000
+```
+
+The repository is:
+
+```text
+http://localhost:3000/gitea-admin/fraud-detector
+```
+
+The main branch is:
+
+```text
+main
+```
+
+The release we need to create is:
+
+```text
+v0.1.0
+```
+
+---
+
+# 3. What Is Gitea?
+
+Gitea is a lightweight Git hosting platform.
+
+It provides functionality similar to platforms such as GitHub and GitLab.
+
+Gitea can provide:
+
+* Git repositories
+* Branches
+* Commits
+* Tags
+* Releases
+* Pull requests
+* Actions/workflows
+* Package registries
+* Container image storage
+
+In this task, we are particularly interested in three Gitea features:
+
+```text
+Git Tags
+     ↓
+Releases
+     ↓
+Packages / Container Registry
+```
+
+The Actions workflow connects these features together.
+
+---
+
+# 4. What Is a Git Tag?
+
+A Git tag is a human-readable name attached to a particular Git object, usually a commit.
+
+For example:
+
+```text
+v0.1.0
+```
+
+might point to:
+
+```text
+ef9288b
+```
+
+This means that instead of asking someone to remember a commit SHA such as:
+
+```text
+ef9288b
+```
+
+we can refer to the release as:
+
+```text
+v0.1.0
+```
+
+Tags are especially useful for releases because they give important commits a stable, human-readable name.
+
+For example:
+
+```text
+main
+  |
+  |---- commit A
+  |
+  |---- commit B
+  |
+  |---- commit C ← v0.1.0
+```
+
+The tag tells us exactly which commit represents version `v0.1.0`.
+
+---
+
+# 5. Why Are Tags Important for Releases?
+
+Suppose the `main` branch continues changing:
+
+```text
+A → B → C → D → E → F
+```
+
+If production is running commit `C`, saying:
+
+```text
+production is running main
+```
+
+is not precise.
+
+`main` can move.
+
+Instead, we create:
+
+```text
+v0.1.0 → C
+```
+
+Now `v0.1.0` identifies a specific point in Git history.
+
+This makes the release reproducible.
+
+---
+
+# 6. What Is a Gitea Release?
+
+A release is a higher-level object associated with a Git tag.
+
+A release normally contains information such as:
+
+* Release title
+* Tag name
+* Target commit/branch
+* Release notes
+* Downloadable assets
+
+For this task, the release must contain:
+
+```text
+v0.1.0
+metrics.json
+```
+
+The Docker image is stored separately in Gitea's package registry, but the release workflow creates it as part of the same release process.
+
+---
+
+# 7. What Is a Container Registry?
+
+A container registry is a server used to store Docker/OCI images.
+
+Docker images are normally identified using a structure such as:
+
+```text
+registry/image:tag
+```
+
+For example:
+
+```text
+docker.io/library/nginx:latest
+```
+
+Here:
+
+```text
+docker.io
+```
+
+is the registry.
+
+```text
+library/nginx
+```
+
+is the image.
+
+```text
+latest
+```
+
+is the tag.
+
+In our task, Gitea itself acts as the registry.
+
+---
+
+# 8. Gitea Container Registry
+
+The workflow defines:
+
+```yaml
+env:
+  REGISTRY: localhost:3000
+  IMAGE: gitea-admin/fraud-detector
+```
+
+Therefore, the full image reference becomes:
+
+```text
+localhost:3000/gitea-admin/fraud-detector:v0.1.0
+```
+
+Breaking this down:
+
+```text
+localhost:3000
+        ↓
+Gitea container registry
+
+gitea-admin/fraud-detector
+        ↓
+Image repository
+
+v0.1.0
+        ↓
+Image version
+```
+
+This is the image that CI needs to build and push.
+
+---
+
+# 9. Understanding the Release Workflow
+
+The workflow is located at:
+
+```text
+.gitea/workflows/release.yml
+```
+
+The workflow starts with:
+
+```yaml
+name: Release
+```
+
+This gives the workflow the name:
+
+```text
+Release
+```
+
+---
+
+# 10. Understanding the Trigger
+
+The workflow contains:
+
+```yaml
+on:
+  push:
+    tags:
+      - 'v*'
+```
+
+This is extremely important.
+
+It means:
+
+> Run this workflow whenever a Git tag beginning with `v` is pushed.
+
+Examples that match:
+
+```text
+v0.1.0
+v1.0.0
+v2.5.3
+```
+
+Examples that do not match:
+
+```text
+release-1.0
+version-1
+test
+```
+
+The release workflow is therefore tag-driven.
+
+---
+
+# 11. Why the Workflow Is Tag-Driven
+
+The purpose of this workflow is to create a release artifact.
+
+A normal push to `main` should run the regular CI jobs:
+
+```text
+lint
+test
+```
+
+But a release should additionally:
+
+```text
+build image
+    ↓
+push image
+    ↓
+generate metrics
+    ↓
+attach metrics
+```
+
+Therefore, the release workflow waits for a release tag.
+
+For this task:
+
+```text
+v0.1.0
+```
+
+creates the trigger.
+
+---
+
+# 12. Understanding the Job
+
+The workflow contains:
+
+```yaml
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+```
+
+The job is named:
+
+```text
+build-and-publish
+```
+
+It runs on:
+
+```text
+ubuntu-latest
+```
+
+The job performs all release-related operations.
+
+---
+
+# 13. Environment Variables
+
+The workflow defines:
+
+```yaml
+env:
+  REGISTRY: localhost:3000
+  IMAGE: gitea-admin/fraud-detector
+```
+
+These values are available to commands executed by the job.
+
+`REGISTRY` identifies the registry:
+
+```text
+localhost:3000
+```
+
+`IMAGE` identifies the image repository:
+
+```text
+gitea-admin/fraud-detector
+```
+
+Combining them:
+
+```text
+$REGISTRY/$IMAGE
+```
+
+becomes:
+
+```text
+localhost:3000/gitea-admin/fraud-detector
+```
+
+---
+
+# 14. Checkout Step
+
+The workflow uses:
+
+```yaml
+- uses: actions/checkout@v4
+```
+
+This checks out the repository source code into the Actions runner.
+
+Without checkout, the runner would not have the project files.
+
+The Docker build requires the repository's Dockerfile and source code.
+
+Therefore:
+
+```text
+checkout
+   ↓
+source code available
+   ↓
+docker build
+```
+
+---
+
+# 15. Resolving the Version from the Tag
+
+The workflow contains:
+
+```yaml
+- name: Resolve version from tag
+  id: version
+  run: echo "VERSION=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+```
+
+This step gets the name of the Git reference that triggered the workflow.
+
+For a release tag:
+
+```text
+v0.1.0
+```
+
+the value of:
+
+```text
+GITHUB_REF_NAME
+```
+
+is:
+
+```text
+v0.1.0
+```
+
+The command writes:
+
+```text
+VERSION=v0.1.0
+```
+
+to the step output.
+
+The step has an ID:
+
+```text
+version
+```
+
+Therefore later steps can access the output using:
+
+```text
+${{ steps.version.outputs.VERSION }}
+```
+
+---
+
+# 16. Actions Expressions vs Shell Variables
+
+This is one of the most important lessons from this task.
+
+The workflow creates a step output:
+
+```text
+steps.version.outputs.VERSION
+```
+
+This is an Actions expression.
+
+It is referenced as:
+
+```text
+${{ steps.version.outputs.VERSION }}
+```
+
+It is NOT automatically available as:
+
+```text
+$VERSION
+```
+
+unless we explicitly put it into the environment.
+
+The original implementation incorrectly used:
+
+```bash
+"$IMAGE:$VERSION"
+```
+
+The correct implementation uses:
+
+```bash
+"$REGISTRY/$IMAGE:${{ steps.version.outputs.VERSION }}"
+```
+
+This distinction is very important in GitHub/Gitea Actions.
+
+---
+
+# 17. Logging into the Container Registry
+
+The workflow contains:
+
+```yaml
+- name: Log in to Gitea container registry
+  run: |
+    echo "${{ secrets.REGISTRY_TOKEN }}" | \
+      docker login "$REGISTRY" -u gitea-admin --password-stdin
+```
+
+This authenticates Docker against Gitea.
+
+The password/token comes from:
+
+```text
+secrets.REGISTRY_TOKEN
+```
+
+Secrets should not be hard-coded into workflow files.
+
+The token is passed to:
+
+```text
+docker login
+```
+
+using:
+
+```text
+--password-stdin
+```
+
+This is safer than placing the password directly on the command line.
+
+---
+
+# 18. Why Authentication Is Needed
+
+The workflow needs to push an image into Gitea.
+
+Pushing requires authentication.
+
+The process is:
+
+```text
+REGISTRY_TOKEN
+      ↓
+docker login
+      ↓
+authenticated Docker client
+      ↓
+docker push
+      ↓
+Gitea package registry
+```
+
+Without successful login, the push would fail.
+
+---
+
+# 19. Building the Docker Image
+
+The Docker build step is:
+
+```yaml
+- name: Build image
+  run: docker build -t "$REGISTRY/$IMAGE:${{ steps.version.outputs.VERSION }}" .
+```
+
+Let's break this down.
+
+The command is:
+
+```bash
+docker build
+```
+
+This builds an image from the Dockerfile.
+
+The:
+
+```text
+-t
+```
+
+option assigns a tag to the image.
+
+The image name is:
+
+```text
+$REGISTRY/$IMAGE:${{ steps.version.outputs.VERSION }}
+```
+
+For `v0.1.0`, this becomes:
+
+```text
+localhost:3000/gitea-admin/fraud-detector:v0.1.0
+```
+
+The final:
+
+```text
+.
+```
+
+means:
+
+> Use the current directory as the Docker build context.
+
+---
+
+# 20. Why the Registry Must Be Included
+
+An important mistake would be:
+
+```bash
+docker build -t "$IMAGE:$VERSION" .
+```
+
+This does not create the intended registry-qualified image.
+
+The task specifically requires:
+
+```text
+$REGISTRY/$IMAGE:<version>
+```
+
+Therefore the correct format is:
+
+```bash
+docker build \
+  -t "$REGISTRY/$IMAGE:${{ steps.version.outputs.VERSION }}" \
+  .
+```
+
+For `v0.1.0`:
+
+```text
+localhost:3000/gitea-admin/fraud-detector:v0.1.0
+```
+
+---
+
+# 21. Docker Image Naming
+
+The image follows:
+
+```text
+REGISTRY / IMAGE : VERSION
+```
+
+In this task:
+
+```text
+localhost:3000
+/
+gitea-admin/fraud-detector
+:
+v0.1.0
+```
+
+Therefore:
+
+```text
+localhost:3000/gitea-admin/fraud-detector:v0.1.0
+```
+
+is the final image reference.
+
+---
+
+# 22. Pushing the Image
+
+The next step is:
+
+```yaml
+- name: Push image to Gitea registry
+  run: docker push "$REGISTRY/$IMAGE:${{ steps.version.outputs.VERSION }}"
+```
+
+This sends the image to Gitea.
+
+For `v0.1.0`, Docker pushes:
+
+```text
+localhost:3000/gitea-admin/fraud-detector:v0.1.0
+```
+
+The important point is that the image is pushed by CI.
+
+We do NOT manually build and upload the image.
+
+The workflow performs the operation automatically.
+
+---
+
+# 23. Build vs Push
+
+These are two separate Docker operations.
+
+### Build
+
+```text
+docker build
+```
+
+creates the image locally on the Actions runner.
+
+### Push
+
+```text
+docker push
+```
+
+uploads that image to the registry.
+
+The flow is:
+
+```text
+Dockerfile
+    ↓
+docker build
+    ↓
+local image
+    ↓
+docker push
+    ↓
+Gitea container registry
+```
+
+---
+
+# 24. Training the Model
+
+After the Docker image is pushed, the workflow runs:
+
+```yaml
+- name: Train model + emit metrics.json
+  run: |
+    pip install --break-system-packages numpy scikit-learn joblib
+    python3 -m src.train
+```
+
+The required Python packages are installed:
+
+```text
+numpy
+scikit-learn
+joblib
+```
+
+Then the training module is executed:
+
+```text
+python3 -m src.train
+```
+
+The training process produces:
+
+```text
+artifacts/metrics.json
+```
+
+---
+
+# 25. What Is `metrics.json`?
+
+`metrics.json` contains information about the trained model's performance.
+
+The exact contents depend on the project, but conceptually it can contain information such as:
+
+```json
+{
+  "accuracy": 0.95,
+  "precision": 0.94,
+  "recall": 0.93
+}
+```
+
+The important point for this task is not the exact metrics.
+
+The important point is that the workflow generates:
+
+```text
+artifacts/metrics.json
+```
+
+as part of the release.
+
+---
+
+# 26. Attaching `metrics.json` to the Release
+
+The workflow contains:
+
+```yaml
+- name: Attach metrics.json to the release
+  uses: akkuman/gitea-release-action@v1
+  with:
+    files: artifacts/metrics.json
+    token: ${{ secrets.REGISTRY_TOKEN }}
+```
+
+This takes:
+
+```text
+artifacts/metrics.json
+```
+
+and attaches it to the Gitea release.
+
+Therefore, someone viewing the release can download the metrics file directly.
+
+---
+
+# 27. Why Attach the Metrics File?
+
+The release should contain more than just a version number.
+
+A downstream user should be able to find:
+
+```text
+Release
+   ↓
+v0.1.0
+   ↓
+metrics.json
+   ↓
+model performance information
+```
+
+This is useful for:
+
+* auditing
+* compliance
+* reproducibility
+* model evaluation
+* deployment verification
+
+---
+
+# 28. Complete Workflow
+
+The complete conceptual workflow is:
+
+```text
+Developer creates release
+          ↓
+       v0.1.0
+          ↓
+   Git tag is created
+          ↓
+  Release workflow starts
+          ↓
+     Checkout source
+          ↓
+   Resolve tag version
+          ↓
+      Docker login
+          ↓
+      Docker build
+          ↓
+      Docker push
+          ↓
+      Train model
+          ↓
+     metrics.json
+          ↓
+ Attach metrics to release
+          ↓
+      Release complete
+```
+
+---
+
+# 29. Why the Release Is Reproducible
+
+The release tag identifies a specific commit.
+
+The Docker image is built from that tagged source code.
+
+The metrics are generated during the same workflow.
+
+Therefore we can associate:
+
+```text
+v0.1.0
+   ↓
+specific Git commit
+   ↓
+Docker image v0.1.0
+   ↓
+metrics.json
+```
+
+This gives us a reproducible relationship between source, container, and model metrics.
+
+---
+
+# 30. The Important Git Relationship
+
+Think of the release as:
+
+```text
+v0.1.0
+   |
+   +---- Git commit
+   |
+   +---- Docker image
+   |
+   +---- metrics.json
+```
+
+The tag is the common identifier.
+
+This is why release tags are important in CI/CD.
+
+---
+
+# 31. The Failed Implementation
+
+The original workflow had:
+
+```yaml
+- name: Build image
+  run: docker build -t "$IMAGE:$VERSION" .
+```
+
+and:
+
+```yaml
+- name: Push image to Gitea registry
+  run: docker push "$IMAGE:$VERSION"
+```
+
+There were two problems.
+
+### Problem 1: Missing registry
+
+The image should be:
+
+```text
+$REGISTRY/$IMAGE
+```
+
+not merely:
+
+```text
+$IMAGE
+```
+
+### Problem 2: Incorrect version reference
+
+The workflow generated:
+
+```text
+steps.version.outputs.VERSION
+```
+
+but the commands tried to use:
+
+```text
+$VERSION
+```
+
+The correct expression is:
+
+```text
+${{ steps.version.outputs.VERSION }}
+```
+
+---
+
+# 32. Correct Implementation
+
+The final implementation is:
+
+```yaml
+- name: Build image
+  run: docker build -t "$REGISTRY/$IMAGE:${{ steps.version.outputs.VERSION }}" .
+
+- name: Push image to Gitea registry
+  run: docker push "$REGISTRY/$IMAGE:${{ steps.version.outputs.VERSION }}"
+```
+
+This satisfies both requirements:
+
+```text
+Registry included
+        +
+Correct version output
+```
+
+---
+
+# 33. Committing the Workflow
+
+After changing the workflow:
+
+```bash
+git add .gitea/workflows/release.yml
+```
+
+This stages the workflow file.
+
+Then:
+
+```bash
+git commit -m "Build and publish Docker image to Gitea registry"
+```
+
+This creates a Git commit containing the workflow change.
+
+Finally:
+
+```bash
+git push origin main
+```
+
+This sends the commit to Gitea.
+
+---
+
+# 34. Why We Must Update `main` Before Creating the Release
+
+The release workflow itself lives on the repository.
+
+We want:
+
+```text
+main
+  ↓
+correct release.yml
+  ↓
+v0.1.0
+  ↓
+workflow runs
+```
+
+If we create the tag before fixing and pushing the workflow, the tag may execute the old workflow.
+
+Therefore the correct order is:
+
+```text
+1. Fix workflow
+2. Commit workflow
+3. Push main
+4. Create release/tag
+5. Workflow runs
+```
+
+---
+
+# 35. Creating the Release
+
+The release is created through Gitea's Releases interface.
+
+The required values are:
+
+```text
+Tag: v0.1.0
+Target: main
+Title: any non-empty title
+```
+
+For example:
+
+```text
+Title: v0.1.0
+```
+
+Publishing the release creates the tag.
+
+The tag then triggers:
+
+```yaml
+on:
+  push:
+    tags:
+      - 'v*'
+```
+
+---
+
+# 36. Why We Should Not Manually Push the Docker Image
+
+The requirement is that:
+
+> The image is published by CI, not by hand.
+
+Therefore we should NOT do:
+
+```bash
+docker build ...
+docker push ...
+```
+
+manually from the control machine.
+
+The intended process is:
+
+```text
+Gitea release
+     ↓
+tag
+     ↓
+Actions workflow
+     ↓
+docker build
+     ↓
+docker push
+```
+
+This proves that the release process itself can reproduce the deployment artifact.
+
+---
+
+# 37. Verifying the Workflow
+
+After publishing the release, the Actions job should show:
+
+```text
+Set up job
+actions/checkout@v4
+Resolve version from tag
+Log in to Gitea container registry
+Build image
+Push image to Gitea registry
+Train model + emit metrics.json
+Attach metrics.json to the release
+Complete job
+```
+
+All steps should succeed.
+
+---
+
+# 38. Successful Build Step
+
+The successful build proves that Docker was able to create the image from the repository.
+
+Conceptually:
+
+```text
+Dockerfile
+     ↓
+Docker build
+     ↓
+fraud-detector:v0.1.0
+```
+
+---
+
+# 39. Successful Push Step
+
+The successful push proves that:
+
+1. The Docker image was built.
+2. Docker authenticated with Gitea.
+3. The image was uploaded to Gitea's registry.
+4. The image is available as a package.
+
+The expected package is:
+
+```text
+fraud-detector
+```
+
+with version:
+
+```text
+v0.1.0
+```
+
+or:
+
+```text
+0.1.0
+```
+
+depending on how the registry represents the version.
+
+---
+
+# 40. Successful Metrics Step
+
+The successful training step proves that:
+
+```text
+python3 -m src.train
+```
+
+ran successfully and generated:
+
+```text
+artifacts/metrics.json
+```
+
+The following release step then attaches this file.
+
+---
+
+# 41. Final Release Structure
+
+The desired result is conceptually:
+
+```text
+fraud-detector
+│
+├── Releases
+│   └── v0.1.0
+│       └── metrics.json
+│
+└── Packages
+    └── fraud-detector
+        └── v0.1.0
+```
+
+At the same time:
+
+```text
+v0.1.0
+   ↓
+specific Git commit
+```
+
+This gives us a complete release chain.
+
+---
+
+# 42. API Verification
+
+Gitea exposes an API that can be used to verify the release.
+
+The release endpoint is:
+
+```text
+GET /api/v1/repos/gitea-admin/fraud-detector/releases/tags/v0.1.0
+```
+
+Using curl:
+
+```bash
+curl -u gitea-admin:gitea2026 \
+  http://localhost:3000/api/v1/repos/gitea-admin/fraud-detector/releases/tags/v0.1.0
+```
+
+A successful response should describe the `v0.1.0` release.
+
+The important property is:
+
+```json
+"tag_name": "v0.1.0"
+```
+
+---
+
+# 43. Checking Release Assets
+
+The release API response contains an:
+
+```text
+assets
+```
+
+array.
+
+We want an asset whose name resolves to:
+
+```text
+metrics.json
+```
+
+This proves that the training output was successfully attached to the release.
+
+---
+
+# 44. Checking the Package Registry
+
+Gitea's package API can be queried with:
+
+```bash
+curl -u gitea-admin:gitea2026 \
+  'http://localhost:3000/api/v1/packages/gitea-admin?type=container'
+```
+
+The response should list the container package.
+
+We expect:
+
+```text
+name: fraud-detector
+```
+
+and:
+
+```text
+version: v0.1.0
+```
+
+or:
+
+```text
+version: 0.1.0
+```
+
+---
+
+# 45. Checking Commit Status
+
+The release tag points to a commit.
+
+The CI checks associated with that commit should have:
+
+```text
+success
+```
+
+The goal is to ensure that the release was produced from a commit whose CI passed.
+
+Conceptually:
+
+```text
+v0.1.0
+   ↓
+commit SHA
+   ↓
+CI checks
+   ↓
+success
+```
+
+---
+
+# 46. Final Verification Checklist
+
+The complete task should satisfy all of these conditions:
+
+```text
+[ ] v0.1.0 release exists
+[ ] v0.1.0 points to main's intended commit
+[ ] release.yml at the tag contains docker build
+[ ] release.yml at the tag contains docker push
+[ ] Docker image is built by CI
+[ ] Docker image is pushed by CI
+[ ] Container package is fraud-detector
+[ ] Container package version is v0.1.0 or 0.1.0
+[ ] metrics.json is generated
+[ ] metrics.json is attached to the release
+[ ] Tag commit checks are successful
+```
+
+---
+
+# 47. The Most Important Commands
+
+### Navigate to the repository
+
+```bash
+cd /root/code/fraud-detector
+```
+
+### Inspect the workflow
+
+```bash
+cat .gitea/workflows/release.yml
+```
+
+### Stage the workflow
+
+```bash
+git add .gitea/workflows/release.yml
+```
+
+### Commit the workflow
+
+```bash
+git commit -m "Build and publish Docker image to Gitea registry"
+```
+
+### Push to main
+
+```bash
+git push origin main
+```
+
+### Inspect the committed workflow
+
+```bash
+git show HEAD:.gitea/workflows/release.yml
+```
+
+### Verify the build and push commands
+
+```bash
+git show HEAD:.gitea/workflows/release.yml | \
+grep -A2 -B1 -E 'Build image|Push image'
+```
+
+---
+
+# 48. Common Mistakes
+
+## Mistake 1: Using `$VERSION`
+
+Incorrect:
+
+```bash
+docker build -t "$IMAGE:$VERSION" .
+```
+
+Why?
+
+Because `VERSION` was created as a step output, not a shell environment variable.
+
+Correct:
+
+```bash
+docker build -t "$REGISTRY/$IMAGE:${{ steps.version.outputs.VERSION }}" .
+```
+
+---
+
+## Mistake 2: Forgetting the registry
+
+Incorrect:
+
+```bash
+docker push "$IMAGE:${{ steps.version.outputs.VERSION }}"
+```
+
+Correct:
+
+```bash
+docker push "$REGISTRY/$IMAGE:${{ steps.version.outputs.VERSION }}"
+```
+
+The registry is:
+
+```text
+localhost:3000
+```
+
+---
+
+## Mistake 3: Creating the tag too early
+
+If the tag is created before the corrected workflow is pushed to `main`, the release may run the old workflow.
+
+Correct order:
+
+```text
+Fix
+ ↓
+Commit
+ ↓
+Push main
+ ↓
+Create release
+```
+
+---
+
+## Mistake 4: Manually pushing the image
+
+Do not manually push:
+
+```text
+fraud-detector:v0.1.0
+```
+
+The CI workflow must perform the push.
+
+---
+
+## Mistake 5: Forgetting the release asset
+
+Generating:
+
+```text
+artifacts/metrics.json
+```
+
+is not enough.
+
+The workflow must also attach it using:
+
+```yaml
+akkuman/gitea-release-action@v1
+```
+
+---
+
+# 49. Understanding the Complete CI/CD Design
+
+This task demonstrates a basic release pipeline.
+
+The pipeline takes:
+
+```text
+Source code
+```
+
+and turns it into:
+
+```text
+Versioned release
++
+Container image
++
+Model metrics
+```
+
+The complete architecture is:
+
+```text
+                 Git Repository
+                       │
+                       │
+                    main
+                       │
+                       ▼
+                  Git commit
+                       │
+                       │
+                  v0.1.0 tag
+                       │
+                       ▼
+              Gitea Actions workflow
+                       │
+          ┌────────────┼─────────────┐
+          │            │             │
+          ▼            ▼             ▼
+      Docker build   Train model   Release
+          │            │             │
+          ▼            ▼             ▼
+      Docker image  metrics.json   Release asset
+          │
+          ▼
+   Gitea Container Registry
+```
+
+---
+
+# 50. Why This Is Useful in Real Projects
+
+This approach is useful because deployment systems need reliable artifacts.
+
+Imagine production is running:
+
+```text
+fraud-detector:v0.1.0
+```
+
+Six months later, someone asks:
+
+> Which source code generated this image?
+
+The release process provides the answer:
+
+```text
+v0.1.0
+   ↓
+Git commit
+   ↓
+workflow
+   ↓
+Docker image
+```
+
+Someone can also ask:
+
+> What were the model metrics for this release?
+
+The answer is:
+
+```text
+v0.1.0
+   ↓
+metrics.json
+```
+
+This is much better than relying on memory or manually maintained documentation.
+
+---
+
+# 51. Reproducibility
+
+Reproducibility means that we can identify the exact inputs that produced an artifact.
+
+For this task:
+
+```text
+Git commit
++
+Dockerfile
++
+source code
++
+training code
+=
+release artifacts
+```
+
+The tag gives the process a stable identifier.
+
+Therefore:
+
+```text
+v0.1.0
+```
+
+becomes the common reference for the release.
+
+---
+
+# 52. CI/CD Principle Demonstrated
+
+One major DevOps principle demonstrated here is:
+
+> Build deployment artifacts automatically from version-controlled source code.
+
+Instead of manually creating an image and then creating a release, the workflow does everything automatically.
+
+This reduces:
+
+* human error
+* inconsistent builds
+* forgotten artifacts
+* undocumented manual steps
+
+---
+
+# 53. Another Important Principle: Immutable Versions
+
+A release version should identify a specific artifact.
+
+For example:
+
+```text
+fraud-detector:v0.1.0
+```
+
+should represent the release associated with:
+
+```text
+v0.1.0
+```
+
+This is better than relying entirely on:
+
+```text
+latest
+```
+
+because `latest` can change.
+
+A version such as:
+
+```text
+v0.1.0
+```
+
+communicates exactly which release is intended.
+
+---
+
+# 54. Tag → Image Version
+
+A particularly useful pattern is:
+
+```text
+Git tag
+    ↓
+Docker image tag
+```
+
+For example:
+
+```text
+Git:
+v0.1.0
+
+Docker:
+fraud-detector:v0.1.0
+```
+
+This makes it easy for deployment systems to understand which source release corresponds to a container image.
+
+---
+
+# 55. Tag → Metrics
+
+The same release tag is associated with:
+
+```text
+metrics.json
+```
+
+Therefore:
+
+```text
+v0.1.0
+ ├── Git commit
+ ├── Docker image v0.1.0
+ └── metrics.json
+```
+
+This creates a complete provenance chain.
+
+---
+
+# 56. What Happened in This Task
+
+Initially, the workflow contained TODO steps that intentionally failed.
+
+The build step was:
+
+```text
+exit 1
+```
+
+and the push step was also incomplete.
+
+We implemented the missing Docker functionality.
+
+The final commands became:
+
+```bash
+docker build -t "$REGISTRY/$IMAGE:${{ steps.version.outputs.VERSION }}" .
+```
+
+and:
+
+```bash
+docker push "$REGISTRY/$IMAGE:${{ steps.version.outputs.VERSION }}"
+```
+
+The workflow was committed to `main`.
+
+The resulting commit was:
+
+```text
+ef9288b
+```
+
+Then the `v0.1.0` release was created.
+
+The release workflow ran successfully.
+
+---
+
+# 57. Final Successful Run
+
+The successful Actions run showed:
+
+```text
+Set up job
+actions/checkout@v4
+Resolve version from tag
+Log in to Gitea container registry
+Build image
+Push image to Gitea registry
+Train model + emit metrics.json
+Attach metrics.json to the release
+Complete job
+```
+
+This confirms that the entire release pipeline worked.
+
+---
+
+# 58. Final Mental Model
+
+Remember this sequence:
+
+```text
+1. Developer changes code
+        ↓
+2. Commit goes to main
+        ↓
+3. Release tag v0.1.0 is created
+        ↓
+4. Tag triggers release workflow
+        ↓
+5. Workflow checks out tagged source
+        ↓
+6. Workflow resolves v0.1.0
+        ↓
+7. Docker logs into Gitea
+        ↓
+8. Docker image is built
+        ↓
+9. Image is pushed to Gitea registry
+        ↓
+10. Model is trained
+        ↓
+11. metrics.json is generated
+        ↓
+12. metrics.json is attached to release
+        ↓
+13. Release becomes the source of truth
+```
+
+---
+
+# 59. Final Takeaway
+
+The central lesson of Day 81 is not just how to write two Docker commands.
+
+The bigger lesson is how to connect:
+
+```text
+Git
++
+Tags
++
+Releases
++
+CI/CD
++
+Docker
++
+Container Registry
++
+Model Artifacts
+```
+
+into one automated release process.
+
+The final relationship is:
+
+```text
+                 v0.1.0
+                    │
+          ┌─────────┼─────────┐
+          │         │         │
+          ▼         ▼         ▼
+       Commit    Docker    metrics.json
+          │       Image         │
+          │         │           │
+          └─────────┼───────────┘
+                    │
+                    ▼
+              Gitea Release
+```
+
+The result is a release that is human-readable, versioned, reproducible, and automatically connected to the exact artifacts used by the system.
 
 
 ---
