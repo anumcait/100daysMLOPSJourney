@@ -196,4 +196,18 @@ localhost:3000/gitea-admin/fraud-detector:v0.1.0
 This ensures the release workflow builds and publishes the correct versioned image automatically.
 
 ### Screenshots
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/ba2ba23d-2e52-4e27-88f7-6d4daa08fe5b" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/cf5920f1-9402-4352-912e-2e3ed1fa83cd" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/71f02deb-6db8-4fe9-8b53-c421be65085c" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/306788ae-50d4-438c-a3a5-1979508542fa" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/b765d071-609b-4276-8ad2-506d7f83f905" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/112fdf26-fdcd-4b0b-9554-4fce0d669df8" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/416999ea-d2e4-4ead-bfc0-88b08a6e4d37" />
+
+
+
+
+
+
+
 
