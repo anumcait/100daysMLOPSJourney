@@ -349,4 +349,12 @@ All three stages are now independently reusable, eliminating duplicated workflow
 **Result:** Successfully refactored `main.yml` to use reusable `lint`, `test`, and `report` workflows and verified the Gitea Actions run successfully.
 
 ### Screenshots
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/6b826890-d6af-42cb-a756-ef993559255b" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/d29f2ab4-b071-4be1-aaa4-f3ae16dafa7e" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/57534ebd-0fd1-4786-a9a8-ed61f021b9a2" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/dd18eb50-12b2-4e63-82bc-5edd369dd361" />
+
+
+
+
 
