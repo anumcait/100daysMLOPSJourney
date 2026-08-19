@@ -33890,6 +33890,1632 @@ The final relationship is:
 
 The result is a release that is human-readable, versioned, reproducible, and automatically connected to the exact artifacts used by the system.
 
+# Gitea Reusable Workflows with `workflow_call`
+
+## 1. Introduction
+
+In CI/CD, workflow files can become large when all build, test, lint, reporting, deployment, and release logic is written inside one workflow.
+
+A common problem is **duplication**.
+
+For example, suppose `main.yml` contains:
+
+```yaml
+jobs:
+  lint:
+    # lint commands
+
+  test:
+    # test commands
+
+  report:
+    # reporting commands
+```
+
+Later, another workflow such as `release.yml` also needs to run the tests.
+
+Without reusable workflows, we might copy the test steps into `release.yml`.
+
+That creates a maintenance problem:
+
+```text
+main.yml
+   |
+   +-- test logic
+
+release.yml
+   |
+   +-- copied test logic
+```
+
+If the test command changes, we now have to remember to update it in multiple places.
+
+Gitea Actions supports **reusable workflows** so that we can define a workflow once and call it from other workflows.
+
+The architecture becomes:
+
+```text
+                 +----------------+
+                 |    test.yml    |
+                 | reusable       |
+                 | workflow       |
+                 +----------------+
+                    ^          ^
+                    |          |
+              uses:|          |uses:
+                    |          |
+             +------+--+    +--+--------+
+             | main.yml|    | release.yml|
+             +---------+    +-----------+
+```
+
+This is the main idea behind `workflow_call`.
+
+---
+
+# 2. What is `workflow_call`?
+
+`workflow_call` is a workflow trigger that makes a workflow available to be called by another workflow.
+
+A reusable workflow contains:
+
+```yaml
+on:
+  workflow_call:
+```
+
+The important part is:
+
+```yaml
+workflow_call
+```
+
+It tells Gitea:
+
+> This workflow can be invoked by another workflow.
+
+For example:
+
+```yaml
+name: Test
+
+on:
+  workflow_call:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run tests
+        run: python3 -m pytest tests -v
+```
+
+This workflow is no longer dependent only on a pull request or push trigger.
+
+Instead, another workflow can call it.
+
+---
+
+# 3. Normal Workflow Triggers vs `workflow_call`
+
+A normal workflow might use:
+
+```yaml
+on:
+  push:
+    branches: [main]
+```
+
+This means:
+
+> Run this workflow when a push occurs on the `main` branch.
+
+A pull request workflow might use:
+
+```yaml
+on:
+  pull_request:
+    branches: [main]
+```
+
+This means:
+
+> Run this workflow when a pull request targets `main`.
+
+A reusable workflow uses:
+
+```yaml
+on:
+  workflow_call:
+```
+
+This means:
+
+> Do not treat this as a standalone event-driven workflow. Make it callable by another workflow.
+
+So:
+
+```text
+push
+  |
+  +--> workflow starts because of Git push
+
+pull_request
+  |
+  +--> workflow starts because of PR event
+
+workflow_call
+  |
+  +--> workflow starts because another workflow calls it
+```
+
+---
+
+# 4. Caller and Callee
+
+Reusable workflows involve two important concepts.
+
+## Caller
+
+The workflow that invokes another workflow is the **caller**.
+
+For example:
+
+```yaml
+jobs:
+  test:
+    uses: ./.gitea/workflows/test.yml
+```
+
+Here, `main.yml` is the caller.
+
+## Callee
+
+The workflow being invoked is the **callee**.
+
+In this example:
+
+```text
+main.yml
+   |
+   | uses:
+   v
+test.yml
+```
+
+`test.yml` is the callee.
+
+Therefore:
+
+```text
+main.yml = caller
+test.yml = reusable callee
+```
+
+The same reusable workflow can have multiple callers.
+
+For example:
+
+```text
+             +-------------+
+             |  test.yml   |
+             |   callee    |
+             +-------------+
+                ^       ^
+                |       |
+             uses:    uses:
+                |       |
+        +-------+       +---------+
+        |                         |
+   +---------+              +------------+
+   | main.yml|              | release.yml|
+   +---------+              +------------+
+     caller                    caller
+```
+
+This is one of the biggest benefits of reusable workflows.
+
+---
+
+# 5. The `uses:` Keyword
+
+A caller invokes a reusable workflow with `uses:`.
+
+Example:
+
+```yaml
+jobs:
+  test:
+    uses: ./.gitea/workflows/test.yml
+```
+
+The path:
+
+```text
+./.gitea/workflows/test.yml
+```
+
+means:
+
+```text
+.
+|
++-- .gitea/
+    |
+    +-- workflows/
+        |
+        +-- test.yml
+```
+
+The `./` means the workflow is referenced relative to the current repository.
+
+So:
+
+```yaml
+uses: ./.gitea/workflows/test.yml
+```
+
+means:
+
+> Use the reusable `test.yml` workflow from this same repository.
+
+---
+
+# 6. Why `runs-on` and `steps` Are Removed
+
+This is one of the most important rules.
+
+A normal job might look like:
+
+```yaml
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run tests
+        run: python3 -m pytest tests -v
+```
+
+Here, the job itself defines how it runs.
+
+But when the job calls a reusable workflow:
+
+```yaml
+jobs:
+  test:
+    uses: ./.gitea/workflows/test.yml
+```
+
+the implementation is inside `test.yml`.
+
+Therefore, the caller must not also contain:
+
+```yaml
+runs-on:
+```
+
+or:
+
+```yaml
+steps:
+```
+
+The reusable workflow owns those details.
+
+The following is invalid:
+
+```yaml
+jobs:
+  test:
+    uses: ./.gitea/workflows/test.yml
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - run: echo "Hello"
+```
+
+A reusable workflow job cannot mix `uses:` with a normal job implementation using `steps:`.
+
+Think of it like this:
+
+```text
+Normal job:
+
+job
+ |
+ +-- runs-on
+ |
+ +-- steps
+       |
+       +-- command
+       +-- command
+
+
+Reusable workflow job:
+
+job
+ |
+ +-- uses
+       |
+       +-- reusable workflow
+              |
+              +-- runs-on
+              +-- steps
+```
+
+The caller delegates the implementation to the callee.
+
+---
+
+# 7. The Day 82 Scenario
+
+The `fraud-detector` repository contained:
+
+```text
+.gitea/
+└── workflows/
+    ├── lint.yml
+    ├── test.yml
+    ├── report.yml
+    └── main.yml
+```
+
+The three specialized workflows were already created:
+
+```text
+lint.yml
+test.yml
+report.yml
+```
+
+Each one was intended to be reusable.
+
+The main workflow was:
+
+```text
+main.yml
+```
+
+The `lint` job had already been converted as an example.
+
+The task was to perform the same conversion for:
+
+```text
+test
+report
+```
+
+---
+
+# 8. Original `main.yml`
+
+The original workflow contained:
+
+```yaml
+jobs:
+  lint:
+    uses: ./.gitea/workflows/lint.yml
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pytest + runtime deps
+        run: pip install --break-system-packages pytest pandas numpy scikit-learn joblib
+
+      - name: Run pytest
+        run: python3 -m pytest tests -v
+
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install report deps
+        run: pip install --break-system-packages numpy scikit-learn joblib matplotlib
+
+      - name: Train
+        run: python3 -m src.train
+
+      - name: Plot confusion matrix
+        run: python3 -m src.plot
+
+      - name: Upload report
+        uses: actions/upload-artifact@v3
+        with:
+          name: model-report
+          path: artifacts/
+```
+
+There was duplication because the same logic was already stored in:
+
+```text
+test.yml
+report.yml
+```
+
+---
+
+# 9. Understanding the `test` Job
+
+Before refactoring, `test` contained:
+
+```yaml
+test:
+  runs-on: ubuntu-latest
+```
+
+This tells the CI system to execute the job on:
+
+```text
+ubuntu-latest
+```
+
+Then:
+
+```yaml
+steps:
+```
+
+defines the individual commands.
+
+The first step:
+
+```yaml
+- uses: actions/checkout@v4
+```
+
+checks out the repository so that the workflow can access the source code.
+
+Next:
+
+```yaml
+- name: Install pytest + runtime deps
+  run: pip install --break-system-packages pytest pandas numpy scikit-learn joblib
+```
+
+installs the Python dependencies required by the tests.
+
+Then:
+
+```yaml
+- name: Run pytest
+  run: python3 -m pytest tests -v
+```
+
+runs the test suite.
+
+All of this logic already existed in the reusable:
+
+```text
+test.yml
+```
+
+Therefore, keeping it in `main.yml` was unnecessary duplication.
+
+---
+
+# 10. Refactoring the `test` Job
+
+The entire inline implementation:
+
+```yaml
+test:
+  runs-on: ubuntu-latest
+  steps:
+    ...
+```
+
+was replaced by:
+
+```yaml
+test:
+  uses: ./.gitea/workflows/test.yml
+```
+
+This is the key refactoring.
+
+The caller now says:
+
+> For the `test` job, execute the reusable test workflow.
+
+The test implementation remains inside:
+
+```text
+.gitea/workflows/test.yml
+```
+
+---
+
+# 11. Understanding the `report` Job
+
+The original `report` job contained several steps.
+
+First:
+
+```yaml
+- uses: actions/checkout@v4
+```
+
+checks out the repository.
+
+Then:
+
+```yaml
+- name: Install report deps
+  run: pip install --break-system-packages numpy scikit-learn joblib matplotlib
+```
+
+installs the dependencies required for generating the report.
+
+Then:
+
+```yaml
+- name: Train
+  run: python3 -m src.train
+```
+
+trains the model.
+
+Then:
+
+```yaml
+- name: Plot confusion matrix
+  run: python3 -m src.plot
+```
+
+generates the confusion matrix visualization.
+
+Finally:
+
+```yaml
+- name: Upload report
+  uses: actions/upload-artifact@v3
+```
+
+uploads the generated report as an artifact.
+
+The artifact configuration was:
+
+```yaml
+with:
+  name: model-report
+  path: artifacts/
+```
+
+Again, this logic was already stored in:
+
+```text
+report.yml
+```
+
+So it did not need to remain duplicated in `main.yml`.
+
+---
+
+# 12. Refactoring the `report` Job
+
+The entire inline job was replaced with:
+
+```yaml
+report:
+  uses: ./.gitea/workflows/report.yml
+```
+
+Now the caller delegates report generation to the reusable workflow.
+
+---
+
+# 13. Final `main.yml`
+
+The final workflow became:
+
+```yaml
+name: Main
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  lint:
+    uses: ./.gitea/workflows/lint.yml
+
+  test:
+    uses: ./.gitea/workflows/test.yml
+
+  report:
+    uses: ./.gitea/workflows/report.yml
+```
+
+This is much smaller and easier to maintain.
+
+---
+
+# 14. Understanding the Final Workflow Graph
+
+The final workflow can be visualized as:
+
+```text
+                         main.yml
+                            |
+             +--------------+--------------+
+             |              |              |
+             v              v              v
+          lint.yml       test.yml       report.yml
+             |              |              |
+             v              v              v
+           Lint           Tests          Report
+```
+
+`main.yml` is responsible for orchestration.
+
+The individual reusable workflows are responsible for implementation.
+
+This creates a clean separation of responsibilities.
+
+---
+
+# 15. Why This Is Better
+
+Suppose the test command changes from:
+
+```bash
+python3 -m pytest tests -v
+```
+
+to:
+
+```bash
+python3 -m pytest tests -v --strict-markers
+```
+
+With duplicated workflows, we might need to change:
+
+```text
+main.yml
+release.yml
+nightly.yml
+```
+
+and possibly other workflows.
+
+With reusable workflows, we change:
+
+```text
+test.yml
+```
+
+once.
+
+Every caller automatically uses the updated implementation.
+
+Therefore:
+
+```text
+One implementation
+       |
+       +-- many callers
+```
+
+is better than:
+
+```text
+Many copies
+       |
+       +-- synchronization problems
+```
+
+---
+
+# 16. Maintainability
+
+Reusable workflows provide a single source of truth.
+
+For example:
+
+```text
+test.yml
+```
+
+becomes the canonical definition of testing.
+
+Similarly:
+
+```text
+lint.yml
+```
+
+is the canonical definition of linting.
+
+And:
+
+```text
+report.yml
+```
+
+is the canonical definition of report generation.
+
+This means developers know exactly where to make changes.
+
+---
+
+# 17. Reuse Across Different Workflows
+
+Imagine that later we create:
+
+```text
+release.yml
+```
+
+We can reuse the existing test workflow:
+
+```yaml
+jobs:
+  test:
+    uses: ./.gitea/workflows/test.yml
+```
+
+Now both workflows use the same test implementation:
+
+```text
+              test.yml
+              /      \
+             /        \
+            v          v
+       main.yml    release.yml
+```
+
+There is no need to copy the test steps.
+
+---
+
+# 18. Reusable Workflow vs Reusable Action
+
+These concepts are related but different.
+
+## Reusable workflow
+
+A reusable workflow is an entire workflow containing jobs.
+
+Example:
+
+```yaml
+on:
+  workflow_call:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: pytest
+```
+
+It is called from a job using:
+
+```yaml
+uses: ./.gitea/workflows/test.yml
+```
+
+## Action
+
+An action is normally used inside a step.
+
+Example:
+
+```yaml
+steps:
+  - uses: actions/checkout@v4
+```
+
+So remember:
+
+```text
+Reusable workflow
+    |
+    +-- called at the job level
+
+Action
+    |
+    +-- called at the step level
+```
+
+This distinction is very important.
+
+---
+
+# 19. Job-Level `uses:` vs Step-Level `uses:`
+
+Consider:
+
+```yaml
+jobs:
+  test:
+    uses: ./.gitea/workflows/test.yml
+```
+
+This is a **job-level reusable workflow call**.
+
+But:
+
+```yaml
+steps:
+  - uses: actions/checkout@v4
+```
+
+is a **step-level action call**.
+
+They are not the same thing.
+
+The first delegates an entire job/workflow implementation.
+
+The second executes an action as one step.
+
+---
+
+# 20. `workflow_call` Can Accept Inputs
+
+A reusable workflow can also accept inputs.
+
+For example:
+
+```yaml
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+```
+
+A caller can provide an input.
+
+Conceptually:
+
+```text
+caller
+   |
+   | environment = production
+   v
+reusable workflow
+```
+
+This allows reusable workflows to be more flexible.
+
+For Day 82, however, no inputs were required. The workflows could simply be called using their local paths.
+
+---
+
+# 21. Reusable Workflows Can Also Use Secrets
+
+Reusable workflows can be designed to receive secrets.
+
+Conceptually:
+
+```yaml
+on:
+  workflow_call:
+    secrets:
+      API_TOKEN:
+        required: true
+```
+
+A caller can then pass the required secret.
+
+This is useful when reusable workflows perform operations requiring authentication.
+
+Again, Day 82 did not require this feature, but it is an important extension of the same concept.
+
+---
+
+# 22. Local vs External Reusable Workflows
+
+In this task, the reusable workflows were in the same repository:
+
+```yaml
+uses: ./.gitea/workflows/test.yml
+```
+
+This is a local reusable workflow.
+
+Reusable workflows can also be organized for sharing across repositories, depending on the Gitea Actions implementation and repository configuration.
+
+The key idea remains:
+
+```text
+Caller
+   |
+   +-- uses --> reusable workflow
+```
+
+---
+
+# 23. Branch and Pull Request Context
+
+The main workflow contained:
+
+```yaml
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+```
+
+This means the caller can be triggered by:
+
+```text
+Pull request targeting main
+```
+
+or:
+
+```text
+Push to main
+```
+
+Once the caller starts, its jobs invoke:
+
+```text
+lint.yml
+test.yml
+report.yml
+```
+
+through `workflow_call`.
+
+Therefore, the event triggering the caller and the mechanism invoking the reusable workflows are different concepts.
+
+```text
+PR / Push
+    |
+    v
+main.yml
+    |
+    +--> workflow_call --> lint.yml
+    |
+    +--> workflow_call --> test.yml
+    |
+    +--> workflow_call --> report.yml
+```
+
+---
+
+# 24. Why the PR Head Commit Matters
+
+In a pull request workflow, the CI status is associated with the commit being tested.
+
+The task required:
+
+> The PR head commit's combined status reaches `success`.
+
+Therefore, after changing the workflow, it was necessary to:
+
+1. Save the file.
+2. Commit the change.
+3. Push the commit to the PR branch.
+4. Allow Gitea Actions to execute.
+5. Verify the workflow status.
+
+Simply editing the local file is not enough.
+
+The remote PR must contain the updated commit.
+
+---
+
+# 25. Git Workflow Used
+
+The standard process was:
+
+```text
+Edit
+  |
+  v
+git diff
+  |
+  v
+git add
+  |
+  v
+git commit
+  |
+  v
+git push
+  |
+  v
+Gitea Actions
+  |
+  v
+Verify success
+```
+
+Commands:
+
+```bash
+cd ~/code/fraud-detector
+```
+
+Check the difference:
+
+```bash
+git diff
+```
+
+Stage:
+
+```bash
+git add .gitea/workflows/main.yml
+```
+
+Commit:
+
+```bash
+git commit -m "refactor test and report to reusable workflows"
+```
+
+Push:
+
+```bash
+git push origin add-reusable-workflows
+```
+
+---
+
+# 26. Verification in Gitea
+
+After pushing, Gitea Actions ran the workflow.
+
+The successful run showed:
+
+```text
+lint
+test
+report
+```
+
+The report workflow also produced:
+
+```text
+model-report
+```
+
+as an artifact.
+
+This verified that the workflow refactoring did not break the underlying CI functionality.
+
+---
+
+# 27. What Success Proves
+
+A successful run demonstrates several things.
+
+### The YAML was accepted
+
+Gitea successfully parsed the workflow.
+
+### The reusable workflow calls were recognized
+
+The jobs were expanded and executed.
+
+### `lint.yml` worked
+
+The lint workflow ran successfully.
+
+### `test.yml` worked
+
+The test workflow ran successfully.
+
+### `report.yml` worked
+
+The report workflow ran and generated its artifact.
+
+### The workflow graph was valid
+
+The caller successfully connected to all three callees.
+
+---
+
+# 28. Common Mistakes
+
+## Mistake 1: Keeping `steps:` with `uses:`
+
+Incorrect:
+
+```yaml
+test:
+  uses: ./.gitea/workflows/test.yml
+  steps:
+    - run: pytest
+```
+
+Fix:
+
+```yaml
+test:
+  uses: ./.gitea/workflows/test.yml
+```
+
+---
+
+## Mistake 2: Forgetting `workflow_call`
+
+The callee needs:
+
+```yaml
+on:
+  workflow_call:
+```
+
+Without the reusable workflow trigger, the caller cannot use it as intended.
+
+---
+
+## Mistake 3: Using the wrong path
+
+If the file is:
+
+```text
+.gitea/workflows/test.yml
+```
+
+the caller should use:
+
+```yaml
+uses: ./.gitea/workflows/test.yml
+```
+
+Not:
+
+```yaml
+uses: ./test.yml
+```
+
+and not:
+
+```yaml
+uses: ./.github/workflows/test.yml
+```
+
+because this repository uses:
+
+```text
+.gitea/workflows/
+```
+
+---
+
+## Mistake 4: Leaving the old inline logic
+
+Simply adding:
+
+```yaml
+uses: ./.gitea/workflows/test.yml
+```
+
+without removing:
+
+```yaml
+runs-on:
+steps:
+```
+
+creates an invalid job.
+
+The old implementation must be removed.
+
+---
+
+## Mistake 5: Forgetting to push
+
+Local changes do not update the PR.
+
+You must run:
+
+```bash
+git push origin add-reusable-workflows
+```
+
+before checking the Gitea PR.
+
+---
+
+## Mistake 6: Checking the wrong commit
+
+Always verify that the PR is testing the newly pushed commit.
+
+Use:
+
+```bash
+git log -1 --oneline
+```
+
+locally and compare it with the commit shown in Gitea.
+
+---
+
+# 29. Debugging a Failed Reusable Workflow
+
+If the workflow fails, start with Git:
+
+```bash
+git status
+```
+
+Then:
+
+```bash
+git log -1 --oneline
+```
+
+Check the workflow file:
+
+```bash
+cat .gitea/workflows/main.yml
+```
+
+Check reusable workflow triggers:
+
+```bash
+grep -n "workflow_call" .gitea/workflows/*.yml
+```
+
+Check reusable workflow calls:
+
+```bash
+grep -n "uses:" .gitea/workflows/main.yml
+```
+
+Then inspect the failed job in Gitea Actions.
+
+Look for the first meaningful error rather than only the final failure message.
+
+---
+
+# 30. A Useful Mental Model
+
+Think of `main.yml` as an orchestrator.
+
+It answers:
+
+> Which stages should run?
+
+```yaml
+jobs:
+  lint:
+    uses: ./.gitea/workflows/lint.yml
+
+  test:
+    uses: ./.gitea/workflows/test.yml
+
+  report:
+    uses: ./.gitea/workflows/report.yml
+```
+
+The reusable workflows answer:
+
+> How should each stage run?
+
+For example:
+
+```text
+main.yml
+   |
+   +--> "Run lint"
+   |       |
+   |       +--> lint.yml knows how
+   |
+   +--> "Run tests"
+   |       |
+   |       +--> test.yml knows how
+   |
+   +--> "Generate report"
+           |
+           +--> report.yml knows how
+```
+
+This separation makes workflows easier to understand.
+
+---
+
+# 31. Why This Pattern Is Useful in Real Projects
+
+As projects grow, CI pipelines often become complicated.
+
+A single workflow may contain:
+
+```text
+lint
+unit tests
+integration tests
+security scanning
+build
+package
+report
+deploy
+release
+```
+
+If all of this is duplicated across multiple workflows, maintenance becomes difficult.
+
+Reusable workflows allow teams to build a library of CI components:
+
+```text
+.gitea/workflows/
+├── lint.yml
+├── test.yml
+├── security.yml
+├── build.yml
+├── report.yml
+└── deploy.yml
+```
+
+Then different caller workflows can compose them.
+
+For example:
+
+```text
+pull-request.yml
+    |
+    +-- lint
+    +-- test
+    +-- security
+
+
+release.yml
+    |
+    +-- test
+    +-- build
+    +-- report
+    +-- deploy
+```
+
+Each concern has a single implementation.
+
+---
+
+# 32. The Core Principle
+
+The main principle is:
+
+> **Define CI logic once, then reuse it wherever needed.**
+
+Instead of:
+
+```text
+Copy
+Copy
+Copy
+Copy
+```
+
+use:
+
+```text
+Define once
+    |
+    +--> Reuse
+    +--> Reuse
+    +--> Reuse
+```
+
+This reduces:
+
+* duplication
+* maintenance effort
+* configuration drift
+* inconsistent behavior
+* copy-paste errors
+
+---
+
+# 33. Day 82 Summary
+
+The task demonstrated how to compose Gitea workflows using `workflow_call`.
+
+The repository already contained reusable workflows:
+
+```text
+lint.yml
+test.yml
+report.yml
+```
+
+The main workflow initially used the reusable lint workflow but duplicated the test and report jobs.
+
+The refactoring changed:
+
+```yaml
+test:
+  runs-on: ubuntu-latest
+  steps:
+    ...
+```
+
+into:
+
+```yaml
+test:
+  uses: ./.gitea/workflows/test.yml
+```
+
+and changed:
+
+```yaml
+report:
+  runs-on: ubuntu-latest
+  steps:
+    ...
+```
+
+into:
+
+```yaml
+report:
+  uses: ./.gitea/workflows/report.yml
+```
+
+The final workflow became:
+
+```yaml
+jobs:
+  lint:
+    uses: ./.gitea/workflows/lint.yml
+
+  test:
+    uses: ./.gitea/workflows/test.yml
+
+  report:
+    uses: ./.gitea/workflows/report.yml
+```
+
+The changes were committed and pushed to the PR branch.
+
+Gitea Actions successfully executed:
+
+```text
+lint
+test
+report
+```
+
+and the report artifact was generated.
+
+---
+
+# 34. Interview / Exam Questions
+
+## What is `workflow_call`?
+
+`workflow_call` allows a workflow to be invoked by another workflow as a reusable workflow.
+
+---
+
+## How do you call a reusable workflow?
+
+Use `uses:` at the job level:
+
+```yaml
+jobs:
+  test:
+    uses: ./.gitea/workflows/test.yml
+```
+
+---
+
+## Can a job contain both `uses:` and `steps:`?
+
+No.
+
+A reusable workflow job uses `uses:` instead of defining its own `steps:`.
+
+---
+
+## What is the difference between a caller and a callee?
+
+The caller invokes the reusable workflow.
+
+The callee is the reusable workflow being invoked.
+
+Example:
+
+```text
+main.yml
+   |
+   +-- uses --> test.yml
+```
+
+`main.yml` is the caller.
+
+`test.yml` is the callee.
+
+---
+
+## Why use reusable workflows?
+
+To avoid duplicated CI logic and create maintainable, composable workflows.
+
+---
+
+## Where does the reusable workflow implementation live?
+
+In this task:
+
+```text
+.gitea/workflows/
+```
+
+For example:
+
+```text
+.gitea/workflows/test.yml
+```
+
+---
+
+## What does this mean?
+
+```yaml
+uses: ./.gitea/workflows/test.yml
+```
+
+It means the current repository's `test.yml` reusable workflow should be invoked.
+
+---
+
+## Why remove `runs-on` and `steps` from `main.yml`?
+
+Because those belong to the reusable workflow being called.
+
+The caller only needs to reference the reusable workflow.
+
+---
+
+# 35. Final Cheat Sheet
+
+```text
+Reusable workflow:
+    on:
+      workflow_call:
+
+Caller:
+    jobs:
+      test:
+        uses: ./.gitea/workflows/test.yml
+
+Important:
+    uses: = reusable workflow at job level
+    steps: = commands inside a normal job
+    workflow_call = makes workflow callable
+    caller = workflow doing the calling
+    callee = reusable workflow being called
+
+Do NOT do:
+    uses + steps
+
+Do:
+    test:
+      uses: ./.gitea/workflows/test.yml
+```
+
+## One-Line Memory Trick
+
+> **`workflow_call` makes a workflow reusable; `uses:` calls it; the caller delegates the job implementation to the callee.**
+
+## Day 82 Takeaway
+
+The major lesson from this task is that Gitea workflows can be composed from smaller reusable workflows. `main.yml` should coordinate the pipeline, while `lint.yml`, `test.yml`, and `report.yml` contain the actual implementation for their respective responsibilities.
+
+This approach turns duplicated CI configuration into reusable building blocks and makes future workflows, such as a `release.yml`, much easier to build and maintain.
+
 
 ---
 

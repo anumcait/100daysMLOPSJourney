@@ -120,4 +120,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 81: Tag a Release and Publish to the Gitea Package Registry](./Day%2081%20-%20Tag%20a%20Release%20and%20Publish%20to%20the%20Gitea%20Package%20Registry.md)
 
+- [Day 82: Compose Gitea Workflows via `workflow_call`](./Day%2082%20-%20Compose%20Gitea%20Workflows%20via%20workflow_call.md)
+
 ---
