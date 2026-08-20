@@ -35516,6 +35516,16 @@ The major lesson from this task is that Gitea workflows can be composed from sma
 
 This approach turns duplicated CI configuration into reusable building blocks and makes future workflows, such as a `release.yml`, much easier to build and maintain.
 
+# Notes: Reverting a Broken ML Release Safely with Gitea
+
+## 1. What is the problem?
+
+Imagine that a development team has a `main` branch that is normally kept in a healthy, deployable state.
+
+A developer creates a Pull Request containing a new change. The PR is reviewed or approved and eventually merged into `main`.
+
+But after the merge, the CI pipeline starts failing.
+
 
 ---
 

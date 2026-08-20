@@ -122,4 +122,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 82: Compose Gitea Workflows via `workflow_call`](./Day%2082%20-%20Compose%20Gitea%20Workflows%20via%20workflow_call.md)
 
+- [Day 83: Revert a Broken ML Release via the Gitea Revert Button](./Day%2083%20-%20Revert%20a%20Broken%20ML%20Release%20via%20the%20Gitea%20Revert%20Button.md)
+
 ---
