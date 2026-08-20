@@ -190,27 +190,23 @@ Merge Revert PR
 ↓  
 `main` CI becomes GREEN
 
-## Verification Checklist
-
-- [x] Original PR #1 is still merged
-- [x] Gitea's **Revert** button was used
-- [x] Revert targeted `main`
-- [x] Revert was created on a separate branch
-- [x] A second PR was created
-- [x] Second PR title starts with `Revert`
-- [x] `CI / lint` passes
-- [x] `CI / test` passes
-- [ ] Revert PR is merged
-- [ ] `main` HEAD commit message contains `Revert`
-- [ ] Latest `main` CI status is `success`
-
-## Key Lesson
-
-The correct rollback pattern is:
-
-**Broken merged PR → Gitea Revert → Revert PR → CI validation → Merge → Green main**
-
-Using the Gitea Revert workflow preserves the original PR, creates an auditable rollback, validates the reverted state with CI, and avoids force-pushing or rewriting `main`.
-
-
 ### Screenshots
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/0523beb3-a475-41ad-9d3e-00782dd2d817" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/3a7aaed9-b876-471e-ac1b-d48cdc451c29" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/fe4c58df-558c-4c10-b913-f9a67528184b" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/b715e34f-c30c-4890-80a1-34f727ae24b0" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/d624488a-e33c-4aac-b87a-614555413b88" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/2e445fe4-5165-48cd-a936-4ac59087b64b" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/58158294-45b1-4fd6-93fe-cc509aed186e" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/77f36a4d-3aa3-45a5-bf3a-3dd493bd9796" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/cbfc7e20-712e-476a-9b09-6c6321f536b9" />
+
+
+
+
+
+
+
+
+
+
