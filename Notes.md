@@ -35526,6 +35526,1811 @@ A developer creates a Pull Request containing a new change. The PR is reviewed o
 
 But after the merge, the CI pipeline starts failing.
 
+# Day 84 – Enforce Branch Protection on the `main` Branch
+
+## Objective
+
+The goal of this task is to improve the production governance of the `fraud-detector` repository.
+
+We need to solve two problems:
+
+1. The CI pipeline only performs linting and does not run the repository's test suite.
+2. The `main` branch is not protected, so changes can bypass Pull Request review and CI.
+
+The required final workflow is:
+
+```text
+Feature Branch
+      |
+      v
+Pull Request
+      |
+      +----> lint check ----> PASS
+      |
+      +----> test check ----> PASS
+      |
+      +----> at least 1 approval
+      |
+      v
+    main
+```
+
+Direct pushes to `main` must be blocked.
+
+---
+
+# 1. Background and Context
+
+The repository belongs to the xFusionCorp Industries ML platform team.
+
+A previous incident happened when an administrator force-merged a red Pull Request. The `main` branch was disrupted for one hour.
+
+This exposed two weaknesses:
+
+- CI was not running the actual tests.
+- There were no branch protection rules forcing contributors to use Pull Requests and wait for successful CI.
+
+This task introduces production-style safeguards.
+
+The idea is simple:
+
+> Code should not enter the important `main` branch unless it has passed automated checks and has been reviewed.
+
+---
+
+# 2. Repository Information
+
+```text
+Gitea UI:
+http://localhost:3000
+
+Repository:
+http://localhost:3000/gitea-admin/fraud-detector
+
+Working clone:
+/root/code/fraud-detector
+
+Repository owner:
+gitea-admin
+
+Branch:
+main
+
+Gitea version:
+1.22.3
+```
+
+The repository is already cloned and the working branch is `main`.
+
+---
+
+# 3. Key Concepts
+
+Before making changes, understand the important terms.
+
+## CI – Continuous Integration
+
+CI automatically runs checks whenever code changes.
+
+Instead of manually testing every change, the CI system can automatically run:
+
+```text
+lint
+tests
+builds
+security checks
+```
+
+In this task, CI runs two checks:
+
+```text
+lint
+test
+```
+
+---
+
+## Linting
+
+Linting analyzes source code for style problems and common mistakes.
+
+This repository uses `ruff`.
+
+The existing command is:
+
+```bash
+ruff check src tests
+```
+
+Linting is useful, but linting alone does not prove that the application works correctly.
+
+---
+
+## Testing
+
+Testing executes automated tests against the application.
+
+This repository uses `pytest`.
+
+The test command is:
+
+```bash
+python3 -m pytest tests -v
+```
+
+The `-v` option means verbose output, so individual tests and their results are displayed.
+
+---
+
+## Pull Request
+
+A Pull Request is a proposed change from one branch into another branch.
+
+For example:
+
+```text
+feature/fraud-model
+        |
+        v
+Pull Request
+        |
+        v
+main
+```
+
+A Pull Request provides a place for:
+
+- CI checks
+- Code review
+- Discussion
+- Approval
+- Controlled merging
+
+---
+
+## Branch Protection
+
+Branch protection prevents unsafe operations on important branches.
+
+For `main`, we want:
+
+```text
+Direct push       → BLOCKED
+Lint              → REQUIRED
+Test              → REQUIRED
+Approval          → REQUIRED
+```
+
+---
+
+## Status Check
+
+A status check is a result reported by CI.
+
+In this task, Gitea identifies the checks as:
+
+```text
+CI / lint (push)
+CI / test (push)
+```
+
+These checks can be required by the branch protection rule.
+
+---
+
+# 4. Why the Test Job Must Exist First
+
+This is one of the most important concepts in the task.
+
+The branch protection rule can require status checks, but the status check needs to exist first.
+
+Therefore, we cannot immediately configure:
+
+```text
+Require test
+```
+
+if Gitea has never seen a `test` CI job.
+
+The correct sequence is:
+
+```text
+1. Add test job
+       ↓
+2. Push workflow
+       ↓
+3. Run CI
+       ↓
+4. Confirm test exists
+       ↓
+5. Protect main
+       ↓
+6. Require test
+```
+
+This is why the task specifically says that the test job must run on `main` at least once.
+
+---
+
+# 5. Existing CI Configuration
+
+The workflow file is:
+
+```text
+.gitea/workflows/ci.yml
+```
+
+The existing workflow was:
+
+```yaml
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ruff
+        run: pip install --break-system-packages ruff
+      - name: Run ruff
+        run: ruff check src tests
+
+  # TODO: add a `test` job so the pipeline runs the repo's test suite,
+  #       not just lint.
+```
+
+The important point is that the workflow already had a `lint` job.
+
+The missing piece was `test`.
+
+---
+
+# 6. Understanding the Existing YAML
+
+## Workflow name
+
+```yaml
+name: CI
+```
+
+This gives the workflow the name `CI`.
+
+Gitea displays this workflow in the Actions interface.
+
+---
+
+## Pull Request trigger
+
+```yaml
+on:
+  pull_request:
+    branches: [main]
+```
+
+This means the workflow runs for Pull Requests targeting `main`.
+
+---
+
+## Push trigger
+
+```yaml
+  push:
+    branches: [main]
+```
+
+This means the workflow also runs when code is pushed to `main`.
+
+This was useful initially because we needed to run the new test job on `main` before protecting it.
+
+---
+
+## Jobs
+
+```yaml
+jobs:
+```
+
+A GitHub Actions/Gitea Actions workflow contains one or more jobs.
+
+Here we have:
+
+```text
+lint
+test
+```
+
+---
+
+# 7. Existing Lint Job
+
+The existing job is:
+
+```yaml
+lint:
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
+    - name: Install ruff
+      run: pip install --break-system-packages ruff
+    - name: Run ruff
+      run: ruff check src tests
+```
+
+## `runs-on`
+
+```yaml
+runs-on: ubuntu-latest
+```
+
+This tells the CI system to execute the job on an Ubuntu runner.
+
+---
+
+## Checkout
+
+```yaml
+- uses: actions/checkout@v4
+```
+
+The runner needs a copy of the repository before it can inspect or test the code.
+
+The checkout action downloads the repository contents into the runner.
+
+---
+
+## Install Ruff
+
+```yaml
+- name: Install ruff
+  run: pip install --break-system-packages ruff
+```
+
+This installs Ruff.
+
+The option:
+
+```text
+--break-system-packages
+```
+
+allows pip to install into the system Python environment on the runner.
+
+---
+
+## Run Ruff
+
+```yaml
+- name: Run ruff
+  run: ruff check src tests
+```
+
+Ruff checks both:
+
+```text
+src
+tests
+```
+
+---
+
+# 8. Adding the Test Job
+
+The new test job is:
+
+```yaml
+test:
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
+    - name: Install test dependencies
+      run: pip install --break-system-packages pytest pandas numpy scikit-learn joblib
+    - name: Run tests
+      run: python3 -m pytest tests -v
+```
+
+## Test runner
+
+```yaml
+runs-on: ubuntu-latest
+```
+
+The test job uses an Ubuntu runner.
+
+---
+
+## Checkout
+
+```yaml
+- uses: actions/checkout@v4
+```
+
+The test runner needs the repository source code.
+
+---
+
+## Install dependencies
+
+```yaml
+- name: Install test dependencies
+  run: pip install --break-system-packages pytest pandas numpy scikit-learn joblib
+```
+
+The required packages are:
+
+```text
+pytest
+pandas
+numpy
+scikit-learn
+joblib
+```
+
+`pytest` runs the tests.
+
+The other packages are required by the repository's application/test code.
+
+---
+
+## Run the tests
+
+```yaml
+- name: Run tests
+  run: python3 -m pytest tests -v
+```
+
+This executes the test suite located under:
+
+```text
+tests
+```
+
+The `-v` flag provides verbose output.
+
+---
+
+# 9. Complete Final CI Configuration
+
+The final `.gitea/workflows/ci.yml` is:
+
+```yaml
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ruff
+        run: pip install --break-system-packages ruff
+      - name: Run ruff
+        run: ruff check src tests
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install test dependencies
+        run: pip install --break-system-packages pytest pandas numpy scikit-learn joblib
+      - name: Run tests
+        run: python3 -m pytest tests -v
+```
+
+---
+
+# 10. Before vs After
+
+## Before
+
+```text
+CI
+ |
+ +-- lint
+ |
+ +-- test → TODO
+```
+
+Only linting was performed.
+
+---
+
+## After
+
+```text
+CI
+ |
+ +-- lint  → ruff check src tests
+ |
+ +-- test  → pytest tests -v
+```
+
+Now both code quality and application behavior are checked.
+
+---
+
+# 11. Commit the CI Change
+
+Move into the repository:
+
+```bash
+cd /root/code/fraud-detector
+```
+
+Check the working tree:
+
+```bash
+git status
+```
+
+Stage the workflow:
+
+```bash
+git add .gitea/workflows/ci.yml
+```
+
+Create the commit:
+
+```bash
+git commit -m "Add test job to CI pipeline"
+```
+
+Push it:
+
+```bash
+git push origin main
+```
+
+The push completed successfully.
+
+The resulting commit was:
+
+```text
+1826a3f Add test job to CI pipeline
+```
+
+The repository showed:
+
+```text
+1826a3f (HEAD -> main, origin/main, origin/HEAD) Add test job to CI pipeline
+```
+
+---
+
+# 12. Verify the Workflow on Main
+
+Use:
+
+```bash
+git log -1 --oneline
+```
+
+Expected result:
+
+```text
+1826a3f Add test job to CI pipeline
+```
+
+Inspect the workflow stored in the commit:
+
+```bash
+git show HEAD:.gitea/workflows/ci.yml
+```
+
+This confirms that the workflow containing the `test` job is actually committed to `main`.
+
+---
+
+# 13. Verify CI in Gitea
+
+Open the repository in Gitea:
+
+```text
+http://localhost:3000/gitea-admin/fraud-detector
+```
+
+Go to:
+
+```text
+Actions
+```
+
+The workflow should show the checks:
+
+```text
+CI / lint (push)
+CI / test (push)
+```
+
+Both must successfully complete.
+
+The task showed:
+
+```text
+CI / lint (push)  ✅
+CI / test (push)  ✅
+```
+
+This confirms that the new test status context exists.
+
+---
+
+# 14. Configure Branch Protection
+
+Now that the `test` check exists, protect `main`.
+
+In Gitea:
+
+```text
+fraud-detector
+→ Settings
+→ Branches
+→ Add Rule
+```
+
+The Gitea version used in this task is:
+
+```text
+1.22.3
+```
+
+---
+
+# 15. Protected Branch Pattern
+
+Set:
+
+```text
+Protected Branch Name Pattern: main
+```
+
+This means the rule applies to exactly the `main` branch.
+
+Leave these fields empty:
+
+```text
+Protected file patterns
+Unprotected file patterns
+```
+
+They are not required by this task.
+
+---
+
+# 16. Block Direct Pushes
+
+Under the Push section, Gitea provides options for controlling pushes.
+
+Select:
+
+```text
+No pushing will be allowed to this branch.
+```
+
+This is important because the requirement says:
+
+> Direct push is blocked.
+
+The resulting API value should be:
+
+```json
+"enable_push": false
+```
+
+This means even users with repository write access cannot directly push to `main`.
+
+The only normal route becomes:
+
+```text
+feature branch
+    ↓
+Pull Request
+    ↓
+review + CI
+    ↓
+main
+```
+
+---
+
+# 17. Why Direct Push Protection Matters
+
+Without direct push protection, a user could do:
+
+```bash
+git checkout main
+git commit
+git push origin main
+```
+
+That could bypass the intended Pull Request process.
+
+A protected branch prevents this.
+
+This is especially important for production branches because `main` is usually treated as a controlled integration or release branch.
+
+---
+
+# 18. Require One Approval
+
+Under:
+
+```text
+Pull Request Approvals
+```
+
+Change:
+
+```text
+Required approvals: 0
+```
+
+to:
+
+```text
+Required approvals: 1
+```
+
+This means a Pull Request cannot be merged until it receives at least one approving review.
+
+The API should show:
+
+```json
+"required_approvals": 1
+```
+
+No reviewer whitelist is necessary for this task.
+
+---
+
+# 19. Require Status Checks
+
+Enable:
+
+```text
+Require status checks to pass before merging.
+```
+
+This tells Gitea:
+
+> Do not allow the Pull Request to merge until the required CI checks have succeeded.
+
+The available checks shown by Gitea were:
+
+```text
+CI / lint (push)
+CI / test (push)
+```
+
+---
+
+# 20. Status Check Patterns
+
+Under:
+
+```text
+Status check patterns
+```
+
+enter:
+
+```text
+*lint*
+*test*
+```
+
+Put each pattern on its own line.
+
+Do not put both patterns on one line.
+
+The patterns match the actual Gitea status contexts:
+
+```text
+CI / lint (push)
+CI / test (push)
+```
+
+The resulting API value was:
+
+```json
+"status_check_contexts": [
+  "*lint*",
+  "*test*"
+]
+```
+
+---
+
+# 21. Why Wildcard Patterns Are Used
+
+Gitea's full status context includes information beyond the simple job name.
+
+For example:
+
+```text
+CI / lint (push)
+CI / test (push)
+```
+
+The pattern:
+
+```text
+*lint*
+```
+
+matches the lint context.
+
+The pattern:
+
+```text
+*test*
+```
+
+matches the test context.
+
+This makes the branch protection rule target the relevant checks without requiring the complete generated context string.
+
+---
+
+# 22. Pull Request Merge Settings
+
+The default merge setting can remain:
+
+```text
+Anyone with write access will be allowed to merge the pull requests into this branch.
+```
+
+This does not remove the other protection requirements.
+
+A user still needs:
+
+```text
+1 approval
++
+successful lint
++
+successful test
+```
+
+before the Pull Request can be merged.
+
+---
+
+# 23. Save the Rule
+
+After configuring:
+
+```text
+Branch: main
+Direct pushes: blocked
+Required approvals: 1
+Status checks: enabled
+Status patterns:
+    *lint*
+    *test*
+```
+
+click:
+
+```text
+Save Rule
+```
+
+---
+
+# 24. Verify Branch Protection Through the API
+
+Use:
+
+```bash
+curl -s -u 'gitea-admin:gitea2026' \
+  http://localhost:3000/api/v1/repos/gitea-admin/fraud-detector/branch_protections | jq .
+```
+
+The API returned:
+
+```json
+[
+  {
+    "branch_name": "main",
+    "rule_name": "main",
+    "enable_push": false,
+    "enable_push_whitelist": false,
+    "push_whitelist_usernames": [],
+    "push_whitelist_teams": [],
+    "push_whitelist_deploy_keys": false,
+    "enable_merge_whitelist": false,
+    "merge_whitelist_usernames": [],
+    "merge_whitelist_teams": [],
+    "enable_status_check": true,
+    "status_check_contexts": [
+      "*lint*",
+      "*test*"
+    ],
+    "required_approvals": 1,
+    "enable_approvals_whitelist": false,
+    "approvals_whitelist_username": [],
+    "approvals_whitelist_teams": [],
+    "block_on_rejected_reviews": false,
+    "block_on_official_review_requests": false,
+    "block_on_outdated_branch": false,
+    "dismiss_stale_approvals": false,
+    "ignore_stale_approvals": false,
+    "require_signed_commits": false,
+    "protected_file_patterns": "",
+    "unprotected_file_patterns": "",
+    "created_at": "2026-08-21T00:21:18-04:00",
+    "updated_at": "2026-08-21T00:21:18-04:00"
+  }
+]
+```
+
+---
+
+# 25. Understanding the Important API Values
+
+## Branch
+
+```json
+"branch_name": "main"
+```
+
+The protection rule applies to `main`.
+
+---
+
+## Direct push
+
+```json
+"enable_push": false
+```
+
+Direct pushes are disabled.
+
+This satisfies the requirement:
+
+```text
+Direct push blocked
+```
+
+---
+
+## Status checks
+
+```json
+"enable_status_check": true
+```
+
+Status-check enforcement is enabled.
+
+---
+
+## Required checks
+
+```json
+"status_check_contexts": [
+  "*lint*",
+  "*test*"
+]
+```
+
+Both lint and test are required.
+
+---
+
+## Required approvals
+
+```json
+"required_approvals": 1
+```
+
+At least one approving review is required.
+
+---
+
+# 26. Final Architecture
+
+The final development process is:
+
+```text
+                Developer
+                    |
+                    v
+             Feature Branch
+                    |
+                    v
+              Pull Request
+                    |
+          +---------+---------+
+          |                   |
+          v                   v
+       CI / lint          CI / test
+          |                   |
+          v                   v
+        PASS                PASS
+          |                   |
+          +---------+---------+
+                    |
+                    v
+             At least 1 Approval
+                    |
+                    v
+               Merge to main
+```
+
+Direct push:
+
+```text
+Developer
+    |
+    v
+  main
+    |
+    X
+ BLOCKED
+```
+
+---
+
+# 27. Before vs After – Complete Comparison
+
+## Before
+
+```text
+CI:
+    lint only
+
+main:
+    direct pushes allowed
+    no required approval
+    no required test check
+```
+
+Possible unsafe path:
+
+```text
+Administrator
+     |
+     v
+  Force merge
+     |
+     v
+main
+     |
+     v
+Broken code
+```
+
+---
+
+## After
+
+```text
+CI:
+    lint
+    test
+
+main:
+    direct pushes blocked
+    1 approval required
+    lint required
+    test required
+```
+
+Safe path:
+
+```text
+Feature Branch
+     |
+     v
+Pull Request
+     |
+     +---- lint PASS
+     |
+     +---- test PASS
+     |
+     +---- approval
+     |
+     v
+main
+```
+
+---
+
+# 28. Common Mistakes
+
+## Mistake 1: Forgetting the test job
+
+If the workflow still contains:
+
+```yaml
+# TODO: add a test job
+```
+
+then the task is incomplete.
+
+### Fix
+
+Add:
+
+```yaml
+test:
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
+    - name: Install test dependencies
+      run: pip install --break-system-packages pytest pandas numpy scikit-learn joblib
+    - name: Run tests
+      run: python3 -m pytest tests -v
+```
+
+---
+
+## Mistake 2: Not running the test job before protecting `main`
+
+The status check must exist before it can be required.
+
+### Correct order
+
+```text
+Add test
+→ push
+→ CI runs
+→ test context appears
+→ branch protection
+```
+
+---
+
+## Mistake 3: Requiring only lint
+
+If the protection rule contains only:
+
+```text
+*lint*
+```
+
+then the test can fail while the Pull Request still satisfies the required checks.
+
+### Fix
+
+Use both:
+
+```text
+*lint*
+*test*
+```
+
+---
+
+## Mistake 4: Putting both patterns on one line
+
+Incorrect:
+
+```text
+*lint* *test*
+```
+
+Correct:
+
+```text
+*lint*
+*test*
+```
+
+Each pattern should be on its own line.
+
+---
+
+## Mistake 5: Leaving required approvals at zero
+
+Incorrect:
+
+```text
+Required approvals: 0
+```
+
+Correct:
+
+```text
+Required approvals: 1
+```
+
+---
+
+## Mistake 6: Allowing direct pushes
+
+If direct pushes remain allowed, the Pull Request process can be bypassed.
+
+The required API state is:
+
+```json
+"enable_push": false
+```
+
+---
+
+## Mistake 7: Protecting the wrong branch
+
+The rule must apply to:
+
+```text
+main
+```
+
+not:
+
+```text
+master
+```
+
+or another branch.
+
+---
+
+## Mistake 8: Editing the wrong workflow file
+
+The required file is:
+
+```text
+.gitea/workflows/ci.yml
+```
+
+Make sure the change is committed to `main`.
+
+---
+
+## Mistake 9: Forgetting to push the workflow
+
+A local change is not enough.
+
+Use:
+
+```bash
+git add .gitea/workflows/ci.yml
+git commit -m "Add test job to CI pipeline"
+git push origin main
+```
+
+---
+
+## Mistake 10: Not verifying the API
+
+The Gitea UI may look correct, but the evaluator checks the API.
+
+Always verify:
+
+```bash
+curl -s -u 'gitea-admin:gitea2026' \
+  http://localhost:3000/api/v1/repos/gitea-admin/fraud-detector/branch_protections | jq .
+```
+
+---
+
+# 29. Troubleshooting
+
+## Problem: No branch protection rule found
+
+If the evaluator says:
+
+```text
+No branch protection rule found for `main`.
+```
+
+then the rule was not created or saved.
+
+### Fix
+
+Go to:
+
+```text
+Settings → Branches
+```
+
+and create the rule for:
+
+```text
+main
+```
+
+---
+
+## Problem: Test status check is missing
+
+If Gitea does not show:
+
+```text
+CI / test (push)
+```
+
+check:
+
+```bash
+git show HEAD:.gitea/workflows/ci.yml
+```
+
+Make sure the `test` job exists.
+
+Then push the workflow and wait for the Actions run to complete.
+
+---
+
+## Problem: Test job fails
+
+Check the dependencies:
+
+```text
+pytest
+pandas
+numpy
+scikit-learn
+joblib
+```
+
+The required installation command is:
+
+```bash
+pip install --break-system-packages pytest pandas numpy scikit-learn joblib
+```
+
+The test command is:
+
+```bash
+python3 -m pytest tests -v
+```
+
+---
+
+## Problem: Direct push is still allowed
+
+Check the API:
+
+```bash
+curl -s -u 'gitea-admin:gitea2026' \
+  http://localhost:3000/api/v1/repos/gitea-admin/fraud-detector/branch_protections | jq .
+```
+
+Look for:
+
+```json
+"enable_push": false
+```
+
+If it is not `false`, the branch protection configuration is incorrect.
+
+---
+
+## Problem: Approval requirement is missing
+
+Check:
+
+```json
+"required_approvals": 1
+```
+
+A value of:
+
+```text
+0
+```
+
+does not satisfy the task.
+
+---
+
+## Problem: Status checks are not required
+
+Check:
+
+```json
+"enable_status_check": true
+```
+
+and:
+
+```json
+"status_check_contexts": [
+  "*lint*",
+  "*test*"
+]
+```
+
+---
+
+# 30. Useful Commands
+
+## Go to repository
+
+```bash
+cd /root/code/fraud-detector
+```
+
+## Check Git status
+
+```bash
+git status
+```
+
+## Check latest commit
+
+```bash
+git log -1 --oneline
+```
+
+## Show workflow from current commit
+
+```bash
+git show HEAD:.gitea/workflows/ci.yml
+```
+
+## Stage workflow
+
+```bash
+git add .gitea/workflows/ci.yml
+```
+
+## Commit
+
+```bash
+git commit -m "Add test job to CI pipeline"
+```
+
+## Push
+
+```bash
+git push origin main
+```
+
+## Check branch protection
+
+```bash
+curl -s -u 'gitea-admin:gitea2026' \
+  http://localhost:3000/api/v1/repos/gitea-admin/fraud-detector/branch_protections | jq .
+```
+
+---
+
+# 31. Requirements Checklist
+
+| Requirement | Result |
+|---|---|
+| `.gitea/workflows/ci.yml` on `main` | ✅ |
+| Existing lint job preserved | ✅ |
+| Test job added | ✅ |
+| Test job runs `pytest` | ✅ |
+| Test dependencies installed | ✅ |
+| Test job executed on `main` | ✅ |
+| `CI / test (push)` exists | ✅ |
+| Branch protection for `main` | ✅ |
+| Status checks enabled | ✅ |
+| Lint status required | ✅ |
+| Test status required | ✅ |
+| At least 1 approval required | ✅ |
+| Direct pushes blocked | ✅ |
+
+---
+
+# 32. Key Concepts to Remember
+
+### CI
+
+Automatically validates changes.
+
+### Lint
+
+Checks code quality and common coding issues.
+
+### Test
+
+Checks whether the application behaves correctly.
+
+### Pull Request
+
+A controlled proposal for merging changes.
+
+### Status Check
+
+A CI result that can be required before merging.
+
+### Branch Protection
+
+Rules that prevent unsafe changes from entering an important branch.
+
+### Required Approval
+
+Requires human review before merging.
+
+### Direct Push Protection
+
+Prevents users from bypassing Pull Requests.
+
+### Status Check Pattern
+
+A pattern used to identify required CI checks.
+
+Example:
+
+```text
+*lint*
+*test*
+```
+
+### Protected Branch
+
+A branch with rules controlling pushes and merges.
+
+In this task:
+
+```text
+main
+```
+
+is the protected branch.
+
+---
+
+# 33. Real-World Use Cases
+
+The same approach is used in real production teams.
+
+## Production application
+
+```text
+feature → PR → tests → review → main
+```
+
+This prevents untested changes from reaching production.
+
+## Machine Learning project
+
+ML repositories can require:
+
+```text
+lint
+unit tests
+data validation
+model tests
+security checks
+```
+
+before merging.
+
+## Team collaboration
+
+Branch protection prevents one developer from accidentally breaking the shared branch.
+
+## Regulated environments
+
+Required approvals and audit trails help demonstrate that production changes were reviewed.
+
+## Incident prevention
+
+The incident described in this task involved a force-merged red Pull Request.
+
+Requiring:
+
+```text
+CI + review + protected main
+```
+
+makes that type of incident much harder to reproduce.
+
+---
+
+# 34. Why This Is Important for MLOps
+
+MLOps is not only about training models.
+
+It also includes reliable software engineering practices around ML systems.
+
+A production ML repository needs:
+
+```text
+Code
++
+Tests
++
+CI
++
+Review
++
+Branch protection
++
+Auditable changes
+```
+
+For this repository:
+
+```text
+lint
+  ↓
+test
+  ↓
+Pull Request review
+  ↓
+protected main
+```
+
+creates a basic but important MLOps governance process.
+
+---
+
+# 35. Quick Revision
+
+## Q1. Why was the `test` job added?
+
+To ensure CI runs the repository's test suite instead of only performing linting.
+
+## Q2. Which command runs the tests?
+
+```bash
+python3 -m pytest tests -v
+```
+
+## Q3. Which dependencies are installed by the test job?
+
+```text
+pytest
+pandas
+numpy
+scikit-learn
+joblib
+```
+
+## Q4. Where is the CI workflow?
+
+```text
+.gitea/workflows/ci.yml
+```
+
+## Q5. What is the protected branch?
+
+```text
+main
+```
+
+## Q6. Why must the test run before branch protection?
+
+Because the status-check context must exist before it can be required by the branch protection rule.
+
+## Q7. What status checks are required?
+
+```text
+*lint*
+*test*
+```
+
+## Q8. How many approvals are required?
+
+```text
+1
+```
+
+## Q9. Can users directly push to `main`?
+
+No.
+
+The API shows:
+
+```json
+"enable_push": false
+```
+
+## Q10. What is the purpose of branch protection?
+
+To ensure changes reach `main` through a controlled process involving CI and review.
+
+## Q11. What was the important Git commit?
+
+```text
+1826a3f Add test job to CI pipeline
+```
+
+## Q12. How can branch protection be verified?
+
+```bash
+curl -s -u 'gitea-admin:gitea2026' \
+  http://localhost:3000/api/v1/repos/gitea-admin/fraud-detector/branch_protections | jq .
+```
+
+## Q13. What should the API show?
+
+At minimum:
+
+```text
+branch_name: main
+enable_status_check: true
+status_check_contexts: contains lint and test
+required_approvals: at least 1
+direct push: blocked
+```
+
+---
+
+# 36. Final Summary
+
+This task implemented two important production safeguards.
+
+First, the CI pipeline was improved by adding a real `test` job:
+
+```yaml
+test:
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
+    - name: Install test dependencies
+      run: pip install --break-system-packages pytest pandas numpy scikit-learn joblib
+    - name: Run tests
+      run: python3 -m pytest tests -v
+```
+
+The workflow was committed as:
+
+```text
+1826a3f Add test job to CI pipeline
+```
+
+Both checks successfully existed in Gitea:
+
+```text
+CI / lint (push)  ✅
+CI / test (push)  ✅
+```
+
+Second, branch protection was added to `main`.
+
+The final important configuration is:
+
+```text
+main
+├── Direct pushes: BLOCKED
+├── Required status checks:
+│   ├── *lint*
+│   └── *test*
+└── Required approvals: 1
+```
+
+The API confirmed:
+
+```json
+"branch_name": "main",
+"enable_push": false,
+"enable_status_check": true,
+"status_check_contexts": [
+  "*lint*",
+  "*test*"
+],
+"required_approvals": 1
+```
+
+The overall production workflow is now:
+
+```text
+Feature Branch
+      ↓
+Pull Request
+      ↓
+lint passes
+      ↓
+test passes
+      ↓
+1 approval
+      ↓
+Merge to main
+```
+
+This prevents direct changes to `main`, requires automated validation, and requires human review before changes are merged.
+
 
 ---
 
