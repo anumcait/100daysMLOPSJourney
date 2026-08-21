@@ -104,3 +104,12 @@ Direct pushes to main blocked ✅
 
 
 ### Screenshots
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/6dae49eb-a7f8-4b0f-b0aa-bcf8a14494a6" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/14384458-b269-46c1-953f-b07a2e8adb30" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/ae6d68e3-b251-494e-b0bb-d4e8940a3e1e" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/95d9e390-e2e7-49ed-a360-7a57904b8eb1" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/a37b7247-b664-4dbd-acec-c01a5cb69b2f" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/5bdeb202-8586-4e46-9041-a6275b2506ab" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/c0a1f799-053f-4317-a430-d81345ed7de7" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/3c51fb7e-9df4-4fe6-8936-194c554e98e8" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/be9e49f0-4ca7-4963-8c69-9e4d7664b39c" />
