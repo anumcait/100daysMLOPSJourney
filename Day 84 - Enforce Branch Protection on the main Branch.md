@@ -38,7 +38,7 @@ Added the `test` job:
         run: pip install --break-system-packages pytest pandas numpy scikit-learn joblib
       - name: Run tests
         run: python3 -m pytest tests -v
-
+```
 Committed and pushed:
 
 git add .gitea/workflows/ci.yml
