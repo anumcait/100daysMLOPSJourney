@@ -54,7 +54,7 @@ Verified Gitea Actions:
 CI / lint (push)  ✅
 CI / test (push)  ✅
 
-2. Configure Branch Protection
+### 2. Configure Branch Protection
 Gitea:
 
 Settings → Branches → Add Rule
@@ -76,7 +76,7 @@ Status check patterns:
 *lint*
 *test*
 
-3. Verify
+### 3. Verify
 curl -s -u 'gitea-admin:gitea2026' \
   http://localhost:3000/api/v1/repos/gitea-admin/fraud-detector/branch_protections | jq .
 
