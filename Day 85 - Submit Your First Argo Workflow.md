@@ -91,3 +91,15 @@ This workflow structure provides the foundation for later Argo concepts such as 
 
 ### Screenshots
 
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/83740abd-8d0e-4edc-847b-54dbc2c42ee8" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/21e210ad-bb1f-494c-aa1b-aba4153289e4" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/13d76600-8da2-4fde-bdcd-69938f92bccf" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/1952c938-858c-43e0-bc6e-cd94baaab096" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/1d0172ab-422f-4ba2-90a6-3315ada2d67d" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/cf3e293f-9e84-4302-8a88-c2b83003003f" />
+
+
+
+
+
+
