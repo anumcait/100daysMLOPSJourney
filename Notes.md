@@ -37331,6 +37331,755 @@ Merge to main
 
 This prevents direct changes to `main`, requires automated validation, and requires human review before changes are merged.
 
+# Argo Workflows - Day 85 Notes
+
+## 1. What is Argo Workflows?
+
+Argo Workflows is a Kubernetes-native workflow engine used to define and run jobs or pipelines as Kubernetes resources.
+
+A workflow describes:
+
+- What needs to run.
+- Which container should run it.
+- The order in which steps should execute.
+- When the workflow has completed successfully or failed.
+
+In this lab, we create the simplest possible workflow: one template containing one container.
+
+Think of it like this:
+
+```text
+Workflow
+  |
+  +-- Entrypoint: training
+         |
+         +-- Template: training
+                |
+                +-- Container
+                       |
+                       +-- echo "Simulating ML training step"
+```
+
+The purpose of this exercise is not to perform real machine learning. The purpose is to understand the basic structure of an Argo Workflow.
+
+## 2. Why Kubernetes?
+
+Argo Workflows runs on Kubernetes and uses Kubernetes resources to represent workflows.
+
+Instead of manually starting commands, we describe the desired workflow in YAML.
+
+Kubernetes and Argo then take care of creating and managing the required resources.
+
+The general flow is:
+
+```text
+YAML definition
+      |
+      v
+Argo Workflow
+      |
+      v
+Kubernetes resources/pods
+      |
+      v
+Container executes
+      |
+      v
+Workflow completes
+```
+
+## 3. Argo Namespace
+
+The lab installs Argo in the `argo` namespace.
+
+The Workflow must also be created in the `argo` namespace:
+
+```yaml
+metadata:
+  namespace: argo
+```
+
+A namespace provides logical isolation inside a Kubernetes cluster.
+
+In this lab, the important objects are associated with the `argo` namespace.
+
+## 4. Argo Components
+
+Two important Deployments are already running in the lab:
+
+- `workflow-controller`
+- `argo-server`
+
+### workflow-controller
+
+The workflow controller watches Workflow resources and makes sure the desired workflow is actually executed.
+
+It coordinates the Workflow lifecycle.
+
+The general process is:
+
+```text
+Workflow created
+      |
+      v
+Controller notices it
+      |
+      v
+Controller creates/runs required resources
+      |
+      v
+Container executes
+      |
+      v
+Workflow status updated
+```
+
+### argo-server
+
+The Argo Server provides the Argo API and web interface.
+
+In this lab, the web UI is exposed on:
+
+`http://localhost:5000/`
+
+The lab uses a quick-start installation, so authentication is not required.
+
+## 5. What Is an Argo Workflow?
+
+An Argo Workflow is a Kubernetes custom resource.
+
+The basic resource begins with:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+```
+
+`apiVersion` tells Kubernetes which API version and resource definition are being used.
+
+`kind` tells Kubernetes that this resource is an Argo `Workflow`.
+
+A simplified structure is:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  ...
+spec:
+  ...
+```
+
+The most important section for this lab is `spec`.
+
+## 6. Workflow Metadata
+
+Example:
+
+```yaml
+metadata:
+  generateName: ml-training-
+  namespace: argo
+```
+
+### namespace
+
+```yaml
+namespace: argo
+```
+
+This places the Workflow in the `argo` namespace.
+
+### generateName
+
+```yaml
+generateName: ml-training-
+```
+
+This tells Kubernetes to generate a unique name using the specified prefix.
+
+For example, Argo might create a Workflow with a name similar to:
+
+`ml-training-x7k9m`
+
+Using `generateName` is convenient when submitting multiple runs because each submission gets a unique name.
+
+## 7. Workflow Entrypoint
+
+One of the most important fields in this lab is:
+
+```yaml
+spec:
+  entrypoint: training
+```
+
+The `entrypoint` tells Argo which template should be the starting point of the Workflow.
+
+Here the entrypoint is:
+
+`training`
+
+Therefore, Argo looks for a template with:
+
+```yaml
+name: training
+```
+
+This creates the connection:
+
+```text
+spec.entrypoint: training
+             |
+             v
+templates:
+  - name: training
+```
+
+The names must match.
+
+If the entrypoint says:
+
+```yaml
+entrypoint: training
+```
+
+but there is no template named `training`, the Workflow definition is incorrect.
+
+## 8. Templates
+
+Templates define what Argo should execute.
+
+Our Workflow contains:
+
+```yaml
+templates:
+  - name: training
+```
+
+The template is named `training`.
+
+A template can represent different kinds of workflow operations. For this introductory exercise, it contains a simple container.
+
+Conceptually:
+
+```text
+Workflow
+   |
+   +-- entrypoint: training
+              |
+              v
+        template: training
+```
+
+Templates become especially important in later Argo topics because workflows can contain multiple templates and connect them into pipelines.
+
+## 9. The Container
+
+Inside the template we define:
+
+```yaml
+container:
+  image: alpine:3.19
+  command: [sh, -c]
+  args:
+    - echo "Simulating ML training step"
+```
+
+This is the actual work performed by our Workflow.
+
+### image
+
+```yaml
+image: alpine:3.19
+```
+
+The container uses the Alpine Linux image.
+
+Alpine is small and convenient for simple examples.
+
+We do not need a machine-learning image because this lab only needs to simulate a training operation.
+
+### command
+
+```yaml
+command: [sh, -c]
+```
+
+This starts a shell inside the container.
+
+### args
+
+```yaml
+args:
+  - echo "Simulating ML training step"
+```
+
+The shell executes the `echo` command.
+
+The output is simply a message indicating that the training step has been simulated.
+
+## 10. Why Use Echo?
+
+The lab is teaching workflow orchestration, not machine-learning model development.
+
+Therefore, we do not need:
+
+- Python.
+- A real ML framework.
+- A training dataset.
+- GPUs.
+- A real model.
+
+Instead, this is enough:
+
+```bash
+echo "Simulating ML training step"
+```
+
+The command runs successfully and exits with a success code.
+
+That allows Argo to demonstrate the complete Workflow lifecycle.
+
+## 11. Complete Workflow
+
+The complete YAML is:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: ml-training-
+  namespace: argo
+spec:
+  entrypoint: training
+  templates:
+    - name: training
+      container:
+        image: alpine:3.19
+        command: [sh, -c]
+        args:
+          - echo "Simulating ML training step"
+```
+
+Read it from top to bottom:
+
+```text
+apiVersion
+    |
+    v
+kind: Workflow
+    |
+    v
+namespace: argo
+    |
+    v
+entrypoint: training
+    |
+    v
+template: training
+    |
+    v
+container: Alpine
+    |
+    v
+execute echo command
+```
+
+## 12. Workflow Lifecycle
+
+After submitting the Workflow, it normally progresses through:
+
+```text
+Pending
+   |
+   v
+Running
+   |
+   v
+Succeeded
+```
+
+### Pending
+
+The Workflow has been accepted, but its work has not started executing yet.
+
+### Running
+
+The container is executing.
+
+### Succeeded
+
+The container completed successfully.
+
+For this lab, the final state must be:
+
+`Succeeded`
+
+The tests may wait up to 180 seconds for the Workflow to reach a terminal state.
+
+## 13. Why Succeeded?
+
+A container that finishes successfully normally exits with a successful exit status.
+
+Our command:
+
+```bash
+echo "Simulating ML training step"
+```
+
+does not intentionally fail.
+
+Therefore, Argo can mark the Workflow as:
+
+`Succeeded`
+
+If the command failed, the Workflow could instead reach a failed or error state.
+
+This is why the simple `echo` command is useful for demonstrating a successful Workflow.
+
+## 14. Using the Argo UI
+
+The important requirement of this lab is that the Workflow is authored through the Argo UI.
+
+The expected process is:
+
+```text
+Open Argo UI
+      |
+      v
+Workflows page
+      |
+      v
++ Submit New Workflow
+      |
+      v
+YAML editor
+      |
+      v
+Enter Workflow YAML
+      |
+      v
+Submit
+      |
+      v
+Watch Workflow status
+      |
+      v
+Succeeded
+```
+
+The YAML editor in the Argo UI is the canonical authoring surface for this section.
+
+## 15. Why Not kubectl Apply?
+
+Do not submit this Workflow using:
+
+```bash
+kubectl apply -f workflow.yaml
+```
+
+Even though Kubernetes can manage Argo Workflow resources through `kubectl`, this particular lab specifically teaches the Argo UI submission process.
+
+The expected method is:
+
+```text
+Argo UI
+   |
+   +-- + Submit New Workflow
+          |
+          +-- YAML editor
+                 |
+                 +-- Submit
+```
+
+This is important because future exercises build on the UI-based workflow authoring process.
+
+## 16. What the Argo UI Shows
+
+After submission, the Workflow appears in the Workflows list.
+
+You should see information such as:
+
+- Workflow name.
+- Namespace.
+- Status.
+- Start time.
+- Completion time.
+- Duration.
+
+The most important value for this exercise is the final status:
+
+`Succeeded`
+
+Opening the Workflow should also allow you to inspect its execution and template/node structure.
+
+## 17. Understanding the Single Node
+
+This lab asks for a single-step Workflow.
+
+That means there is essentially one piece of actual work:
+
+```text
+training
+   |
+   v
+container
+   |
+   v
+echo command
+```
+
+There is no:
+
+- Parallel processing.
+- Multiple steps.
+- Dependency graph.
+- Parameters.
+- Conditional execution.
+
+The goal is simply to understand the foundation.
+
+## 18. Why Entrypoints Matter
+
+The entrypoint becomes increasingly important as workflows become more complicated.
+
+In this lab:
+
+```yaml
+entrypoint: training
+```
+
+means:
+
+Start with the `training` template.
+
+Later, a Workflow can have many templates:
+
+```text
+Workflow
+   |
+   +-- preprocess
+   |
+   +-- train
+   |
+   +-- evaluate
+   |
+   +-- deploy
+```
+
+The entrypoint identifies where execution begins.
+
+This basic concept is required before learning more advanced Argo workflow structures.
+
+## 19. Foundation for Future Labs
+
+This first Workflow teaches the basic building blocks that later features extend.
+
+### WorkflowTemplate
+
+Allows reusable Workflow definitions.
+
+### CronWorkflow
+
+Allows Workflows to be scheduled.
+
+### Parameters
+
+Allows values to be passed into Workflow templates.
+
+### Multiple Steps
+
+Allows several operations to be executed in sequence.
+
+### DAG Workflows
+
+Allows more complex dependency graphs.
+
+The foundation remains:
+
+```text
+Workflow
+   |
+   +-- entrypoint
+          |
+          +-- templates
+                 |
+                 +-- containers / steps
+```
+
+## 20. Common Mistakes
+
+### Wrong namespace
+
+Incorrect:
+
+```yaml
+namespace: default
+```
+
+The lab expects:
+
+```yaml
+namespace: argo
+```
+
+### Missing entrypoint
+
+A Workflow should specify:
+
+```yaml
+spec:
+  entrypoint: training
+```
+
+### Entrypoint does not match a template
+
+If you use:
+
+```yaml
+entrypoint: training
+```
+
+you need:
+
+```yaml
+templates:
+  - name: training
+```
+
+### Missing container
+
+The template needs a container for this exercise:
+
+```yaml
+container:
+  image: alpine:3.19
+```
+
+### Missing command or args
+
+The container needs to execute something, for example:
+
+```yaml
+command: [sh, -c]
+args:
+  - echo "Simulating ML training step"
+```
+
+### Using kubectl instead of the UI
+
+The lab specifically expects submission through:
+
+`+ Submit New Workflow`
+
+### Workflow does not reach Succeeded
+
+Check the Workflow details and container output.
+
+The simplest successful command is:
+
+```bash
+echo "Simulating ML training step"
+```
+
+## 21. Final Verification Checklist
+
+Before considering the lab complete, verify:
+
+- [ ] Argo UI opens at `http://localhost:5000/`.
+- [ ] The UI responds successfully.
+- [ ] `workflow-controller` is Available.
+- [ ] `argo-server` is Available.
+- [ ] Both are in namespace `argo`.
+- [ ] At least one Workflow exists.
+- [ ] The newest Workflow is genuinely authored rather than an unrelated resource.
+- [ ] The Workflow has `spec.entrypoint`.
+- [ ] The entrypoint points to a real template.
+- [ ] The template contains a container.
+- [ ] The container has a command and/or args.
+- [ ] The Workflow progresses from Pending to Running.
+- [ ] The Workflow eventually reaches Succeeded.
+
+The desired final state is:
+
+```text
+Argo UI
+  |
+  +-- HTTP 200
+  |
+  +-- workflow-controller: Available
+  |
+  +-- argo-server: Available
+  |
+  +-- Workflow exists
+         |
+         +-- entrypoint: training
+         |
+         +-- template: training
+                |
+                +-- container
+                       |
+                       +-- echo training message
+                              |
+                              v
+                         Succeeded
+```
+
+## Key Takeaway
+
+The most important lesson from Day 85 is that an Argo Workflow is a declarative description of work that Argo executes on Kubernetes.
+
+The essential relationship is:
+
+```text
+Workflow
+   |
+   +-- spec.entrypoint
+          |
+          v
+      Template
+          |
+          v
+      Container
+          |
+          v
+       Command
+```
+
+Once this structure is understood, more advanced Argo concepts become much easier to understand.
+
+For this lab, the complete flow is:
+
+```text
+Create Workflow in Argo UI
+        |
+        v
+Set namespace to argo
+        |
+        v
+Set entrypoint to training
+        |
+        v
+Create training template
+        |
+        v
+Run Alpine container
+        |
+        v
+Execute echo command
+        |
+        v
+Pending → Running → Succeeded
+```
+
+The key command is intentionally simple:
+
+```bash
+echo "Simulating ML training step"
+```
+
+The goal is not the command itself. The goal is learning how Argo takes a declarative Workflow definition and orchestrates its execution on Kubernetes.
+
 
 ---
 

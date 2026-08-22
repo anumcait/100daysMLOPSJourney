@@ -126,4 +126,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 84: Enforce Branch Protection on the `main` Branch](./Day%2084%20-%20Enforce%20Branch%20Protection%20on%20the%20main%20Branch.md)
 
+- [Day 85: Submit Your First Argo Workflow](./Day%2085%20-%20Submit%20Your%20First%20Argo%20Workflow.md)
+
 ---
