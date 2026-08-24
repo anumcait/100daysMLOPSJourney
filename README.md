@@ -128,4 +128,7 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 85: Submit Your First Argo Workflow](./Day%2085%20-%20Submit%20Your%20First%20Argo%20Workflow.md)
 
+- [Day 86: Fix Argo Workflow DAG Dependencies](./Day%2086%20-%20Fix%20Argo%20Workflow%20DAG%20Dependencies.md)
+
+
 ---

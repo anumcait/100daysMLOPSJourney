@@ -38080,6 +38080,431 @@ echo "Simulating ML training step"
 
 The goal is not the command itself. The goal is learning how Argo takes a declarative Workflow definition and orchestrates its execution on Kubernetes.
 
+# Day 86 — Argo Workflows: DAG Dependencies
+
+## 1. What This Lab Teaches
+
+This lab demonstrates an important Argo Workflows concept: **DAG task dependencies**.
+
+The ML pipeline has three steps:
+
+1. `data-prep` — prepares the training data.
+2. `train` — trains the model using the prepared data.
+3. `evaluate` — checks the trained model.
+
+The required execution order is:
+
+    data-prep → train → evaluate
+
+The problem in the original workflow was that the tasks were not correctly dependent on one another, so Argo could schedule a task before its required input was available.
+
+---
+
+## 2. What Is a DAG?
+
+DAG means **Directed Acyclic Graph**.
+
+In Argo, a DAG is used to describe tasks and the relationships between them.
+
+For example:
+
+    data-prep → train → evaluate
+
+means:
+
+- `data-prep` must finish before `train` starts.
+- `train` must finish before `evaluate` starts.
+- `evaluate` cannot start until `train` has completed.
+
+Argo uses these dependency declarations to decide when each task can run.
+
+---
+
+## 3. Why the Original Workflow Failed
+
+Each DAG task runs in its own Kubernetes pod.
+
+The pods share a workspace volume called `workdir`.
+
+The `data-prep` task creates:
+
+    /workdir/data.txt
+
+The `train` task creates:
+
+    /workdir/model.pkl
+
+The `evaluate` task checks whether:
+
+    /workdir/model.pkl
+
+exists.
+
+If `evaluate` starts before `train` has created the model, it prints:
+
+    [evaluate] ERROR: model.pkl not found
+
+and exits with a failure.
+
+The important point is that **sharing a volume does not automatically create task ordering**.
+
+A shared volume only makes the files available to the pods. Argo still needs explicit DAG dependencies to know which task must wait for which other task.
+
+---
+
+## 4. How Argo DAG Scheduling Works
+
+A DAG task with **no dependencies** can start immediately.
+
+A task with dependencies starts only when its dependencies have been satisfied.
+
+For this pipeline:
+
+    data-prep
+         |
+         v
+       train
+         |
+         v
+      evaluate
+
+`data-prep` has no dependency, so it starts first.
+
+`train` contains:
+
+    dependencies:
+      - data-prep
+
+Therefore, Argo waits for `data-prep` to finish before starting `train`.
+
+`evaluate` contains:
+
+    dependencies:
+      - train
+
+Therefore, Argo waits for `train` to finish before starting `evaluate`.
+
+---
+
+## 5. Correct DAG Definition
+
+The important part of the workflow is:
+
+    - name: main
+      dag:
+        tasks:
+          - name: data-prep
+            template: data-prep
+
+          - name: train
+            template: train
+            dependencies:
+              - data-prep
+
+          - name: evaluate
+            template: evaluate
+            dependencies:
+              - train
+
+This creates the required execution order:
+
+    data-prep → train → evaluate
+
+---
+
+## 6. Understanding `template`
+
+Each DAG task points to a template using:
+
+    template: data-prep
+
+or:
+
+    template: train
+
+or:
+
+    template: evaluate
+
+The DAG defines **when** a task runs.
+
+The referenced template defines **what the task does**.
+
+For example:
+
+    - name: train
+      template: train
+      dependencies:
+        - data-prep
+
+Here:
+
+- `name: train` identifies the DAG task.
+- `template: train` tells Argo which execution template to run.
+- `dependencies` tells Argo when it is allowed to run.
+
+---
+
+## 7. Shared Workspace Volume
+
+The workflow defines a volume claim template:
+
+    volumeClaimTemplates:
+      - metadata:
+          name: workdir
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 64Mi
+
+The volume is mounted into each task at:
+
+    /workdir
+
+Therefore all three tasks can use the same workspace.
+
+`data-prep` writes:
+
+    /workdir/data.txt
+
+`train` writes:
+
+    /workdir/model.pkl
+
+`evaluate` reads:
+
+    /workdir/model.pkl
+
+Again, the volume provides shared storage, while the DAG dependencies provide execution order.
+
+---
+
+## 8. The Three Pipeline Steps
+
+### Data Preparation
+
+The first task runs:
+
+    echo 'rows=100' > /workdir/data.txt
+
+This simulates preparing training data.
+
+It has no dependency, so Argo can start it immediately.
+
+### Training
+
+The training task waits for `data-prep`.
+
+It creates:
+
+    /workdir/model.pkl
+
+with:
+
+    model-v1
+
+### Evaluation
+
+The evaluation task waits for `train`.
+
+It checks:
+
+    if [ ! -f /workdir/model.pkl ]
+
+If the model is missing, the task exits with code `1`.
+
+If the model exists, it reads the model and completes successfully.
+
+---
+
+## 9. Why Dependencies Matter
+
+Without dependencies, Argo treats tasks as independently schedulable.
+
+For example:
+
+    data-prep
+    train
+    evaluate
+
+does not mean "run these from top to bottom."
+
+It means there is no dependency relationship between them.
+
+Argo can therefore start them independently.
+
+That creates a race condition:
+
+    evaluate
+       |
+       | model does not exist yet
+       v
+      FAIL
+
+With dependencies:
+
+    data-prep
+       |
+       v
+     train
+       |
+       v
+    evaluate
+
+the race is eliminated.
+
+---
+
+## 10. Corrected Workflow
+
+The corrected workflow keeps the existing workflow structure and fixes the DAG dependencies.
+
+The key section is:
+
+    tasks:
+      - name: data-prep
+        template: data-prep
+
+      - name: train
+        template: train
+        dependencies:
+          - data-prep
+
+      - name: evaluate
+        template: evaluate
+        dependencies:
+          - train
+
+The critical requirement is:
+
+    evaluate
+      dependencies:
+        - train
+
+and `train` must depend on `data-prep`.
+
+---
+
+## 11. File Location
+
+The staged workflow file is:
+
+    /root/code/pipelines/training-workflow.yaml
+
+The corrected YAML can be reviewed or edited there before submitting it through the Argo UI.
+
+---
+
+## 12. Git Note
+
+An attempt to commit the file with:
+
+    cd /root/code/pipelines
+    git add training-workflow.yaml
+    git commit -m "Fix training workflow DAG dependencies"
+
+returned:
+
+    fatal: not a git repository (or any of the parent directories): .git
+
+This means `/root/code/pipelines` is not a Git repository in this environment.
+
+Do not run `git init` just to make the commit work unless the lab explicitly asks for a Git repository.
+
+The important lab operation is submitting the corrected workflow to Argo.
+
+---
+
+## 13. Argo UI Workflow
+
+The lab provides an Argo UI button at the top.
+
+The Workflows page is available through the lab environment on port `5000`.
+
+The existing workflow has a name similar to:
+
+    training-pipeline-<suffix>
+
+The original run should be in:
+
+    Failed
+
+state.
+
+Open the failed workflow and inspect the red node and its logs. This shows where the pipeline failed because the required model file was not available when evaluation ran.
+
+Then submit the corrected workflow using the YAML editor.
+
+---
+
+## 14. Expected Execution
+
+After submitting the corrected workflow, Argo should execute:
+
+    data-prep → train → evaluate
+
+The expected progression is:
+
+    data-prep   Succeeded
+        ↓
+    train       Succeeded
+        ↓
+    evaluate    Succeeded
+        ↓
+    Workflow    Succeeded
+
+All three DAG nodes should eventually become green.
+
+---
+
+## 15. Final Lab Requirements
+
+The final state should contain at least two workflows in the `argo` namespace:
+
+- The original broken workflow.
+- The newly submitted corrected workflow.
+
+The corrected workflow must have:
+
+    train
+      dependencies:
+        - data-prep
+
+and:
+
+    evaluate
+      dependencies:
+        - train
+
+The most recent workflow must have:
+
+    status.phase == Succeeded
+
+The final DAG should therefore represent:
+
+    data-prep → train → evaluate
+
+---
+
+## 16. Main Takeaway
+
+The most important lesson is:
+
+**Argo does not infer task dependencies from shared files or from the order in which tasks appear in YAML.**
+
+You must explicitly declare dependencies.
+
+A task with no dependencies starts immediately.
+
+A task with dependencies waits for those dependencies.
+
+For this ML pipeline, the correct design is:
+
+    data-prep → train → evaluate
+
+This converts three independently scheduled pods into a properly ordered ML workflow and prevents the evaluation step from racing ahead of model training.
+
 
 ---
 
