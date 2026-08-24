@@ -213,3 +213,12 @@ In the Argo UI, verify:
 The final DAG should show all three nodes in green and in the correct dependency order.
 
 ### Screenshots
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/a212e26b-07f1-4ddd-ba8f-b0a3dfc64691" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/457e1d8c-102d-4307-8302-885e6c5cd6c5" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/c50367ae-6d5b-4d62-81b7-34318667ac39" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/8fb0a571-3626-4f8a-867e-6a18c595bfc2" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/7e12aadf-0f50-4ea2-9995-f76961367727" />
+
+
+
+
