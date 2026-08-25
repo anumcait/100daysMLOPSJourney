@@ -340,3 +340,24 @@ Production  → min_score=0.9
 Every commit can therefore run the training and evaluation stages, while only models that clear the configured quality threshold are promoted to the registry.
 
 ### Screenshots
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/3f3ea84b-cc34-4102-93a5-29dd5cc058bd" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/126e98ac-4065-4093-990f-ca12bd590f54" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/4f78749c-6dba-4a98-be84-d702fb246b82" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/54fd8b72-68e3-45d9-ab85-a41938d13ca3" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/a526f37e-6503-450d-b286-5ec0aeae2044" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/3a6bca65-6c16-4200-a62c-cc1a3ba39df9" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/0a99fdbe-232a-466c-ba9f-e26f819636a8" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/5d88eb41-1948-46c2-85b9-5c6adc0b97dc" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/6a91ff5c-6843-4e78-a949-e1bc9436526b" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/89020717-39cb-4407-997c-4a82d5da50fd" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/78b5888c-0062-4c4d-9da0-a599f75603b4" />
+
+
+
+
+
+
+
+
+
+
