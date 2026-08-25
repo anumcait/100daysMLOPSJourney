@@ -130,5 +130,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 86: Fix Argo Workflow DAG Dependencies](./Day%2086%20-%20Fix%20a%20Broken%20Argo%20DAG%20Dependency%20Chain.md)
 
+- [Day 87: Pass Data Between Argo Steps with Output Parameters and Branching](./Day%2087%20-%20Pass%20Data%20Between%20Argo%20Steps%20with%20Output%20Parameters%20and%20Branching.md)
 
 ---

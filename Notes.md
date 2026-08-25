@@ -38505,6 +38505,1203 @@ For this ML pipeline, the correct design is:
 
 This converts three independently scheduled pods into a properly ordered ML workflow and prevents the evaluation step from racing ahead of model training.
 
+# Day 87 — Pass Data Between Argo Steps with Output Parameters and Branching
+
+## Lecture Notes
+
+Today we are learning one of the most important patterns in Argo Workflows: **passing data from one step to another and using that data to decide whether a later step should run**.
+
+The teaching example is an MLOps-style training pipeline. The pipeline will:
+
+1. Train a model.
+2. Evaluate the model.
+3. Produce a quality score.
+4. Pass that score to the next step.
+5. Compare the score against a configurable minimum threshold.
+6. Register/promote the model only if it passes the quality gate.
+
+The important concept is not machine learning itself. The score is deliberately synthetic. The real lesson is **Argo parameter plumbing and conditional branching**.
+
+---
+
+## 1. The Problem We Are Solving
+
+Imagine that every commit to our ML project should trigger a pipeline.
+
+The pipeline should always perform:
+
+```text
+train → evaluate
+```
+
+But we do **not** want every evaluated model to be promoted to the model registry.
+
+Instead, promotion should depend on a quality threshold.
+
+For example:
+
+```text
+Development → min_score = 0.5
+Staging     → min_score = 0.75
+Production  → min_score = 0.9
+```
+
+The same pipeline should work for all three environments.
+
+We should not have to create three different workflow definitions.
+
+Instead, we create one reusable `WorkflowTemplate` and provide a different `min_score` each time we submit it.
+
+The logical pipeline becomes:
+
+```text
+                ┌──────────┐
+                │  train   │
+                └────┬─────┘
+                     │
+                     ▼
+                ┌──────────┐
+                │ evaluate │
+                │          │
+                │ score=0.75
+                └────┬─────┘
+                     │
+                     ▼
+             score >= min_score?
+                /           \
+              yes            no
+               │              │
+               ▼              ▼
+          ┌──────────┐     SKIPPED
+          │ register │
+          └──────────┘
+```
+
+This is a **quality gate**.
+
+---
+
+## 2. The Scaffolded WorkflowTemplate
+
+The starting file was:
+
+```text
+/root/code/argo/train-and-maybe-register.yaml
+```
+
+The initial template looked like this conceptually:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: train-and-maybe-register
+  namespace: argo
+spec:
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: min_score
+        value: "0.80"
+  templates:
+    - name: main
+      steps:
+        - - name: train
+            template: train
+        - - name: evaluate
+            template: evaluate
+        - - name: register
+            template: register
+
+    - name: train
+      container:
+        image: alpine:3.19
+        command: [sh, -c]
+        args: ["echo '[train] fitting model' && sleep 2"]
+
+    - name: evaluate
+      script:
+        image: alpine:3.19
+        command: [sh]
+        source: |
+          echo "0.75" > /tmp/score.txt
+          echo "[evaluate] score=0.75"
+
+    - name: register
+      container:
+        image: alpine:3.19
+        command: [sh, -c]
+        args: ["echo '[register] promoting model to registry'"]
+```
+
+There are two important problems.
+
+### Problem 1: The score is not published
+
+The `evaluate` step writes the score to:
+
+```text
+/tmp/score.txt
+```
+
+But simply writing a file inside the container does **not** automatically make that value available to another Argo step.
+
+The next step cannot simply assume that `/tmp/score.txt` exists.
+
+Why?
+
+Because each step runs in its own execution environment/container.
+
+We therefore need to explicitly tell Argo:
+
+> Take the contents of this file and publish it as an output parameter.
+
+### Problem 2: Register runs unconditionally
+
+The `register` step has no condition.
+
+Therefore, if the workflow reaches that step, Argo runs it.
+
+It does not matter whether the score is:
+
+```text
+0.1
+```
+
+or:
+
+```text
+0.75
+```
+
+or:
+
+```text
+0.99
+```
+
+The register step would still execute.
+
+That is not what we want.
+
+---
+
+# 3. Argo Output Parameters
+
+Argo provides **output parameters** for exactly this purpose.
+
+An output parameter allows a template to publish a value so that another part of the workflow can consume it.
+
+For our evaluation step, we want to expose:
+
+```text
+/tmp/score.txt
+```
+
+as:
+
+```text
+score
+```
+
+We add:
+
+```yaml
+outputs:
+  parameters:
+    - name: score
+      valueFrom:
+        path: /tmp/score.txt
+```
+
+The complete `evaluate` template becomes:
+
+```yaml
+- name: evaluate
+  script:
+    image: alpine:3.19
+    command: [sh]
+    source: |
+      echo "0.75" > /tmp/score.txt
+      echo "[evaluate] score=0.75"
+  outputs:
+    parameters:
+      - name: score
+        valueFrom:
+          path: /tmp/score.txt
+```
+
+Now Argo knows that the template produces an output parameter named:
+
+```text
+score
+```
+
+and that its value should be read from:
+
+```text
+/tmp/score.txt
+```
+
+---
+
+# 4. Understanding `valueFrom.path`
+
+The important section is:
+
+```yaml
+valueFrom:
+  path: /tmp/score.txt
+```
+
+This means:
+
+> After the step executes, read the contents of this file and use that content as the output parameter value.
+
+Our script writes:
+
+```bash
+echo "0.75" > /tmp/score.txt
+```
+
+Therefore the output parameter becomes:
+
+```text
+score = 0.75
+```
+
+This is how data moves from the script to the Argo workflow engine.
+
+The data flow is:
+
+```text
+shell script
+    |
+    | writes
+    v
+/tmp/score.txt
+    |
+    | valueFrom.path
+    v
+Argo output parameter
+    |
+    | named "score"
+    v
+steps.evaluate.outputs.parameters.score
+```
+
+That last expression is the important reference that later steps use.
+
+---
+
+# 5. Referencing an Output Parameter
+
+Once the `evaluate` template publishes:
+
+```text
+score
+```
+
+the calling step can reference it using:
+
+```text
+steps.evaluate.outputs.parameters.score
+```
+
+Let's break that expression down.
+
+```text
+steps
+```
+
+means we are referring to a step in the current workflow.
+
+```text
+evaluate
+```
+
+is the name of the step that produced the value.
+
+```text
+outputs
+```
+
+means we want something produced by that step.
+
+```text
+parameters
+```
+
+means the output is an Argo parameter.
+
+```text
+score
+```
+
+is the name we gave the output parameter.
+
+So:
+
+```text
+steps.evaluate.outputs.parameters.score
+```
+
+means:
+
+> Give me the `score` output parameter produced by the `evaluate` step.
+
+---
+
+# 6. Workflow Parameters
+
+The workflow already has another parameter:
+
+```yaml
+arguments:
+  parameters:
+    - name: min_score
+      value: "0.80"
+```
+
+This parameter represents the minimum acceptable quality score.
+
+The default is:
+
+```text
+0.80
+```
+
+But the important point is that we can override it when submitting the workflow.
+
+Inside the workflow, we reference it as:
+
+```text
+workflow.parameters.min_score
+```
+
+So we now have two values:
+
+```text
+steps.evaluate.outputs.parameters.score
+```
+
+and:
+
+```text
+workflow.parameters.min_score
+```
+
+The first is the score produced by evaluation.
+
+The second is the threshold supplied for this workflow run.
+
+---
+
+# 7. Adding a `when:` Expression
+
+Now we need to make the register step conditional.
+
+Argo supports a `when:` expression for this purpose.
+
+We add:
+
+```yaml
+when: "{{steps.evaluate.outputs.parameters.score}} >= {{workflow.parameters.min_score}}"
+```
+
+The complete register step becomes:
+
+```yaml
+- - name: register
+    template: register
+    when: "{{steps.evaluate.outputs.parameters.score}} >= {{workflow.parameters.min_score}}"
+```
+
+Now Argo will evaluate the condition before executing `register`.
+
+The expression is:
+
+```text
+score >= min_score
+```
+
+In our example:
+
+```text
+0.75 >= min_score
+```
+
+---
+
+# 8. What Happens with `min_score=0.99`?
+
+Suppose we submit the workflow with:
+
+```text
+min_score = 0.99
+```
+
+The evaluate step produces:
+
+```text
+score = 0.75
+```
+
+Argo evaluates:
+
+```text
+0.75 >= 0.99
+```
+
+The result is:
+
+```text
+false
+```
+
+Therefore:
+
+```text
+register → Skipped
+```
+
+The workflow itself can still finish successfully.
+
+This is an important distinction.
+
+A skipped step is not necessarily a failed workflow.
+
+The workflow has successfully determined:
+
+> This model did not meet the promotion criteria, so do not register it.
+
+That is exactly what a quality gate should do.
+
+---
+
+# 9. What Happens with `min_score=0.5`?
+
+Now submit the same template with:
+
+```text
+min_score = 0.5
+```
+
+The evaluation score is still:
+
+```text
+0.75
+```
+
+Argo evaluates:
+
+```text
+0.75 >= 0.5
+```
+
+The result is:
+
+```text
+true
+```
+
+Therefore:
+
+```text
+register → Succeeded
+```
+
+The model is promoted.
+
+Notice that we did not change the workflow template.
+
+Only the input parameter changed.
+
+This is the reusable pipeline pattern.
+
+---
+
+# 10. Boundary Condition: `min_score=0.75`
+
+There is another useful case.
+
+Suppose:
+
+```text
+score = 0.75
+min_score = 0.75
+```
+
+The expression is:
+
+```text
+0.75 >= 0.75
+```
+
+Because the operator is `>=`, this is:
+
+```text
+true
+```
+
+Therefore registration happens.
+
+If the requirement instead said that the score must be **strictly greater** than the threshold, we would use:
+
+```text
+>
+```
+
+rather than:
+
+```text
+>=
+```
+
+Always pay attention to the exact comparison operator used in the quality gate.
+
+---
+
+# 11. The Completed WorkflowTemplate
+
+The final template is:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: train-and-maybe-register
+  namespace: argo
+spec:
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: min_score
+        value: "0.80"
+
+  templates:
+    - name: main
+      steps:
+        - - name: train
+            template: train
+
+        - - name: evaluate
+            template: evaluate
+
+        - - name: register
+            template: register
+            when: "{{steps.evaluate.outputs.parameters.score}} >= {{workflow.parameters.min_score}}"
+
+    - name: train
+      container:
+        image: alpine:3.19
+        command: [sh, -c]
+        args: ["echo '[train] fitting model' && sleep 2"]
+
+    - name: evaluate
+      script:
+        image: alpine:3.19
+        command: [sh]
+        source: |
+          # Deterministic score -- MLOps-not-ML. Teaching point is the
+          # parameter plumbing, not the score itself.
+          echo "0.75" > /tmp/score.txt
+          echo "[evaluate] score=0.75"
+      outputs:
+        parameters:
+          - name: score
+            valueFrom:
+              path: /tmp/score.txt
+
+    - name: register
+      container:
+        image: alpine:3.19
+        command: [sh, -c]
+        args: ["echo '[register] promoting model to registry'"]
+```
+
+There are only two functional changes compared with the scaffold:
+
+```yaml
+outputs:
+  parameters:
+    - name: score
+      valueFrom:
+        path: /tmp/score.txt
+```
+
+and:
+
+```yaml
+when: "{{steps.evaluate.outputs.parameters.score}} >= {{workflow.parameters.min_score}}"
+```
+
+---
+
+# 12. Applying the WorkflowTemplate
+
+The template was initially only a file on disk.
+
+It needed to be applied to the `argo` namespace.
+
+The command used was:
+
+```bash
+kubectl apply -f /root/code/argo/train-and-maybe-register.yaml -n argo
+```
+
+The result was:
+
+```text
+workflowtemplate.argoproj.io/train-and-maybe-register created
+```
+
+We then verified it with:
+
+```bash
+kubectl get workflowtemplate -n argo train-and-maybe-register
+```
+
+The result showed:
+
+```text
+NAME                       AGE
+train-and-maybe-register   ...
+```
+
+This confirms that Kubernetes now has the WorkflowTemplate.
+
+---
+
+# 13. Why the Argo UI Was Initially Empty
+
+There is an important distinction between a **WorkflowTemplate** and a **Workflow**.
+
+Applying:
+
+```text
+WorkflowTemplate
+```
+
+does not automatically create:
+
+```text
+Workflow
+```
+
+The template is reusable.
+
+A workflow is an actual execution of that template.
+
+Therefore, after applying the template, the Workflow list can still show:
+
+```text
+No workflows
+```
+
+That is expected.
+
+The template should appear under:
+
+```text
+Workflow Templates
+```
+
+To actually execute it, we submit a workflow using that template.
+
+---
+
+# 14. Submitting Through the Argo UI
+
+The Argo UI was running on port `5000`.
+
+The workflow template appeared as:
+
+```text
+train-and-maybe-register
+```
+
+We used the UI to submit the template.
+
+For the first test, we supplied:
+
+```text
+min_score = 0.99
+```
+
+For the second test, we submitted the same template again with:
+
+```text
+min_score = 0.5
+```
+
+This demonstrates that one reusable template can serve multiple environments or deployment policies.
+
+---
+
+# 15. First Test: Failing the Quality Gate
+
+The first workflow was:
+
+```text
+train-and-maybe-register-wvlz9
+```
+
+The graph showed:
+
+```text
+train
+evaluate
+register
+```
+
+The `register` node was inspected in the Argo UI.
+
+Its details showed:
+
+```text
+TYPE
+Skipped
+
+PHASE
+Skipped
+```
+
+Most importantly, Argo reported:
+
+```text
+when '0.75 >= 0.99' evaluated false
+```
+
+This is excellent evidence that the entire parameter flow is working.
+
+Let's trace what happened:
+
+```text
+evaluate writes:
+0.75
+```
+
+Argo publishes:
+
+```text
+score = 0.75
+```
+
+The workflow parameter is:
+
+```text
+min_score = 0.99
+```
+
+Argo evaluates:
+
+```text
+0.75 >= 0.99
+```
+
+Result:
+
+```text
+false
+```
+
+Therefore:
+
+```text
+register = Skipped
+```
+
+The gate is functioning exactly as intended.
+
+---
+
+# 16. Second Test: Passing the Quality Gate
+
+The second workflow was:
+
+```text
+train-and-maybe-register-45n7k
+```
+
+This time the workflow was submitted with:
+
+```text
+min_score = 0.5
+```
+
+The graph showed:
+
+```text
+train       ✓
+evaluate    ✓
+register    ✓
+```
+
+The `register` node details showed:
+
+```text
+TYPE
+Pod
+
+PHASE
+Succeeded
+```
+
+The pod also completed successfully:
+
+```text
+PROGRESS
+1/1
+```
+
+This proves that when the quality gate evaluates to true, Argo executes the registration step.
+
+The evaluation is effectively:
+
+```text
+0.75 >= 0.5
+```
+
+which is:
+
+```text
+true
+```
+
+Therefore:
+
+```text
+register → Succeeded
+```
+
+---
+
+# 17. Comparing Both Runs
+
+We now have two executions of the same template.
+
+### Run 1
+
+```text
+min_score = 0.99
+score     = 0.75
+```
+
+Comparison:
+
+```text
+0.75 >= 0.99
+```
+
+Result:
+
+```text
+false
+```
+
+Outcome:
+
+```text
+register → Skipped
+```
+
+### Run 2
+
+```text
+min_score = 0.5
+score     = 0.75
+```
+
+Comparison:
+
+```text
+0.75 >= 0.5
+```
+
+Result:
+
+```text
+true
+```
+
+Outcome:
+
+```text
+register → Succeeded
+```
+
+This is the complete demonstration of the quality gate.
+
+---
+
+# 18. Why This Pattern Is Useful in MLOps
+
+In a real ML platform, the evaluation step might calculate metrics such as:
+
+```text
+accuracy
+precision
+recall
+F1 score
+AUC
+BLEU
+ROUGE
+```
+
+For this exercise, we use a deterministic:
+
+```text
+0.75
+```
+
+The actual metric calculation is not the lesson.
+
+The important architecture is:
+
+```text
+Train
+  ↓
+Evaluate
+  ↓
+Publish metric
+  ↓
+Compare metric against policy
+  ↓
+Promote only if policy passes
+```
+
+This pattern separates:
+
+- model training,
+- model evaluation,
+- deployment/promotion policy.
+
+That separation is valuable because the policy can change without rewriting the training pipeline.
+
+---
+
+# 19. One Template, Multiple Environments
+
+The same template can support different environments.
+
+For example:
+
+```text
+Development
+min_score = 0.5
+```
+
+A relatively permissive environment can allow models that achieve at least 0.5.
+
+Then:
+
+```text
+Staging
+min_score = 0.75
+```
+
+requires a higher score.
+
+Finally:
+
+```text
+Production
+min_score = 0.9
+```
+
+requires an even higher score.
+
+The workflow definition remains unchanged.
+
+Only the parameter changes.
+
+Conceptually:
+
+```text
+                   Same WorkflowTemplate
+                           │
+             ┌─────────────┼─────────────┐
+             │             │             │
+             ▼             ▼             ▼
+          Dev           Staging        Prod
+        0.5 gate        0.75 gate      0.9 gate
+```
+
+This is much better than maintaining separate YAML files for every environment.
+
+---
+
+# 20. The CI/CT Gate Concept
+
+This pattern can be thought of as a CI/CT promotion gate.
+
+Every commit can run:
+
+```text
+train
+  ↓
+evaluate
+```
+
+But promotion happens only if:
+
+```text
+evaluation score >= configured threshold
+```
+
+The pipeline therefore separates **validation** from **promotion**.
+
+A failed quality gate does not necessarily mean the pipeline itself failed.
+
+Instead, it can mean:
+
+> The pipeline completed correctly, but the model did not meet the promotion policy.
+
+This distinction is important in production ML workflows.
+
+---
+
+# 21. Important Argo Syntax to Remember
+
+### Workflow parameter
+
+Use:
+
+```text
+{{workflow.parameters.min_score}}
+```
+
+to access a workflow-level parameter.
+
+### Step output parameter
+
+Use:
+
+```text
+{{steps.evaluate.outputs.parameters.score}}
+```
+
+to access an output parameter from a previous step.
+
+### Output parameter from a file
+
+Use:
+
+```yaml
+outputs:
+  parameters:
+    - name: score
+      valueFrom:
+        path: /tmp/score.txt
+```
+
+### Conditional step
+
+Use:
+
+```yaml
+when: "{{steps.evaluate.outputs.parameters.score}} >= {{workflow.parameters.min_score}}"
+```
+
+These four pieces form the core of today's lesson.
+
+---
+
+# 22. Verification
+
+The final implementation should satisfy all of the following:
+
+- The `WorkflowTemplate` exists in the `argo` namespace.
+- The template is named `train-and-maybe-register`.
+- The `evaluate` template publishes an output parameter named `score`.
+- The score comes from `/tmp/score.txt`.
+- The `register` step has a `when:` expression.
+- The `when:` expression references the evaluate score.
+- The `when:` expression references `workflow.parameters.min_score`.
+- A run with `min_score=0.99` skips registration.
+- A run with `min_score=0.5` successfully registers.
+- Both runs use the same `WorkflowTemplate`.
+
+The demonstrated results satisfy these requirements.
+
+---
+
+# 23. Final Mental Model
+
+Remember the flow as:
+
+```text
+Step produces data
+       ↓
+Output parameter
+       ↓
+Later step references output
+       ↓
+when expression evaluates condition
+       ↓
+true  → execute
+false → skip
+```
+
+For today's example:
+
+```text
+evaluate
+   │
+   │ writes 0.75
+   ▼
+/tmp/score.txt
+   │
+   │ valueFrom.path
+   ▼
+score output parameter
+   │
+   ▼
+steps.evaluate.outputs.parameters.score
+   │
+   │ compared with
+   ▼
+workflow.parameters.min_score
+   │
+   ▼
+       when:
+score >= min_score
+   │
+   ├── true  → register
+   │
+   └── false → skipped
+```
+
+That is the central lesson of Day 87.
+
+---
+
+# Key Takeaway
+
+**Argo output parameters allow one step to publish data that another step can consume. Argo `when:` expressions allow that data to control whether a later step executes.**
+
+Together, these features let us build reusable, parameterized pipelines where:
+
+```text
+Every commit → train + evaluate
+                       ↓
+                quality gate
+                  /       \
+               pass        fail
+                ↓            ↓
+             register      skip
+```
+
+This is the foundation of a configurable ML promotion pipeline:
+
+```text
+Development → min_score=0.5
+Staging     → min_score=0.75
+Production  → min_score=0.9
+```
+
+One template. Different policies. No rewrite required.
 
 ---
 
