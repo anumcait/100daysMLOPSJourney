@@ -132,4 +132,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 87: Pass Data Between Argo Steps with Output Parameters and Branching](./Day%2087%20-%20Pass%20Data%20Between%20Argo%20Steps%20with%20Output%20Parameters%20and%20Branching.md)
 
+- [Day 88: Fix a Missing @task Decorator in a Prefect Flow](./Day%2088%20-%20Fix%20a%20Missing%20@task%20Decorator%20in%20a%20Prefect%20Flow.md)
+
 ---

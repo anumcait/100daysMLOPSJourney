@@ -39703,5 +39703,259 @@ Production  → min_score=0.9
 
 One template. Different policies. No rewrite required.
 
+# Day 88 — Prefect 3.x: Fixing a Missing `@task` Decorator
+
+## 1. What We Are Learning
+
+This exercise demonstrates an important Prefect 3.x concept:
+
+> A Python function can execute inside a Prefect flow without appearing as a task in the Prefect Flow Run graph.
+
+For Prefect to track a function as a task run, it must be registered as a Prefect task using the `@task` decorator.
+
+Our fraud pipeline contains three steps:
+
+```text
+prep → train → evaluate
+```
+
+The expected Flow Run graph therefore contains three task nodes.
+
+Initially, the graph showed only:
+
+```text
+prep → train
+```
+
+The reason was that `evaluate()` was missing its `@task` decorator.
+
+## 2. The Original Problem
+
+The first two functions were correctly decorated:
+
+```python
+@task(name="prep")
+def prep() -> dict:
+    print("[prep] preparing training data")
+    return {"rows": 100, "path": "/tmp/train.csv"}
+
+
+@task(name="train")
+def train(data: dict) -> str:
+    print(f"[train] fitting model on {data['rows']} rows from {data['path']}")
+    return "model-v1"
+```
+
+But `evaluate()` originally looked like:
+
+```python
+def evaluate(model: str) -> float:
+    print(f"[evaluate] scoring model {model}")
+    return 0.75
+```
+
+The function still executed, but Prefect did not create a task-run record for it.
+
+This gives an important distinction:
+
+- Normal Python execution: the function runs.
+- Prefect orchestration: only registered tasks receive task-run records and appear in the task graph.
+
+## 3. The Correct Fix
+
+Add the Prefect task decorator:
+
+```python
+@task(name="evaluate")
+def evaluate(model: str) -> float:
+    print(f"[evaluate] scoring model {model}")
+    return 0.75
+```
+
+The explicit name `evaluate` ensures that the Prefect task-run name is exactly `evaluate`.
+
+## 4. Important Mistake: Duplicate Function Definition
+
+During the fix, a second `evaluate()` definition was accidentally left in the file.
+
+Incorrect:
+
+```python
+@task(name="evaluate")
+def evaluate(model: str) -> float:
+    print(f"[evaluate] scoring model {model}")
+    return 0.75
+
+
+def evaluate(model: str) -> float:
+    print(f"[evaluate] scoring model {model}")
+    return 0.75
+```
+
+This is a Python problem. The second definition replaces the decorated function reference, so the flow calls the undecorated function.
+
+Therefore, there must be only one `evaluate()` definition, and it must have `@task(name="evaluate")` immediately above it.
+
+## 5. Correct Task Structure
+
+```python
+@task(name="prep")
+def prep() -> dict:
+    print("[prep] preparing training data")
+    return {"rows": 100, "path": "/tmp/train.csv"}
+
+
+@task(name="train")
+def train(data: dict) -> str:
+    print(f"[train] fitting model on {data['rows']} rows from {data['path']}")
+    return "model-v1"
+
+
+@task(name="evaluate")
+def evaluate(model: str) -> float:
+    print(f"[evaluate] scoring model {model}")
+    return 0.75
+```
+
+The flow calls the tasks in order:
+
+```python
+@flow(name="fraud-pipeline")
+def fraud_pipeline() -> float:
+    data = prep()
+    model = train(data)
+    score = evaluate(model)
+    print(f"[flow] final score={score}")
+    return score
+```
+
+This creates the intended dependency chain:
+
+```text
+prep
+  ↓
+train
+  ↓
+evaluate
+```
+
+## 6. Why Redeployment Is Required
+
+The deployment runs the served version of the flow. Saving the Python file does not necessarily make an already-running serve process reload the new source.
+
+The lab provides a Makefile for the required restart/redeployment cycle.
+
+Run:
+
+```bash
+cd /root/code/prefect
+make
+```
+
+A successful redeployment reports:
+
+```text
+Redeployed fraud-pipeline. Check /var/log/prefect-serve.log
+```
+
+The serve process can be checked with:
+
+```bash
+tail -n 30 /var/log/prefect-serve.log
+```
+
+The log should show that `fraud-pipeline` is being served and polling for runs.
+
+## 7. Triggering a Fresh Run
+
+After redeployment, open the Prefect UI on port 5000.
+
+Navigate to:
+
+```text
+Deployments → fraud-pipeline
+```
+
+Select **Quick Run**.
+
+Always inspect the newly created run rather than an older run because previous runs may still contain the old two-task behavior.
+
+## 8. Successful Verification
+
+The new Flow Run must contain exactly three task runs:
+
+```text
+prep
+train
+evaluate
+```
+
+Each task must reach:
+
+```text
+Completed
+```
+
+The graph should show:
+
+```text
+prep → train → evaluate
+```
+
+The deployment should also remain available through:
+
+```text
+/api/deployments/name/fraud-pipeline/fraud-pipeline
+```
+
+A completed run containing all three task names proves that Prefect is now recording `evaluate` as a task.
+
+## 9. Key Lesson
+
+The central lesson is:
+
+> Prefect's task graph is built from task-run records created by the orchestrator.
+
+A normal Python function can execute successfully without becoming a Prefect task.
+
+Therefore:
+
+```python
+def evaluate(...):
+```
+
+means the function executes as ordinary Python.
+
+Whereas:
+
+```python
+@task(name="evaluate")
+def evaluate(...):
+```
+
+registers it with Prefect so Prefect can create a task run, track its state, and display it in the Flow Run graph.
+
+Also remember that a decorated function must not subsequently be redefined with the same name, because a later Python definition replaces the decorated function reference.
+
+## 10. Final Checklist
+
+- `evaluate()` has `@task(name="evaluate")`.
+- There is only one `evaluate()` definition.
+- The file is saved at `/root/code/prefect/fraud_pipeline.py`.
+- `make` successfully redeploys `fraud-pipeline`.
+- The serve log confirms the new process is running.
+- A fresh Quick Run is triggered after redeployment.
+- The new Flow Run is `Completed`.
+- The run contains exactly three task runs: `prep`, `train`, and `evaluate`.
+- All three task runs are `Completed`.
+- The graph shows `prep → train → evaluate`.
+- The `fraud-pipeline` deployment remains available through the expected API endpoint.
+
+## Final Takeaway
+
+The difference is between a function that **runs inside a flow** and a Prefect task that the **orchestrator can track**.
+
+Adding `@task(name="evaluate")`, removing the duplicate function definition, redeploying the flow, and triggering a fresh run makes `evaluate` visible in the Prefect DAG.
+
 ---
 
