@@ -57,3 +57,21 @@ The final deployment should have a completed Flow Run containing exactly these t
 - `prep`
 - `train`
 - `evaluate`
+
+### Screenshots
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/b0f15317-4255-4643-a464-cb7a9800cfdf" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/6ab7e9b4-3e64-4a49-af78-6ec71897ad49" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/16536bd2-a923-47a9-8401-cffb2ce86c31" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/89092113-c788-49cc-bf61-bc4b026641f3" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/828a97e7-11e4-4853-b5f3-2fe0ed56e5b8" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/d37d8e90-a4b5-4462-bb59-c81ee9696e63" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/a2e16d89-06fc-473a-9e8e-d01af8212265" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/9abe7e22-4986-481d-9ba2-1f69f8faddd8" />
+
+
+
+
+
+
+
+
