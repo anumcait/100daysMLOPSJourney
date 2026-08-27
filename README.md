@@ -134,4 +134,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 88: Fix a Missing @task Decorator in a Prefect Flow](./Day%2088%20-%20Fix%20a%20Missing%20@task%20Decorator%20in%20a%20Prefect%20Flow.md)
 
+- [Day 89: Parallel Model Training with Argo withParam Fan-Out](./Day%2089%20-%20Parallel%20Model%20Training%20with%20Argo%20withParam%20Fan-Out.md)
+
 ---

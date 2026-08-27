@@ -39957,5 +39957,543 @@ The difference is between a function that **runs inside a flow** and a Prefect t
 
 Adding `@task(name="evaluate")`, removing the duplicate function definition, redeploying the flow, and triggering a fresh run makes `evaluate` visible in the Prefect DAG.
 
+# Day 89 — Parallel Model Training with Argo `withParam` Fan-Out
+
+## 1. What This Exercise Teaches
+
+This exercise demonstrates a very common Argo Workflows pattern:
+
+**One input list → multiple parallel tasks → one final reducer**
+
+In machine learning, we often want to train several model variants with different hyperparameters and then select the best result.
+
+For example:
+
+```text
+estimators_list = ["10", "50", "100"]
+```
+
+means:
+
+```text
+              ┌── train with 10
+              ├── train with 50
+estimators ───┼── train with 100
+              │
+              └── pick-best
+```
+
+Argo provides `withParam` specifically for this kind of fan-out.
+
+---
+
+## 2. Starting WorkflowTemplate
+
+The template is:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: train-parallel-variants
+  namespace: argo
+```
+
+A `WorkflowTemplate` is a reusable workflow definition. Instead of defining a complete workflow every time, we create the template once and submit it multiple times.
+
+The template uses:
+
+```yaml
+entrypoint: main
+```
+
+Therefore, execution starts at the `main` template.
+
+---
+
+## 3. The Input Parameter
+
+The workflow defines:
+
+```yaml
+arguments:
+  parameters:
+    - name: estimators_list
+      value: '["10","50","100"]'
+```
+
+`estimators_list` contains a JSON array.
+
+Each value represents a different training configuration:
+
+```text
+10
+50
+100
+```
+
+The important point is that the parameter is a **list**, not a single value.
+
+---
+
+## 4. The `train-variant` Template
+
+The training template expects one parameter:
+
+```yaml
+- name: train-variant
+  inputs:
+    parameters:
+      - name: n_estimators
+```
+
+The actual value is read inside the script:
+
+```yaml
+N='{{inputs.parameters.n_estimators}}'
+```
+
+The script validates the value:
+
+```sh
+case "$N" in
+  ''|*[!0-9]*)
+    echo "[train] ERROR: n_estimators must be a positive integer, got: $N"
+    exit 1
+    ;;
+esac
+```
+
+If the value contains invalid characters, the container exits with status `1`, so that particular branch fails.
+
+For a valid value, it prints:
+
+```text
+[train] fitting with n_estimators=10
+```
+
+and eventually:
+
+```text
+model-n10
+```
+
+The exercise uses a simple Alpine container rather than performing real ML training. The purpose is to demonstrate Argo's workflow behavior.
+
+---
+
+## 5. Why `withParam` Is Needed
+
+Initially, the main step was:
+
+```yaml
+- - name: train
+    template: train-variant
+```
+
+This invokes `train-variant` only once.
+
+It also does not provide the required `n_estimators` parameter.
+
+Therefore, it cannot perform a parameter sweep.
+
+The solution is:
+
+```yaml
+- - name: train
+    template: train-variant
+    arguments:
+      parameters:
+        - name: n_estimators
+          value: "{{item}}"
+    withParam: "{{workflow.parameters.estimators_list}}"
+```
+
+There are two important pieces here.
+
+### `withParam`
+
+```yaml
+withParam: "{{workflow.parameters.estimators_list}}"
+```
+
+tells Argo to iterate over the JSON list.
+
+### `{{item}}`
+
+```yaml
+value: "{{item}}"
+```
+
+represents the current list element.
+
+Therefore:
+
+```json
+["10","50","100"]
+```
+
+becomes conceptually:
+
+```text
+n_estimators = 10
+n_estimators = 50
+n_estimators = 100
+```
+
+Argo creates separate parallel executions for them.
+
+---
+
+## 6. Fan-Out
+
+This is called **fan-out**.
+
+One step definition expands into multiple executions:
+
+```text
+                  ┌── train-variant(10)
+                  │
+train + withParam ├── train-variant(50)
+                  │
+                  └── train-variant(100)
+```
+
+The important advantage is that the branches are independent.
+
+If one input is bad, Argo does not automatically stop the other branches.
+
+For example:
+
+```json
+["10","bad","100"]
+```
+
+produces:
+
+```text
+train(10)   → Succeeded
+train(bad)  → Failed
+train(100)  → Succeeded
+```
+
+So the valid models can still finish even though one branch failed.
+
+---
+
+## 7. Fan-In with `pick-best`
+
+After the parallel training step, the workflow needs a reducer.
+
+That reducer is:
+
+```yaml
+- - name: pick-best
+    template: pick-best
+```
+
+It is deliberately placed in a **second step group**.
+
+The structure is therefore:
+
+```yaml
+steps:
+  - - name: train
+      ...
+  - - name: pick-best
+      template: pick-best
+```
+
+Argo executes the second step group after the first step group completes.
+
+Conceptually:
+
+```text
+             ┌── train(10) ──┐
+             ├── train(50) ──┼── pick-best
+             └── train(100) ─┘
+```
+
+This is called **fan-in** because multiple parallel results come back together into one reducer step.
+
+---
+
+## 8. The `pick-best` Template
+
+The reducer is:
+
+```yaml
+- name: pick-best
+  container:
+    image: alpine:3.19
+    command: [sh, -c]
+    args: ["echo '[pick_best] selected: model-n100'"]
+```
+
+In this exercise, the reducer simply prints the selected model.
+
+A real ML workflow could instead:
+
+- read model metrics,
+- compare accuracy or loss,
+- identify the best model,
+- save the selected model,
+- publish it to a model registry.
+
+The important lesson here is the workflow structure, not the actual ML logic.
+
+---
+
+## 9. Applying the Template
+
+The template is stored at:
+
+```text
+/root/code/argo/train-parallel-variants.yaml
+```
+
+Apply it with:
+
+```bash
+kubectl apply -f /root/code/argo/train-parallel-variants.yaml -n argo
+```
+
+Verify:
+
+```bash
+kubectl get workflowtemplate train-parallel-variants -n argo
+```
+
+The expected result is that the WorkflowTemplate exists in the `argo` namespace.
+
+You can inspect it with:
+
+```bash
+kubectl get workflowtemplate train-parallel-variants -n argo -o yaml
+```
+
+Look for:
+
+```yaml
+withParam: '{{workflow.parameters.estimators_list}}'
+```
+
+and:
+
+```yaml
+- - name: pick-best
+    template: pick-best
+```
+
+---
+
+## 10. First Submission — Deliberately Broken
+
+The first submission tests failure isolation.
+
+Use:
+
+```json
+["10","bad","100"]
+```
+
+Argo creates three branches:
+
+```text
+train(0:10)   ✓
+train(1:bad)  ✗
+train(2:100)  ✓
+```
+
+The `bad` value fails the validation in `train-variant`.
+
+The important observation is that `10` and `100` still execute successfully.
+
+This proves that `withParam` creates independent parallel branches.
+
+Because one branch failed, the reducer does not get a complete successful set.
+
+Therefore:
+
+```text
+train(10)    → Succeeded
+train(bad)   → Failed
+train(100)   → Succeeded
+pick-best    → Omitted
+workflow     → Failed
+```
+
+This is the expected failure mode.
+
+---
+
+## 11. Second Submission — Valid Input
+
+Submit the template again with:
+
+```json
+["10","50","100"]
+```
+
+Now every branch has a valid value:
+
+```text
+train(0:10)   ✓
+train(1:50)   ✓
+train(2:100)  ✓
+```
+
+After the parallel branches complete, Argo runs:
+
+```text
+pick-best ✓
+```
+
+The final workflow should be:
+
+```text
+Succeeded
+```
+
+The workflow graph demonstrates both concepts:
+
+```text
+              ┌── train(10) ──┐
+              ├── train(50) ──┤
+main ─────────┤               ├── pick-best
+              └── train(100) ─┘
+                 FAN-OUT          FAN-IN
+```
+
+---
+
+## 12. What the Argo UI Confirms
+
+For the faulty workflow, the UI showed:
+
+```text
+train(2:100)  ✓
+train(1:bad)  ✗
+train(0:10)   ✓
+```
+
+This confirms fan-out.
+
+For the successful workflow, the UI showed:
+
+```text
+train(2:100)  ✓
+pick-best     ✓
+train(1:50)   ✓
+train(0:10)   ✓
+```
+
+This confirms both fan-out and fan-in.
+
+---
+
+## 13. Final Verification
+
+At the end, there should be at least two workflows using:
+
+```yaml
+spec:
+  workflowTemplateRef:
+    name: train-parallel-variants
+```
+
+One should demonstrate the failure case and the latest one should demonstrate success.
+
+The latest workflow should have:
+
+```text
+status.phase = Succeeded
+```
+
+and should contain at least:
+
+```text
+3 × train-variant → Succeeded
+1 × pick-best     → Succeeded
+```
+
+The WorkflowTemplate itself should contain:
+
+```yaml
+withParam: "{{workflow.parameters.estimators_list}}"
+```
+
+and the second step group:
+
+```yaml
+- - name: pick-best
+    template: pick-best
+```
+
+---
+
+## 14. Key Takeaways
+
+### `withParam`
+
+`withParam` is Argo's primitive for iterating over a JSON list and creating parallel workflow executions.
+
+```yaml
+withParam: "{{workflow.parameters.estimators_list}}"
+```
+
+### `{{item}}`
+
+`{{item}}` represents the current value being processed:
+
+```yaml
+value: "{{item}}"
+```
+
+### Fan-Out
+
+One definition becomes many parallel executions:
+
+```text
+1 step → N branches
+```
+
+### Fan-In
+
+Multiple branches are followed by one reducer:
+
+```text
+N branches → 1 reducer
+```
+
+### Failure Isolation
+
+A bad input does not prevent other fan-out branches from running.
+
+### Reducer Dependency
+
+The reducer only runs when the preceding step group completes successfully enough for Argo to proceed. In this exercise, a failed training branch causes `pick-best` to be omitted and the workflow to finish `Failed`.
+
+### Real-World ML Pattern
+
+This same design can be used for:
+
+```text
+Hyperparameter list
+       ↓
+Parallel model training
+       ↓
+Metric collection
+       ↓
+Best-model selection
+       ↓
+Deployment
+```
+
+The central lesson is:
+
+**`withParam` turns one workflow step into a parallel parameter sweep, while a following step group provides the fan-in point for selecting or processing the combined result.**
+
+
 ---
 
