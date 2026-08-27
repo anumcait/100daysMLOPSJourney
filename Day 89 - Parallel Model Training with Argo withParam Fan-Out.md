@@ -266,3 +266,17 @@ and its nodes should include:
 The completed exercise demonstrates:
 
 **Argo `withParam` fan-out → parallel model training → reducer fan-in → best model selection**
+
+### Screenshots
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/d98b1ca5-0d40-49f2-a49b-ee09547e2521" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/d3beeda7-c604-4439-8a57-11ed5d7f71c3" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/f8988d60-44e3-48af-9506-4810751df90e" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/21d8ebba-4cc0-4208-b1ea-7785387c5675" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/d2db61e8-d7c9-4b4a-872b-9ee44065ae84" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/8128eac5-fe67-46c1-af06-6375dea19473" />
+
+
+
+
+
+
