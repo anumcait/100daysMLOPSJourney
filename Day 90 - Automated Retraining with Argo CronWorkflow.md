@@ -110,3 +110,11 @@ The `Forbid` concurrency policy ensures that a slow retraining run will not over
 
 ### Screenshots
 
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/a1964a9c-c108-4099-a2cd-93be95ec7df0" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/81b24e7c-78bc-4161-86d0-483662991416" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/fee965d8-1135-4af3-ab53-53ff95294b10" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/ee876f63-6ec4-4f35-836a-01215ae0e421" />
+
+
+
+
