@@ -136,4 +136,8 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 89: Parallel Model Training with Argo withParam Fan-Out](./Day%2089%20-%20Parallel%20Model%20Training%20with%20Argo%20withParam%20Fan-Out.md)
 
+- [Day 90: Automated Retraining with Argo CronWorkflow](./Day%2090%20-%20Automated%20Retraining%20with%20Argo%20CronWorkflow.md)
+
+
+
 ---

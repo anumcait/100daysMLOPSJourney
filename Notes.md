@@ -40494,6 +40494,739 @@ The central lesson is:
 
 **`withParam` turns one workflow step into a parallel parameter sweep, while a following step group provides the fan-in point for selecting or processing the combined result.**
 
+# Day 90 Notes: Automated Retraining with Argo CronWorkflow
+
+## 1. What We Are Learning
+
+Today we are learning how to automate a machine-learning retraining workflow using an **Argo CronWorkflow**.
+
+The goal is simple:
+
+> Instead of manually starting the fraud-detector retraining process, Argo should automatically start it on a fixed schedule.
+
+A `CronWorkflow` combines two ideas:
+
+- **Cron schedule** — determines *when* a Workflow should run.
+- **Workflow specification** — determines *what* should run.
+
+This gives us automated, repeatable retraining without human intervention.
+
+---
+
+## 2. CronWorkflow vs Workflow
+
+A normal Argo `Workflow` represents a single execution.
+
+For example:
+
+```yaml
+kind: Workflow
+```
+
+When submitted, it runs once.
+
+A `CronWorkflow` is different:
+
+```yaml
+kind: CronWorkflow
+```
+
+It acts like a scheduled job. It repeatedly creates child Workflows according to its schedule.
+
+Conceptually:
+
+```text
+CronWorkflow
+     |
+     | every minute
+     v
+Workflow #1 -> Succeeded
+     |
+     | next minute
+     v
+Workflow #2 -> Succeeded
+     |
+     | next minute
+     v
+Workflow #3 -> Succeeded
+```
+
+The CronWorkflow itself remains active while the individual child Workflows execute.
+
+---
+
+## 3. The Scaffold
+
+The provided file is:
+
+```text
+/root/code/argo/fraud-retraining.yaml
+```
+
+The original scaffold had two missing pieces:
+
+1. The `schedules` configuration.
+2. The actual retraining command.
+
+The rest of the configuration was already provided.
+
+---
+
+## 4. `apiVersion`
+
+The first line is:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+```
+
+This tells Kubernetes which API version and resource definition we are using.
+
+`argoproj.io` identifies Argo's Kubernetes API group.
+
+---
+
+## 5. `kind`
+
+We use:
+
+```yaml
+kind: CronWorkflow
+```
+
+This tells Kubernetes that the resource is an Argo CronWorkflow rather than a normal Workflow, Deployment, Service, etc.
+
+---
+
+## 6. Metadata
+
+The resource is named:
+
+```yaml
+metadata:
+  name: fraud-retraining
+  namespace: argo
+```
+
+The name is important because we later use it to inspect the CronWorkflow:
+
+```bash
+kubectl get cronworkflow fraud-retraining -n argo
+```
+
+The namespace is `argo`, so the CronWorkflow must be applied there.
+
+---
+
+## 7. The Schedule
+
+The most important missing piece was:
+
+```yaml
+schedules:
+  - "* * * * *"
+```
+
+This is a standard cron expression.
+
+The five fields represent:
+
+```text
+minute hour day-of-month month day-of-week
+```
+
+For:
+
+```text
+* * * * *
+```
+
+every field is `*`, meaning every possible value.
+
+Therefore:
+
+```text
+* * * * *
+```
+
+means:
+
+> Run every minute.
+
+This frequent schedule is intentional for the exercise because the grading system needs to see a Workflow run quickly.
+
+### Why Is It a List?
+
+Argo's `schedules` field accepts a list:
+
+```yaml
+schedules:
+  - "* * * * *"
+```
+
+Even though we only need one schedule, it is still represented as a YAML list.
+
+---
+
+## 8. Timezone
+
+The configuration contains:
+
+```yaml
+timezone: "Etc/UTC"
+```
+
+This specifies the timezone used to interpret the schedule.
+
+Using UTC makes the schedule predictable regardless of the machine's local timezone.
+
+---
+
+## 9. Concurrency Policy
+
+The configuration contains:
+
+```yaml
+concurrencyPolicy: Forbid
+```
+
+This prevents overlapping scheduled runs.
+
+For example, suppose one retraining run takes longer than a minute:
+
+```text
+09:00 -> Workflow starts
+09:01 -> Previous run still running
+09:01 -> New run is forbidden
+09:02 -> Previous run still running
+```
+
+Without this policy, multiple retraining jobs could potentially run at the same time.
+
+For model retraining, avoiding overlapping runs can prevent wasted resources or conflicting model updates.
+
+---
+
+## 10. Starting Deadline
+
+We have:
+
+```yaml
+startingDeadlineSeconds: 60
+```
+
+This gives Argo a deadline for starting a missed scheduled run.
+
+The exercise also specifies a short grading window, so this helps ensure a scheduled execution is not ignored indefinitely after a scheduling delay.
+
+---
+
+## 11. Workflow History
+
+The configuration includes:
+
+```yaml
+successfulJobsHistoryLimit: 4
+failedJobsHistoryLimit: 2
+```
+
+These control how many completed child Workflow records are retained.
+
+Successful runs:
+
+```text
+4
+```
+
+Failed runs:
+
+```text
+2
+```
+
+This prevents unlimited historical Workflow objects from accumulating.
+
+---
+
+## 12. `workflowSpec`
+
+The CronWorkflow needs to know what Workflow to create at each scheduled tick.
+
+That is defined under:
+
+```yaml
+workflowSpec:
+```
+
+Inside it we have:
+
+```yaml
+entrypoint: main
+```
+
+This tells Argo that the `main` template is the starting point of the Workflow.
+
+---
+
+## 13. The Main Template
+
+The template is:
+
+```yaml
+templates:
+  - name: main
+```
+
+The name must match the entrypoint:
+
+```yaml
+entrypoint: main
+```
+
+So Argo starts execution at the template named `main`.
+
+---
+
+## 14. Container
+
+The Workflow runs a container:
+
+```yaml
+container:
+  image: alpine:3.19
+```
+
+Alpine is a small Linux container image.
+
+We do not need a real machine-learning environment for this exercise because the objective is to demonstrate scheduling and orchestration.
+
+The retraining operation is therefore represented by a simple shell command.
+
+---
+
+## 15. Command
+
+The container uses:
+
+```yaml
+command: [sh, -c]
+```
+
+This tells the container to execute the supplied text using the shell.
+
+The actual script is supplied through:
+
+```yaml
+args:
+  - |
+```
+
+The `|` means the following indented lines form a multi-line string.
+
+---
+
+## 16. The Retraining Step
+
+The placeholder originally contained:
+
+```bash
+echo "TODO 2: author the retraining step"
+exit 1
+```
+
+This deliberately fails because:
+
+```bash
+exit 1
+```
+
+represents an unsuccessful command.
+
+We replace it with:
+
+```bash
+echo "retrain $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+exit 0
+```
+
+The first command prints a retraining marker and a UTC timestamp.
+
+Example output:
+
+```text
+retrain 2026-08-28T04:05:00Z
+```
+
+The second command:
+
+```bash
+exit 0
+```
+
+indicates successful completion.
+
+This is important because the child Workflow must reach:
+
+```text
+Succeeded
+```
+
+---
+
+## 17. Why Use `echo` Instead of Real Training?
+
+This exercise is about **orchestration**, not model training.
+
+We only need to demonstrate that:
+
+1. Argo understands the schedule.
+2. Argo creates a Workflow automatically.
+3. The Workflow executes the retraining step.
+4. The step succeeds.
+
+A real ML training command could later replace the `echo` command.
+
+For this exercise, the following is enough:
+
+```bash
+echo "retrain $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+exit 0
+```
+
+---
+
+## 18. Complete YAML
+
+The completed resource is:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: CronWorkflow
+metadata:
+  name: fraud-retraining
+  namespace: argo
+spec:
+  schedules:
+    - "* * * * *"
+  timezone: "Etc/UTC"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 60
+  successfulJobsHistoryLimit: 4
+  failedJobsHistoryLimit: 2
+  workflowSpec:
+    entrypoint: main
+    templates:
+      - name: main
+        container:
+          image: alpine:3.19
+          command: [sh, -c]
+          args:
+            - |
+              echo "retrain $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              exit 0
+```
+
+---
+
+## 19. Apply the CronWorkflow
+
+The scaffold is not automatically applied.
+
+We must create/update the resource in Kubernetes:
+
+```bash
+kubectl apply -f /root/code/argo/fraud-retraining.yaml -n argo
+```
+
+The `-n argo` option specifies the target namespace.
+
+After applying it, Argo can start scheduling child Workflows.
+
+---
+
+## 20. Verify the CronWorkflow
+
+Check the resource:
+
+```bash
+kubectl get cronworkflow fraud-retraining -n argo
+```
+
+We want the CronWorkflow to be active.
+
+It should not be suspended.
+
+We can also inspect the complete resource:
+
+```bash
+kubectl get cronworkflow fraud-retraining -n argo -o yaml
+```
+
+Check that:
+
+```yaml
+schedules:
+  - "* * * * *"
+```
+
+is present.
+
+Also make sure the CronWorkflow is not configured with:
+
+```yaml
+suspend: true
+```
+
+---
+
+## 21. Verify Child Workflows
+
+A CronWorkflow creates normal Workflow resources when its schedule fires.
+
+The Argo-added label is:
+
+```text
+workflows.argoproj.io/cron-workflow=fraud-retraining
+```
+
+We can find those runs using:
+
+```bash
+kubectl get workflows -n argo \
+  -l workflows.argoproj.io/cron-workflow=fraud-retraining
+```
+
+A successful run should eventually show:
+
+```text
+Succeeded
+```
+
+The important distinction is:
+
+```text
+CronWorkflow = scheduler
+Workflow     = individual execution
+```
+
+---
+
+## 22. Watch for the First Run
+
+To continuously watch for a child Workflow:
+
+```bash
+kubectl get workflows -n argo \
+  -l workflows.argoproj.io/cron-workflow=fraud-retraining \
+  -w
+```
+
+Because the schedule is every minute, a child Workflow should appear around the next schedule tick.
+
+It may initially be running:
+
+```text
+Running
+```
+
+and then become:
+
+```text
+Succeeded
+```
+
+---
+
+## 23. Verify the Argo API
+
+The expected API endpoint is:
+
+```text
+/api/v1/cron-workflows/argo/fraud-retraining
+```
+
+It can be checked with:
+
+```bash
+curl -s http://localhost:5000/api/v1/cron-workflows/argo/fraud-retraining
+```
+
+The response should represent the `fraud-retraining` CronWorkflow.
+
+The important requirements are:
+
+- `schedules` must be non-empty.
+- The CronWorkflow must not be suspended.
+- A next scheduled execution should be close to the current time.
+
+---
+
+## 24. Verify in the Argo UI
+
+The Argo UI is available on port `5000`.
+
+Open the Argo interface and navigate to the **Cron Workflows** page.
+
+You should see:
+
+```text
+fraud-retraining
+```
+
+It should be active and should not have a **Suspended** badge.
+
+The next scheduled time should be within approximately 60 seconds.
+
+After the next schedule tick, a child Workflow should appear.
+
+That Workflow should eventually show:
+
+```text
+Succeeded
+```
+
+---
+
+## 25. Expected End State
+
+The final system should look conceptually like this:
+
+```text
+fraud-retraining CronWorkflow
+          |
+          | every minute
+          v
+   Child Workflow #1
+          |
+       Succeeded
+          |
+          | next minute
+          v
+   Child Workflow #2
+          |
+       Succeeded
+```
+
+The CronWorkflow remains active and continues scheduling future runs.
+
+The child Workflow receives the label:
+
+```text
+workflows.argoproj.io/cron-workflow=fraud-retraining
+```
+
+---
+
+## 26. Important Things to Remember
+
+### Schedule
+
+```yaml
+schedules:
+  - "* * * * *"
+```
+
+Means:
+
+> Run every minute.
+
+### Concurrency
+
+```yaml
+concurrencyPolicy: Forbid
+```
+
+Means:
+
+> Do not start another scheduled run while the previous one is still running.
+
+### Successful retraining
+
+```bash
+exit 0
+```
+
+Means:
+
+> The retraining step completed successfully.
+
+### Failed retraining
+
+```bash
+exit 1
+```
+
+Means:
+
+> The command failed.
+
+### Entrypoint
+
+```yaml
+entrypoint: main
+```
+
+Means:
+
+> Start execution using the template named `main`.
+
+### Namespace
+
+```yaml
+namespace: argo
+```
+
+Means:
+
+> The CronWorkflow belongs to the `argo` namespace.
+
+---
+
+## 27. Quick Verification Checklist
+
+Before considering the task complete, verify:
+
+- [ ] `fraud-retraining` exists in the `argo` namespace.
+- [ ] `schedules` is present.
+- [ ] The schedule is `* * * * *`.
+- [ ] The CronWorkflow is not suspended.
+- [ ] `concurrencyPolicy` is `Forbid`.
+- [ ] The retraining command contains `retrain`.
+- [ ] The command prints a UTC timestamp.
+- [ ] The command exits with `0`.
+- [ ] A child Workflow is automatically created.
+- [ ] The child Workflow has the CronWorkflow owner label.
+- [ ] At least one child Workflow reaches `Succeeded`.
+- [ ] The Argo UI shows `fraud-retraining` as active.
+
+---
+
+## 28. Key Takeaway
+
+An Argo `CronWorkflow` provides **scheduled automation** for Kubernetes Workflows.
+
+For this exercise:
+
+```text
+schedules
+    ↓
+determines WHEN retraining runs
+
+workflowSpec
+    ↓
+determines WHAT retraining does
+
+concurrencyPolicy: Forbid
+    ↓
+prevents overlapping runs
+
+exit 0
+    ↓
+marks the retraining execution successful
+```
+
+The important lesson is that retraining no longer requires someone to manually click **Submit**. Once the CronWorkflow is applied, Argo automatically creates and executes the retraining Workflow on every scheduled tick.
+
 
 ---
 
