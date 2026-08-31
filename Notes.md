@@ -41227,6 +41227,662 @@ marks the retraining execution successful
 
 The important lesson is that retraining no longer requires someone to manually click **Submit**. Once the CronWorkflow is applied, Argo automatically creates and executes the retraining Workflow on every scheduled tick.
 
+# Day 91 — Lecturer Notes: Production ML Pipeline with Argo Workflows + MLflow
+
+## 1. What are we building?
+
+Today we are fixing a production-style ML pipeline running on Kubernetes.
+
+The pipeline has three important pieces:
+
+```text
+CronWorkflow
+     |
+     v
+WorkflowTemplate: fraud-training-pipeline
+     |
+     +----> train
+     |        |
+     |        +----> MLflow experiment/run
+     |        +----> model artifact
+     |        +----> run_id output
+     |
+     +----> register
+              |
+              +----> reads run_id
+              +----> registers model in MLflow
+```
+
+The final goal is for `fraud-detector` to appear in the MLflow Models page with at least one version.
+
+---
+
+## 2. What is Argo Workflows?
+
+Argo Workflows is a Kubernetes-native workflow engine.
+
+Instead of manually running commands one after another, we define a workflow as YAML.
+
+For example:
+
+```yaml
+steps:
+  - - name: train
+      template: train
+  - - name: register
+      template: register
+```
+
+This means:
+
+1. Run `train`.
+2. Wait for `train` to finish.
+3. Run `register`.
+
+Argo manages the execution, dependencies, status, logs, retries, and Kubernetes pods.
+
+---
+
+## 3. What is a WorkflowTemplate?
+
+A `WorkflowTemplate` is a reusable workflow definition.
+
+Here the template is:
+
+```yaml
+metadata:
+  name: fraud-training-pipeline
+```
+
+It contains the complete training and registration pipeline.
+
+A WorkflowTemplate can be manually submitted, and it can also be invoked by another Argo resource such as a CronWorkflow.
+
+---
+
+## 4. What is a CronWorkflow?
+
+A CronWorkflow is the Argo equivalent of a scheduled job.
+
+Our schedule is:
+
+```yaml
+schedules:
+  - "* * * * *"
+```
+
+The five fields mean:
+
+```text
+minute hour day-of-month month day-of-week
+```
+
+`* * * * *` means every minute.
+
+The CronWorkflow is named:
+
+```text
+fraud-retraining
+```
+
+Its job is to periodically start the training pipeline.
+
+---
+
+# 5. Understanding the first bug — output parameters
+
+The `train` template writes the MLflow run ID into a file:
+
+```python
+with open("/tmp/run_id", "w") as f:
+    f.write(run.info.run_id)
+```
+
+Argo exposes that file as an output parameter:
+
+```yaml
+outputs:
+  parameters:
+    - name: run_id
+      valueFrom:
+        path: /tmp/run_id
+```
+
+Notice the exact name:
+
+```text
+run_id
+```
+
+The `register` step needs that value.
+
+The broken reference was:
+
+```yaml
+{{steps.train.outputs.parameters.runid}}
+```
+
+Argo rejected the workflow before execution:
+
+```text
+templates.main.steps failed to resolve {{steps.train.outputs.parameters.runid}}
+```
+
+The problem is simply that `runid` and `run_id` are different names.
+
+### Correct reference
+
+```yaml
+{{steps.train.outputs.parameters.run_id}}
+```
+
+So the register step becomes:
+
+```yaml
+arguments:
+  parameters:
+    - name: run_id
+      value: "{{steps.train.outputs.parameters.run_id}}"
+```
+
+### Lecturer takeaway
+
+When Argo reports a parameter-resolution error, compare:
+
+```text
+parameter being referenced
+        VS
+parameter actually declared
+```
+
+Names must match exactly.
+
+---
+
+# 6. Understanding the second bug — Kubernetes service DNS
+
+After fixing the parameter reference, the workflow reached the `train` container.
+
+The training code uses MLflow:
+
+```python
+mlflow.set_tracking_uri(os.environ["MLFLOW_TRACKING_URI"])
+```
+
+The environment variable tells MLflow where its server is:
+
+```yaml
+- name: MLFLOW_TRACKING_URI
+  value: ...
+```
+
+The original value was:
+
+```text
+http://mlflow.default.svc.cluster.local:5000
+```
+
+The container failed with:
+
+```text
+NameResolutionError:
+Failed to resolve 'mlflow.default.svc.cluster.local'
+```
+
+This is a Kubernetes DNS problem.
+
+---
+
+## 7. Kubernetes service DNS explained
+
+A Kubernetes service can normally be reached using:
+
+```text
+service.namespace.svc.cluster.local
+```
+
+The important pieces are:
+
+```text
+service       = mlflow
+namespace     = mlflow
+domain        = svc.cluster.local
+port          = 5000
+```
+
+Therefore the working address was:
+
+```text
+http://mlflow.mlflow.svc.cluster.local:5000
+```
+
+We initially tried:
+
+```text
+mlflow.argo.svc.cluster.local
+```
+
+but that also failed because the MLflow service was not in the `argo` namespace.
+
+The final working value was:
+
+```yaml
+- name: MLFLOW_TRACKING_URI
+  value: http://mlflow.mlflow.svc.cluster.local:5000
+```
+
+This value had to be corrected in both:
+
+- `train`
+- `register`
+
+### Lecturer takeaway
+
+When you see:
+
+```text
+Failed to resolve <hostname>
+```
+
+think **DNS/service discovery**, not Python or MLflow code.
+
+For Kubernetes services, verify:
+
+```text
+service name
+namespace
+port
+```
+
+---
+
+# 8. Why the pip warnings were not the problem
+
+The logs contained:
+
+```text
+WARNING: Running pip as the 'root' user...
+```
+
+and:
+
+```text
+[notice] A new release of pip is available
+```
+
+These are informational warnings.
+
+They were not causing the workflow failure.
+
+The real failure was:
+
+```text
+NameResolutionError
+```
+
+A good troubleshooting habit is to locate the first meaningful exception rather than assuming the warning immediately above it caused the failure.
+
+---
+
+# 9. Understanding the third bug — CronWorkflow reference
+
+The CronWorkflow originally contained:
+
+```yaml
+workflowTemplateRef:
+  name: training-pipeline
+```
+
+But the actual WorkflowTemplate was:
+
+```yaml
+metadata:
+  name: fraud-training-pipeline
+```
+
+These names do not match.
+
+The CronWorkflow therefore could not correctly reference the intended template.
+
+The CronWorkflow page showed:
+
+```text
+Last Scheduled Time: -
+No completed cron workflows
+```
+
+### Correct configuration
+
+```yaml
+workflowTemplateRef:
+  name: fraud-training-pipeline
+```
+
+Now the relationship is:
+
+```text
+fraud-retraining
+        |
+        v
+fraud-training-pipeline
+```
+
+### Lecturer takeaway
+
+References between Kubernetes/Argo resources are just names.
+
+A typo such as:
+
+```text
+training-pipeline
+```
+
+instead of:
+
+```text
+fraud-training-pipeline
+```
+
+can break orchestration even though both resources individually look valid.
+
+---
+
+# 10. The complete three-bug diagnosis
+
+| Bug | Broken value | Correct value |
+|---|---|---|
+| Output parameter | `runid` | `run_id` |
+| MLflow DNS | `mlflow.default.svc.cluster.local` | `mlflow.mlflow.svc.cluster.local` |
+| Cron template reference | `training-pipeline` | `fraud-training-pipeline` |
+
+These failures occurred at different stages.
+
+```text
+Bug 1
+Argo submission/parameter resolution
+        ↓
+Bug 2
+Runtime/service DNS
+        ↓
+Bug 3
+Scheduled workflow/template reference
+```
+
+This is why reading only one YAML resource is not enough.
+
+---
+
+# 11. Understanding the MLflow part
+
+MLflow tracks machine-learning experiments, runs, metrics, artifacts, and registered models.
+
+The training code creates an experiment:
+
+```python
+mlflow.set_experiment("fraud-detector")
+```
+
+Then it creates a run:
+
+```python
+with mlflow.start_run() as run:
+```
+
+A metric is recorded:
+
+```python
+mlflow.log_metric("f1_score", 0.82)
+```
+
+The model is stored:
+
+```python
+mlflow.sklearn.log_model(model, artifact_path="model")
+```
+
+The generated MLflow run ID is saved:
+
+```python
+with open("/tmp/run_id", "w") as f:
+    f.write(run.info.run_id)
+```
+
+Argo then passes that run ID to the registration step.
+
+---
+
+# 12. How model registration works
+
+The register step receives:
+
+```yaml
+inputs:
+  parameters:
+    - name: run_id
+```
+
+The Python code reads it:
+
+```python
+run_id = "{{inputs.parameters.run_id}}"
+```
+
+Then MLflow registers the model:
+
+```python
+result = mlflow.register_model(
+    f"runs:/{run_id}/model",
+    "fraud-detector",
+)
+```
+
+The important relationship is:
+
+```text
+Argo output parameter
+        |
+        v
+run_id
+        |
+        v
+MLflow run
+        |
+        v
+model artifact
+        |
+        v
+registered model: fraud-detector
+```
+
+---
+
+# 13. What successful execution looks like
+
+A successful manual execution should look conceptually like:
+
+```text
+fraud-training-pipeline
+        |
+        +---- train       Succeeded
+        |
+        +---- register    Succeeded
+```
+
+The overall workflow should become:
+
+```text
+Succeeded
+```
+
+The register log should contain information similar to:
+
+```text
+[register] fraud-detector v1
+```
+
+The exact version number may differ if multiple successful runs have occurred.
+
+---
+
+# 14. What the CronWorkflow should eventually show
+
+The CronWorkflow runs every minute:
+
+```yaml
+schedules:
+  - "* * * * *"
+```
+
+After the template reference is corrected, it should create child workflows.
+
+Conceptually:
+
+```text
+fraud-retraining
+      |
+      +---- fraud-training-pipeline-xxxxx
+      |
+      +---- fraud-training-pipeline-yyyyy
+      |
+      +---- ...
+```
+
+The generated child workflow should complete successfully.
+
+The child workflow is associated with the CronWorkflow through the Argo owner label:
+
+```text
+workflows.argoproj.io/cron-workflow=fraud-retraining
+```
+
+---
+
+# 15. Final verification checklist
+
+Before considering the task complete, verify all of these:
+
+### Argo
+
+- [x] `fraud-training-pipeline` exists.
+- [x] Output parameter is `run_id`.
+- [x] Register references `run_id`.
+- [x] MLflow URI points to `mlflow.mlflow.svc.cluster.local:5000`.
+- [x] Manual workflow succeeds.
+- [x] `train` is green.
+- [x] `register` is green.
+
+### CronWorkflow
+
+- [x] `fraud-retraining` exists.
+- [x] Schedule is every minute.
+- [x] It references `fraud-training-pipeline`.
+- [x] It creates child workflows.
+- [x] At least one child workflow succeeds.
+
+### MLflow
+
+- [x] `fraud-detector` exists on the Models page.
+- [x] At least one model version is present.
+
+---
+
+# 16. The main troubleshooting lesson
+
+This exercise demonstrates **cross-resource debugging**.
+
+Do not only inspect the resource that appears broken.
+
+Follow the failure through the system:
+
+```text
+Argo submission
+      ↓
+parameter resolution
+      ↓
+workflow execution
+      ↓
+container logs
+      ↓
+Kubernetes DNS/service
+      ↓
+MLflow
+      ↓
+CronWorkflow
+      ↓
+child workflow
+```
+
+Each symptom gives information about a different layer.
+
+### Error 1
+
+```text
+failed to resolve {{steps.train.outputs.parameters.runid}}
+```
+
+Means:
+
+> Argo cannot resolve the referenced output parameter.
+
+### Error 2
+
+```text
+Failed to resolve 'mlflow....svc.cluster.local'
+```
+
+Means:
+
+> The container cannot resolve the Kubernetes service hostname.
+
+### CronWorkflow showing no executions
+
+Means:
+
+> Investigate the schedule and the referenced WorkflowTemplate.
+
+This is the mindset used when troubleshooting real production orchestration systems.
+
+---
+
+# 17. Final architecture
+
+The corrected production pipeline is:
+
+```text
+                  CronWorkflow
+               fraud-retraining
+                       |
+                 every minute
+                       |
+                       v
+             WorkflowTemplate
+          fraud-training-pipeline
+                       |
+             +---------+---------+
+             |                   |
+             v                   v
+           train              register
+             |                   |
+             |                   |
+             +---- MLflow -------+
+                    |
+                    v
+             fraud-detector
+                    |
+                    v
+              Model Version
+```
+
+## Final result
+
+All three wiring issues were fixed through the Argo UI:
+
+1. Corrected the `run_id` output-parameter reference.
+2. Corrected the Kubernetes MLflow service DNS name.
+3. Corrected the CronWorkflow's WorkflowTemplate reference.
+
+The pipeline then completed successfully and registered the `fraud-detector` model in MLflow.
+
 
 ---
 
