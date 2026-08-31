@@ -252,4 +252,26 @@ register
 fraud-detector model version
 ```
 ### Screenshots
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/4cc03b4e-a77c-4377-96fe-eb6a14bf2ecc" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/de911953-dac3-413e-af62-5658d6cbb03f" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/a0fd72a0-60fe-4851-8bdc-6b0331f66f5d" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/fd1a5e01-835d-4bf3-bb56-fedfb3a0b5cb" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/5533e496-f1e7-4f84-98a0-4a611f63a3dc" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/d45737ee-9e8b-43d0-8420-ca026fe450e2" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/fbffff66-5829-404e-b0d2-e99070647b63" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/2fe1257c-796c-46da-a95d-535153b2f24b" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/b11f9456-8c83-450f-acd7-6614db6b9a65" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/8a167ec8-4837-4944-bc68-a12029258784" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/6c9860f9-827e-473a-9abd-20f245ae936b" />
+
+
+
+
+
+
+
+
+
+
+
 
