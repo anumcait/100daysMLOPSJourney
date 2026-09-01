@@ -252,3 +252,18 @@ The key Kubernetes concept is that `port` is the port exposed by the Service to 
 **Final fix: `8080 -> 80`.**
 
 ### Screenshots
+
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/3db4d437-8c47-4ace-a8a5-627abf7d44f6" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/97893974-2afb-4b93-b410-1abca1742a40" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/31cc6314-944a-4c18-a915-820b5e5d00c7" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/8336735c-c14e-474f-8de4-e8f3e824d328" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/2fd1dab9-ff2c-4f51-b42f-235e9aede792" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/516161ba-606d-4f48-a96d-4767fe761a75" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/b3165b92-dbe7-4f6e-a595-0e040f841885" />
+
+
+
+
+
+
+
