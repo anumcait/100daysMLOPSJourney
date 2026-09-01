@@ -140,4 +140,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 91: Production ML Pipeline: Argo Workflows + MLflow on Kubernetes](./Day%2091%20-%20Production%20ML%20Pipeline%20Argo%20Workflows%20%2B%20MLflow%20on%20Kubernetes.md)
 
+- [Day 92: Fix a Service targetPort Mismatch on a Kubernetes Deployment](./Day%2092%20-%20Fix%20a%20Service%20targetPort%20Mismatch%20on%20a%20Kubernetes%20Deployment.md)
+
 ---

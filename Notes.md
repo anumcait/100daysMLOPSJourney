@@ -41883,6 +41883,454 @@ All three wiring issues were fixed through the Argo UI:
 
 The pipeline then completed successfully and registered the `fraud-detector` model in MLflow.
 
+# Kubernetes Service `targetPort` Mismatch — Notes
+
+## 1. What was the problem?
+
+A Kubernetes Deployment named `fraud-detector` was running successfully with **2 replicas**.
+
+The application used an `nginx:alpine` container, and nginx listens on:
+
+```text
+Port 80
+```
+
+A Kubernetes Service named `fraud-detector-svc` allowed clients to connect on:
+
+```text
+Port 8080
+```
+
+However, requests to:
+
+```text
+http://fraud-detector-svc:8080/
+```
+
+timed out.
+
+The important point is that the Deployment was healthy. The problem was with **Service routing**.
+
+---
+
+## 2. Understand `port` vs `targetPort`
+
+This is one of the most important Kubernetes Service concepts.
+
+A Service can expose one port to clients and forward traffic to a different port on the pods.
+
+For example:
+
+```yaml
+ports:
+  - port: 8080
+    targetPort: 80
+```
+
+This means:
+
+```text
+Client
+  |
+  | connects to Service :8080
+  v
+Service
+  |
+  | forwards to pod :80
+  v
+Pod / Container
+```
+
+### `port`
+
+`port` is the port exposed by the **Service**.
+
+Clients use this port:
+
+```text
+fraud-detector-svc:8080
+```
+
+### `targetPort`
+
+`targetPort` is the port on the **backing pod** that receives the traffic.
+
+Since nginx listens on port `80`, the Service must use:
+
+```yaml
+targetPort: 80
+```
+
+The two ports do **not** need to be the same.
+
+---
+
+## 3. Diagnose the Service
+
+The first useful command was:
+
+```bash
+kubectl describe svc fraud-detector-svc
+```
+
+The incorrect configuration showed:
+
+```text
+Port:       8080/TCP
+TargetPort: 8080/TCP
+Endpoints:  10.244.0.5:8080,10.244.0.6:8080
+```
+
+This tells us:
+
+- The Service accepts traffic on `8080`.
+- It forwards traffic to `8080` on the pods.
+- The selected pods are correct.
+- But nginx is actually listening on `80`.
+
+Therefore:
+
+```text
+8080 -> 8080  ❌
+8080 -> 80    ✅
+```
+
+---
+
+## 4. Check the Endpoints
+
+Endpoints show which pod IPs are backing the Service and which target port is being used.
+
+Command:
+
+```bash
+kubectl get endpoints fraud-detector-svc -o yaml
+```
+
+The incorrect configuration contained:
+
+```yaml
+ports:
+  - port: 8080
+    protocol: TCP
+```
+
+After fixing `targetPort`, the Service endpoints became:
+
+```text
+10.244.0.5:80
+10.244.0.6:80
+```
+
+This confirms that Service traffic is now being directed to port `80`.
+
+---
+
+## 5. Why did the Deployment still show `2/2`?
+
+This is an important troubleshooting lesson.
+
+The Deployment showed:
+
+```text
+READY   2/2
+AVAILABLE   2
+```
+
+That only tells us that the pods are running and considered ready.
+
+It does **not** prove that a Service is correctly routing traffic to them.
+
+There are separate layers:
+
+```text
+Deployment
+   |
+   | creates
+   v
+Pods
+   |
+   | selected by
+   v
+Service
+   |
+   | forwards to targetPort
+   v
+Container application
+```
+
+The Deployment can be completely healthy while the Service configuration is wrong.
+
+---
+
+## 6. Fix the Service
+
+Open the Service manifest:
+
+```bash
+vi /root/code/k8s/service.yaml
+```
+
+The incorrect configuration was effectively:
+
+```yaml
+ports:
+  - port: 8080
+    targetPort: 8080
+```
+
+Change it to:
+
+```yaml
+ports:
+  - port: 8080
+    targetPort: 80
+    protocol: TCP
+```
+
+Then apply the manifest:
+
+```bash
+kubectl apply -f /root/code/k8s/service.yaml
+```
+
+The important change is:
+
+```text
+targetPort: 8080  ->  targetPort: 80
+```
+
+Do **not** change the Service `port` from `8080`, because clients are required to continue using:
+
+```text
+fraud-detector-svc:8080
+```
+
+---
+
+## 7. Verify the Service
+
+Run:
+
+```bash
+kubectl describe svc fraud-detector-svc
+```
+
+The important output should now show:
+
+```text
+Port:       8080/TCP
+TargetPort: 80/TCP
+Endpoints:  10.244.0.5:80,10.244.0.6:80
+```
+
+This proves:
+
+```text
+Service :8080
+     |
+     v
+Pod :80
+```
+
+---
+
+## 8. Verify the Deployment
+
+Run:
+
+```bash
+kubectl get deploy fraud-detector
+```
+
+Expected:
+
+```text
+READY   2/2
+AVAILABLE   2
+```
+
+The Deployment should remain healthy after changing the Service.
+
+---
+
+## 9. Test the Service from inside the cluster
+
+A Service should be tested from a pod inside the cluster.
+
+For example:
+
+```bash
+kubectl run curl-test --rm -i --restart=Never \
+  --image=curlimages/curl -- \
+  curl -s http://fraud-detector-svc:8080/
+```
+
+The request goes through:
+
+```text
+curl pod
+    |
+    | :8080
+    v
+fraud-detector-svc
+    |
+    | targetPort :80
+    v
+nginx pod
+```
+
+A successful response contains the nginx default page, such as:
+
+```html
+<title>Welcome to nginx!</title>
+```
+
+---
+
+## 10. General Troubleshooting Method
+
+When a Kubernetes Service does not respond, check the problem layer by layer.
+
+### Step 1 — Check the Deployment
+
+```bash
+kubectl get deploy
+kubectl get pods
+```
+
+Confirm that the pods are running and ready.
+
+### Step 2 — Check the Service
+
+```bash
+kubectl describe svc <service-name>
+```
+
+Look at:
+
+```text
+Port
+TargetPort
+Selector
+Endpoints
+```
+
+### Step 3 — Check Endpoints
+
+```bash
+kubectl get endpoints <service-name>
+```
+
+Make sure the Service has the expected pod IPs and target port.
+
+### Step 4 — Check the application port
+
+Determine which port the container actually listens on.
+
+For this task:
+
+```text
+nginx -> port 80
+```
+
+### Step 5 — Compare the ports
+
+For this task:
+
+```text
+Service port:  8080
+Target port:   80
+Container:     80
+```
+
+Therefore:
+
+```text
+8080 -> 80
+```
+
+is correct.
+
+---
+
+## 11. Common Mistake
+
+A common mistake is assuming:
+
+```text
+port == targetPort
+```
+
+This is not required.
+
+Both of these are valid:
+
+```yaml
+port: 80
+targetPort: 80
+```
+
+and:
+
+```yaml
+port: 8080
+targetPort: 80
+```
+
+The second configuration is exactly what this task requires.
+
+Think of it as:
+
+```text
+port       = "Where do clients connect?"
+targetPort = "Where does the application listen?"
+```
+
+---
+
+## 12. Key Takeaways
+
+- A Deployment being `READY 2/2` does not guarantee Service connectivity.
+- `port` is the Service-facing port.
+- `targetPort` is the pod/application-facing port.
+- `targetPort` must match a port where the application is actually listening.
+- A Service can expose `8080` and forward to `80`.
+- Endpoints help confirm where the Service is sending traffic.
+- Always verify the complete path:
+
+```text
+Client
+  -> Service port
+  -> targetPort
+  -> Pod
+  -> Container application
+```
+
+For this task, the final correct mapping is:
+
+```text
+fraud-detector-svc:8080
+          |
+          v
+        :80
+          |
+          v
+     nginx:alpine
+```
+
+### Final Configuration
+
+```yaml
+ports:
+  - port: 8080
+    targetPort: 80
+    protocol: TCP
+```
+
+**Root cause:** The Service was forwarding traffic to port `8080`, while the nginx containers were listening on port `80`.
+
+**Fix:** Keep the Service port at `8080` and change `targetPort` to `80`.
 
 
 ---
