@@ -305,3 +305,16 @@ kubectl apply --dry-run=server
 ```
 
 can be useful in CI pipelines: it helps catch invalid references against live cluster resources before changes are applied.
+
+### Screenshots
+
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/5c917e5e-bd0f-4c5d-bc8a-29b873280c7c" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/82508c3a-42e7-4cf9-a83f-b523e3f77f09" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/9fcbddf0-26d4-4679-854c-b02e8e767d0d" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/0893e633-cfe2-4799-a5dd-fca66dc3ab20" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/f3142f77-9a73-4303-b87b-1a7b07dc0559" />
+
+
+
+
+
