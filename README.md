@@ -142,4 +142,5 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 92: Fix a Service targetPort Mismatch on a Kubernetes Deployment](./Day%2092%20-%20Fix%20a%20Service%20targetPort%20Mismatch%20on%20a%20Kubernetes%20Deployment.md)
 
+- [Day 93: Fix a Broken HorizontalPodAutoscaler scaleTargetRef](./Day%2093%20-%20Fix%20a%20Broken%20HorizontalPodAutoscaler%20scaleTargetRef.md)
 ---

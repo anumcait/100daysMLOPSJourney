@@ -42332,6 +42332,493 @@ ports:
 
 **Fix:** Keep the Service port at `8080` and change `targetPort` to `80`.
 
+Here’s a concise but lecturer-style notes.md that covers the whole concept, including the mistake, why it caused <unknown>, how to fix it, and how to verify it.
+
+# Day 93 Notes — HorizontalPodAutoscaler `scaleTargetRef`
+
+## 1. What is the task about?
+
+This task is about fixing a Kubernetes **HorizontalPodAutoscaler (HPA)** that is unable to read CPU metrics because it points to the wrong Deployment.
+
+The HPA was showing:
+
+```text
+TARGETS <unknown>/70%
+```
+
+The important clue is `<unknown>`. It means the HPA cannot currently calculate the metric it needs for scaling.
+
+---
+
+## 2. What is a HorizontalPodAutoscaler?
+
+A **HorizontalPodAutoscaler (HPA)** automatically changes the number of pod replicas based on resource usage or other supported metrics.
+
+For example:
+
+```text
+CPU usage increases
+        ↓
+HPA detects higher utilization
+        ↓
+HPA increases replicas
+```
+
+And:
+
+```text
+CPU usage decreases
+        ↓
+HPA detects lower utilization
+        ↓
+HPA can reduce replicas
+```
+
+In this task, the HPA is configured to use **CPU utilization**.
+
+---
+
+## 3. The Deployment
+
+The application Deployment is:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fraud-server
+```
+
+Therefore, the actual Deployment name is:
+
+```text
+fraud-server
+```
+
+The Deployment also has CPU resources configured:
+
+```yaml
+resources:
+  requests:
+    cpu: "50m"
+  limits:
+    cpu: "200m"
+```
+
+The CPU request is important because the HPA's utilization percentage is calculated relative to the CPU request.
+
+For example, if a pod requests `50m` CPU and uses `25m`, its CPU utilization is approximately:
+
+```text
+25m / 50m × 100 = 50%
+```
+
+---
+
+## 4. Understanding `scaleTargetRef`
+
+The HPA needs to know **which workload it should scale**.
+
+This is specified with:
+
+```yaml
+scaleTargetRef:
+  apiVersion: apps/v1
+  kind: Deployment
+  name: fraud-server
+```
+
+Think of it as:
+
+```text
+HPA
+ ↓
+Which workload should I scale?
+ ↓
+Deployment/fraud-server
+```
+
+The `name` must match an actual Deployment in the cluster.
+
+---
+
+## 5. What was broken?
+
+The original HPA contained:
+
+```yaml
+scaleTargetRef:
+  apiVersion: apps/v1
+  kind: Deployment
+  name: fraud-serving
+```
+
+But the actual Deployment was:
+
+```text
+fraud-server
+```
+
+So Kubernetes effectively had:
+
+```text
+HPA
+ ↓
+Deployment/fraud-serving
+ ↓
+Does not exist
+```
+
+This mismatch was the root cause.
+
+---
+
+## 6. Why did the HPA show `<unknown>`?
+
+The HPA needs information about its target Deployment before it can calculate the desired replica count.
+
+Because it was looking for:
+
+```text
+fraud-serving
+```
+
+instead of:
+
+```text
+fraud-server
+```
+
+it could not retrieve the target's scale information.
+
+The HPA therefore could not properly perform its normal scaling calculation.
+
+This resulted in:
+
+```text
+TARGETS <unknown>/70%
+```
+
+The `70%` is the configured target, while `<unknown>` represents the current metric that could not be calculated.
+
+---
+
+## 7. How was it fixed?
+
+Only the target name needed to be corrected:
+
+```diff
+- name: fraud-serving
++ name: fraud-server
+```
+
+The corrected reference is:
+
+```yaml
+scaleTargetRef:
+  apiVersion: apps/v1
+  kind: Deployment
+  name: fraud-server
+```
+
+Then the HPA was reapplied:
+
+```bash
+kubectl apply -f /root/code/k8s/hpa.yaml
+```
+
+---
+
+## 8. Understanding the CPU metric
+
+The HPA uses:
+
+```yaml
+metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+```
+
+This means:
+
+> Try to maintain average CPU utilization across the pods at approximately 70% of their requested CPU.
+
+The Deployment requests:
+
+```yaml
+cpu: "50m"
+```
+
+So a pod using approximately `35m` CPU would represent about:
+
+```text
+35m / 50m × 100 = 70%
+```
+
+The HPA can increase or decrease replicas depending on the observed utilization.
+
+---
+
+## 9. Important HPA fields
+
+### `minReplicas`
+
+```yaml
+minReplicas: 2
+```
+
+The HPA will not normally scale below 2 replicas.
+
+### `maxReplicas`
+
+```yaml
+maxReplicas: 10
+```
+
+The HPA will not scale above 10 replicas.
+
+### `averageUtilization`
+
+```yaml
+averageUtilization: 70
+```
+
+The desired average CPU utilization is 70% of the requested CPU.
+
+### `scaleTargetRef`
+
+```yaml
+scaleTargetRef:
+  apiVersion: apps/v1
+  kind: Deployment
+  name: fraud-server
+```
+
+This identifies the workload that the HPA controls.
+
+---
+
+## 10. Verification
+
+First verify that the Deployment is healthy:
+
+```bash
+kubectl get deployment fraud-server
+```
+
+Expected result:
+
+```text
+READY   AVAILABLE
+2/2     2
+```
+
+Then check the HPA:
+
+```bash
+kubectl get hpa fraud-server-hpa
+```
+
+The important result is:
+
+```text
+REFERENCE                 TARGETS
+Deployment/fraud-server   cpu: 0%/70%
+```
+
+The key difference from the broken state is:
+
+```text
+<unknown>/70%
+```
+
+becoming something like:
+
+```text
+0%/70%
+```
+
+The exact current percentage can vary.
+
+---
+
+## 11. Use `describe` for troubleshooting
+
+A useful troubleshooting command is:
+
+```bash
+kubectl describe hpa fraud-server-hpa
+```
+
+The successful state showed:
+
+```text
+ScalingActive   True    ValidMetricFound
+```
+
+This is strong evidence that the HPA can now calculate the CPU metric.
+
+The output also showed:
+
+```text
+Deployment pods: 2 current / 2 desired
+```
+
+which confirms that the HPA is managing the expected Deployment.
+
+---
+
+## 12. What about the old warning?
+
+After fixing the HPA, `kubectl describe hpa` may still show an older Event such as:
+
+```text
+FailedGetScale
+deployments/scale.apps "fraud-serving" not found
+```
+
+This can be confusing.
+
+That Event was generated **before the fix**, when the HPA still referenced `fraud-serving`.
+
+Kubernetes Events are historical records. Seeing the old warning does not mean the current HPA configuration is still broken.
+
+The current state should be judged from the current reference and current conditions:
+
+```text
+Reference: Deployment/fraud-server
+```
+
+and:
+
+```text
+ScalingActive   True    ValidMetricFound
+```
+
+---
+
+## 13. Final checks
+
+A good troubleshooting sequence is:
+
+```bash
+kubectl get deployment fraud-server
+kubectl get hpa fraud-server-hpa
+kubectl describe hpa fraud-server-hpa
+kubectl get hpa fraud-server-hpa -o yaml
+```
+
+The final HPA should have:
+
+```yaml
+scaleTargetRef:
+  apiVersion: apps/v1
+  kind: Deployment
+  name: fraud-server
+```
+
+And its status should contain a populated resource metric rather than an unknown value.
+
+---
+
+## 14. CI/CD Lesson
+
+A very important lesson is that Kubernetes resources can depend on the names of other resources.
+
+For example:
+
+```text
+HPA → Deployment
+```
+
+If a Deployment is renamed from:
+
+```text
+fraud-server
+```
+
+to:
+
+```text
+fraud-serving
+```
+
+every resource referring to the old name must be reviewed.
+
+A useful CI validation is:
+
+```bash
+kubectl apply --dry-run=server -f hpa.yaml
+```
+
+Server-side dry-run can validate the manifest against the Kubernetes API before actually changing resources.
+
+This helps catch broken references and similar configuration problems earlier in a deployment pipeline.
+
+---
+
+## 15. Final Takeaway
+
+Remember the three important parts:
+
+```text
+1. HPA needs a valid scaleTargetRef.
+2. The target name must match an existing scalable workload.
+3. Resource metrics require appropriate resource requests and a working metrics provider.
+```
+
+For this task:
+
+```text
+Deployment:
+fraud-server
+
+HPA:
+fraud-server-hpa
+
+Target:
+Deployment/fraud-server
+
+Metric:
+CPU utilization
+
+Target:
+70%
+
+Replicas:
+2–10
+```
+
+The root cause was simply the incorrect reference:
+
+```diff
+- fraud-serving
++ fraud-server
+```
+
+Once the reference was corrected, the HPA successfully found the Deployment and its CPU metric changed from:
+
+```text
+<unknown>/70%
+```
+
+to:
+
+```text
+0%/70%
+```
+
+and reported:
+
+```text
+ScalingActive=True
+ValidMetricFound
+```
+
 
 ---
 
