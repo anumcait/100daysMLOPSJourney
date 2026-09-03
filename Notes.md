@@ -42819,6 +42819,499 @@ ScalingActive=True
 ValidMetricFound
 ```
 
+# Day 94 - Notes
+
+# KServe InferenceService — Fixing a Broken `storageUri`
+
+## 1. What is the problem?
+
+We have a KServe `InferenceService` called `fraud-detector`.
+
+The model is stored inside a Kubernetes PVC, and the predictor is expected to mount that PVC and load the Scikit-learn model.
+
+However, the predictor pod remains in `Pending`, and the `InferenceService` does not become Ready.
+
+The first thing to investigate is the predictor pod:
+
+```bash
+kubectl describe pod -l serving.kserve.io/inferenceservice=fraud-detector
+```
+
+The important part to investigate in `describe` output is the **Events** section. Kubernetes usually tells us why a pod cannot be scheduled or started.
+
+---
+
+## 2. Understand the `InferenceService`
+
+A basic KServe `InferenceService` looks like:
+
+```yaml
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: fraud-detector
+spec:
+  predictor:
+    model:
+      modelFormat:
+        name: sklearn
+      storageUri: "pvc://model-storage/"
+```
+
+Important sections:
+
+- `apiVersion`: KServe API version.
+- `kind: InferenceService`: tells Kubernetes this is a KServe inference service.
+- `metadata.name`: name of the deployed model service.
+- `predictor`: defines the model-serving component.
+- `modelFormat.name`: tells KServe which model runtime to use.
+- `storageUri`: tells KServe where the model artifacts are stored.
+
+---
+
+## 3. The important part: `storageUri`
+
+For a PVC-backed model, KServe supports the `pvc://` storage scheme.
+
+Example:
+
+```yaml
+storageUri: "pvc://model-storage/"
+```
+
+Here:
+
+```text
+pvc://
+```
+
+means that the model is stored in a Kubernetes PersistentVolumeClaim.
+
+And:
+
+```text
+model-storage
+```
+
+is the name of the PVC.
+
+The PVC must exist in the same namespace as the `InferenceService`.
+
+KServe mounts the referenced PVC into the predictor pod so that the model runtime can read the model artifacts.
+
+---
+
+## 4. The actual mistake
+
+The broken manifest contained:
+
+```yaml
+storageUri: "pvc://models-storage/"
+```
+
+But the real PVC was:
+
+```text
+model-storage
+```
+
+Notice the difference:
+
+```text
+Wrong:   models-storage
+Correct: model-storage
+```
+
+This is a simple naming error, but it prevents the predictor from getting its model storage correctly.
+
+### Incorrect
+
+```yaml
+storageUri: "pvc://models-storage/"
+```
+
+### Correct
+
+```yaml
+storageUri: "pvc://model-storage/"
+```
+
+---
+
+## 5. Check the PVC before fixing anything
+
+Always verify that the PVC actually exists:
+
+```bash
+kubectl get pvc
+```
+
+You should find:
+
+```text
+model-storage
+```
+
+You can also inspect it directly:
+
+```bash
+kubectl get pvc model-storage
+```
+
+The important idea is:
+
+> The name in `storageUri` must match the actual PVC name.
+
+---
+
+## 6. Corrected manifest
+
+The final manifest should contain:
+
+```yaml
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: fraud-detector
+  annotations:
+    serving.kserve.io/deploymentMode: "RawDeployment"
+spec:
+  predictor:
+    minReplicas: 1
+    maxReplicas: 1
+    model:
+      modelFormat:
+        name: sklearn
+      storageUri: "pvc://model-storage/"
+```
+
+`RawDeployment` means KServe deploys the predictor using Kubernetes Deployment-style resources rather than relying on Knative Serving.
+
+---
+
+## 7. Apply the corrected manifest
+
+After editing the file:
+
+```bash
+kubectl apply -f /root/code/k8s/inference-service.yaml
+```
+
+Expected output is similar to:
+
+```text
+inferenceservice.serving.kserve.io/fraud-detector configured
+```
+
+`configured` means Kubernetes accepted the updated resource.
+
+---
+
+## 8. Watch the InferenceService
+
+Use:
+
+```bash
+kubectl get isvc fraud-detector -w
+```
+
+Initially, it may show:
+
+```text
+READY=False
+```
+
+After the predictor starts successfully, it should become:
+
+```text
+READY=True
+```
+
+The final output should contain something similar to:
+
+```text
+fraud-detector   http://fraud-detector-default.example.com   True
+```
+
+The key requirement is:
+
+```text
+READY=True
+```
+
+---
+
+## 9. Check the predictor pod
+
+KServe creates the predictor pod based on the `InferenceService`.
+
+Check it with:
+
+```bash
+kubectl get pods -l serving.kserve.io/inferenceservice=fraud-detector
+```
+
+Before the fix, the pod was stuck in:
+
+```text
+Pending
+```
+
+After fixing the PVC reference, it should become:
+
+```text
+Running
+```
+
+For example:
+
+```text
+NAME                                        READY   STATUS    RESTARTS
+fraud-detector-predictor-xxxxxxxxxx-xxxxx   1/1     Running   0
+```
+
+This confirms that the predictor has successfully started.
+
+---
+
+## 10. Check the predictor service
+
+KServe creates a Kubernetes Service for the predictor.
+
+Find it using:
+
+```bash
+kubectl get svc | grep fraud-detector
+```
+
+Example:
+
+```text
+fraud-detector-predictor   ClusterIP   10.96.76.3   <none>   80/TCP
+```
+
+The service gives us a stable way to reach the predictor inside the cluster.
+
+---
+
+## 11. Test the model
+
+For local testing, port-forward the predictor service:
+
+```bash
+kubectl port-forward svc/fraud-detector-predictor 8080:80
+```
+
+Keep this command running.
+
+In another terminal, send a request to KServe's V1 prediction endpoint:
+
+```bash
+curl -X POST \
+  http://localhost:8080/v1/models/fraud-detector:predict \
+  -H 'Content-Type: application/json' \
+  -d '{"instances":[[1,2,3,4]]}'
+```
+
+A successful response should contain:
+
+```json
+{"predictions":[...]}
+```
+
+The exact prediction depends on the trained model.
+
+The important requirement is that the response contains a JSON:
+
+```text
+predictions
+```
+
+array.
+
+---
+
+## 12. How to troubleshoot if it is still Pending
+
+If the predictor remains `Pending`, inspect the pod:
+
+```bash
+kubectl describe pod -l serving.kserve.io/inferenceservice=fraud-detector
+```
+
+Look at:
+
+```text
+Events:
+```
+
+Also inspect the InferenceService:
+
+```bash
+kubectl describe isvc fraud-detector
+```
+
+Check the PVC:
+
+```bash
+kubectl get pvc
+kubectl describe pvc model-storage
+```
+
+Useful checks include:
+
+```bash
+kubectl get pods
+kubectl get pvc
+kubectl get isvc fraud-detector
+kubectl describe pod <predictor-pod>
+```
+
+The general troubleshooting process is:
+
+```text
+InferenceService
+      |
+      v
+Predictor Pod
+      |
+      +---- Pending? ---> Check Events
+      |
+      v
+PVC
+      |
+      +---- Does the referenced PVC exist?
+      |
+      v
+Model Runtime
+      |
+      v
+Prediction Endpoint
+```
+
+---
+
+## 13. What we learned
+
+### `InferenceService`
+
+KServe's custom resource used to deploy and manage model inference.
+
+### `predictor`
+
+The component responsible for serving predictions.
+
+### `modelFormat`
+
+Specifies the model type/runtime, such as:
+
+```yaml
+modelFormat:
+  name: sklearn
+```
+
+### `storageUri`
+
+Specifies where the model artifacts are located.
+
+For a Kubernetes PVC:
+
+```yaml
+storageUri: "pvc://<PVC-NAME>/"
+```
+
+### PVC
+
+A `PersistentVolumeClaim` provides persistent storage to workloads in Kubernetes.
+
+The PVC name must match the name referenced by KServe.
+
+---
+
+## 14. Key exam/lab takeaway
+
+When a KServe predictor is stuck in `Pending` and the model uses PVC storage:
+
+1. Inspect the predictor pod:
+   ```bash
+   kubectl describe pod -l serving.kserve.io/inferenceservice=<name>
+   ```
+
+2. Check the PVC:
+   ```bash
+   kubectl get pvc
+   ```
+
+3. Compare the PVC name with:
+   ```yaml
+   storageUri: "pvc://<PVC-NAME>/"
+   ```
+
+4. Fix the name if it is incorrect.
+
+5. Apply the manifest:
+   ```bash
+   kubectl apply -f <manifest>
+   ```
+
+6. Wait for:
+   ```bash
+   kubectl get isvc <name>
+   ```
+   to show:
+   ```text
+   READY=True
+   ```
+
+7. Confirm the predictor pod is:
+   ```text
+   Running
+   ```
+
+8. Test:
+   ```text
+   /v1/models/<model-name>:predict
+   ```
+
+9. Confirm the response contains:
+   ```json
+   {"predictions":[...]}
+   ```
+
+---
+
+## 15. Final mental model
+
+Remember the entire flow:
+
+```text
+PVC
+ |
+ | pvc://model-storage/
+ v
+KServe InferenceService
+ |
+ v
+Predictor Pod
+ |
+ v
+Scikit-learn Runtime
+ |
+ v
+/v1/models/fraud-detector:predict
+ |
+ v
+{"predictions":[...]}
+```
+
+In this lab, the model-serving configuration itself was correct. The failure was caused by one incorrect PVC name:
+
+```diff
+- pvc://models-storage/
++ pvc://model-storage/
+```
+
+Once the reference matched the real PVC, the predictor could start, the `InferenceService` became Ready, and the model could serve predictions.
 
 ---
 
