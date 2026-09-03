@@ -222,3 +222,13 @@ Therefore, the required fix was simply:
 After applying the correction, KServe successfully mounted the PVC, started the predictor, and transitioned the `InferenceService` to `Ready=True`.
 
 ### Screenshots
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/1814c4ff-48b5-4ab9-8799-a2c6b9bef52d" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/01479452-f254-48cc-81ea-8566c41cb4d5" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/d5e7dc89-637e-4297-9273-3c8ed3ff8231" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/b27be08b-2d08-4be0-b5f6-d1f127774ecb" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/2dbb4d1c-3fc2-4d0e-8a80-7f231e775027" />
+
+
+
+
+
