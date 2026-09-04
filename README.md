@@ -146,4 +146,5 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 94: Fix a Broken KServe InferenceService storageUri](./Day%2094%20-%20Fix%20a%20Broken%20KServe%20InferenceService%20storageUri.md)
 
+- [Day 95: Complete a Kubeflow Pipeline and Run It via the KFP UI](./Day%2095%20-%20Complete%20a%20Kubeflow%20Pipeline%20and%20Run%20It%20via%20the%20KFP%20UI.md)
 ---

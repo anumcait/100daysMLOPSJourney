@@ -43313,5 +43313,490 @@ In this lab, the model-serving configuration itself was correct. The failure was
 
 Once the reference matched the real PVC, the predictor could start, the `InferenceService` became Ready, and the model could serve predictions.
 
+## Day-95 
+
+# Notes: Kubeflow Pipelines — Components, DAGs, Compilation, and Runs
+
+## 1. What is Kubeflow Pipelines?
+
+**Kubeflow Pipelines (KFP)** is a platform for defining and running machine-learning workflows.
+
+A pipeline breaks an ML workflow into separate **components**. Each component performs one task and can run as its own container/pod.
+
+For example:
+
+```text
+Prepare data → Train model → Evaluate model → Deploy model
+```
+
+KFP handles the orchestration: which step runs first, which steps can run in parallel, and when the entire pipeline is complete.
+
+---
+
+## 2. Components vs. Pipeline
+
+There are two important concepts:
+
+### Component
+
+A component represents **one task**.
+
+In Python, KFP v2 can define a component using `@dsl.component`:
+
+```python
+@dsl.component(base_image="python:3.11-slim")
+def prep_data():
+    print("Preparing data")
+```
+
+Another component might train the model:
+
+```python
+@dsl.component(base_image="python:3.11-slim")
+def train():
+    print("Training model")
+```
+
+Each component becomes a containerized execution step when the pipeline runs.
+
+### Pipeline
+
+The `@dsl.pipeline` function defines the **workflow/DAG**.
+
+```python
+@dsl.pipeline(name="fraud-training")
+def fraud_training_pipeline():
+    prep = prep_data()
+    train().after(prep)
+```
+
+The pipeline does not perform the actual work itself. Instead, it describes how the component tasks should be orchestrated.
+
+---
+
+## 3. What is a DAG?
+
+DAG means **Directed Acyclic Graph**.
+
+- **Directed**: dependencies have a direction.
+- **Acyclic**: the workflow cannot loop back indefinitely.
+- **Graph**: tasks are represented as nodes connected by dependencies.
+
+For this lab:
+
+```text
+prep_data → train
+```
+
+This means:
+
+1. `prep_data` starts first.
+2. `train` waits for `prep_data`.
+3. After `prep_data` finishes successfully, `train` can execute.
+
+---
+
+## 4. Why `.after()` Matters
+
+KFP can run independent components in parallel.
+
+If we wrote:
+
+```python
+def fraud_training_pipeline():
+    prep = prep_data()
+    train = train()
+```
+
+there is no dependency between the two tasks. KFP could schedule them independently.
+
+But training should happen after data preparation.
+
+Therefore we explicitly declare:
+
+```python
+prep = prep_data()
+train().after(prep)
+```
+
+The important part is:
+
+```python
+.after(prep)
+```
+
+It tells KFP:
+
+> Do not start `train` until `prep` has completed.
+
+This is especially useful when components do not pass data directly through input/output parameters.
+
+---
+
+## 5. Component Outputs Can Also Create Dependencies
+
+In larger pipelines, components often exchange artifacts or parameters.
+
+For example:
+
+```python
+@dsl.component
+def prepare() -> str:
+    return "training-data.csv"
+
+@dsl.component
+def train(data: str):
+    print(f"Training with {data}")
+```
+
+The pipeline can connect the output of one task to the input of another:
+
+```python
+@dsl.pipeline
+def pipeline():
+    prep = prepare()
+    train(data=prep.output)
+```
+
+That connection automatically establishes the dependency.
+
+In this lab, however, `prep_data` and `train` have no inputs or outputs, so `.after(prep)` is the correct solution.
+
+---
+
+## 6. Understanding the Lab's Source File
+
+The important source file is:
+
+```text
+/root/code/kfp/pipeline.py
+```
+
+The unfinished function contains:
+
+```python
+def fraud_training_pipeline():
+    prep = prep_data()
+```
+
+The required completion is:
+
+```python
+def fraud_training_pipeline():
+    prep = prep_data()
+    train().after(prep)
+```
+
+The complete DAG is therefore:
+
+```text
+prep_data
+    |
+    v
+  train
+```
+
+---
+
+## 7. Compilation
+
+Writing the Python pipeline is not the final execution format.
+
+KFP compiles the Python DSL into an **IR YAML** package that the KFP backend understands.
+
+The source contains:
+
+```python
+if __name__ == "__main__":
+    compiler.Compiler().compile(
+        pipeline_func=fraud_training_pipeline,
+        package_path="pipeline.yaml",
+    )
+```
+
+Running:
+
+```bash
+cd /root/code/kfp
+python3 pipeline.py
+```
+
+produces:
+
+```text
+/root/code/kfp/pipeline.yaml
+```
+
+Think of the process as:
+
+```text
+Python DSL
+    ↓
+KFP Compiler
+    ↓
+pipeline.yaml
+    ↓
+KFP UI / Backend
+    ↓
+Pipeline Run
+```
+
+The YAML is the compiled representation of the pipeline.
+
+---
+
+## 8. Why Download the YAML?
+
+The lab specifically requires uploading the compiled YAML through the KFP web UI.
+
+The important detail is that the KFP UI's file picker runs on the **local computer/browser environment**, not directly inside the lab container.
+
+Therefore:
+
+1. Compile `pipeline.py` inside the lab.
+2. Locate `/root/code/kfp/pipeline.yaml`.
+3. Download it using the VS Code Explorer.
+4. Select that downloaded file in the KFP UI.
+
+---
+
+## 9. Uploading the Pipeline
+
+In the KFP UI:
+
+**Pipelines → Upload pipeline**
+
+Upload:
+
+```text
+pipeline.yaml
+```
+
+Register it as:
+
+```text
+fraud-training
+```
+
+After successful upload, the pipeline should appear in the pipeline list.
+
+The pipeline name comes from:
+
+```python
+PIPELINE_NAME = "fraud-training"
+```
+
+and:
+
+```python
+@dsl.pipeline(name=PIPELINE_NAME)
+```
+
+---
+
+## 10. Experiments and Runs
+
+An **experiment** groups related pipeline runs.
+
+This lab uses the existing:
+
+```text
+Default
+```
+
+experiment.
+
+A **run** is one actual execution of a pipeline.
+
+The hierarchy is conceptually:
+
+```text
+Pipeline
+   ↓
+Experiment
+   ↓
+Run
+   ↓
+Tasks/components
+```
+
+For this task:
+
+```text
+fraud-training
+      ↓
+   Default
+      ↓
+    Run
+      ↓
+prep_data → train
+```
+
+---
+
+## 11. Creating the Run
+
+After uploading the pipeline:
+
+1. Open **Experiments**.
+2. Select **Default**.
+3. Create a new run.
+4. Select `fraud-training`.
+5. Start the run.
+
+KFP then schedules the component pods according to the DAG.
+
+Expected execution:
+
+```text
+prep_data
+    ↓
+  train
+    ↓
+  Succeeded
+```
+
+---
+
+## 12. Understanding Run States
+
+A KFP run goes through lifecycle states such as:
+
+```text
+Pending → Running → Succeeded
+```
+
+If a component fails, the run may instead become:
+
+```text
+Failed
+```
+
+For this lab, the required final state is:
+
+```text
+SUCCEEDED
+```
+
+Allow enough time for the Kubernetes pods to start and finish. The lab's tests may wait up to **420 seconds**.
+
+---
+
+## 13. API Verification
+
+The pipeline can also be checked through the KFP API:
+
+```bash
+curl -s http://localhost:5000/apis/v2beta1/pipelines
+```
+
+The response should contain a pipeline named:
+
+```text
+fraud-training
+```
+
+This verifies that the pipeline was successfully registered with KFP.
+
+---
+
+## 14. Key Concepts to Remember
+
+### `@dsl.component`
+
+Defines an individual executable task.
+
+```python
+@dsl.component
+def task():
+    ...
+```
+
+### `@dsl.pipeline`
+
+Defines the workflow/DAG.
+
+```python
+@dsl.pipeline
+def my_pipeline():
+    ...
+```
+
+### `.after()`
+
+Explicitly establishes execution order.
+
+```python
+train().after(prep)
+```
+
+### Compiler
+
+Converts the Python pipeline definition into an executable KFP package/IR YAML.
+
+```python
+compiler.Compiler().compile(...)
+```
+
+### Pipeline
+
+The reusable workflow definition.
+
+### Experiment
+
+A grouping for runs.
+
+### Run
+
+One execution of a pipeline.
+
+---
+
+## 15. The Complete Lab Flow
+
+The entire task can be remembered as:
+
+```text
+Edit pipeline.py
+      ↓
+Add train().after(prep)
+      ↓
+python3 pipeline.py
+      ↓
+pipeline.yaml
+      ↓
+Download YAML
+      ↓
+KFP UI
+      ↓
+Upload as fraud-training
+      ↓
+Default experiment
+      ↓
+Create run
+      ↓
+prep_data → train
+      ↓
+SUCCEEDED
+```
+
+## Final Takeaway
+
+The most important lesson is that **defining components is not enough**. The `@dsl.pipeline` function defines how those components are connected and therefore controls the workflow's execution order.
+
+For this lab, the critical line is:
+
+```python
+train().after(prep)
+```
+
+That single dependency changes the workflow from potentially parallel execution to the required:
+
+```text
+prep_data → train
+```
+
+The Python source is then compiled to `pipeline.yaml`, uploaded to KFP, and executed as a run in the **Default** experiment.
+
 ---
 
