@@ -150,12 +150,20 @@ SUCCEEDED
 
 The lab tests may poll for up to 420 seconds, so allow sufficient time for both component pods to complete.
 
-## Final Checklist
+### Screenshots
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/379c43a8-271e-4293-a432-914a5580ba04" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/bc451311-a89a-40b0-b3d3-47211f18da56" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/6d2daabb-d3df-4ea7-9e14-760f80f3c7f8" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/b7c091e6-1e46-4904-9318-47f263f78c57" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/179d8534-7dce-4275-9754-eec8ef55cc02" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/f6550594-7d43-469a-bad6-80d1e8603f1c" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/9b5b6d92-9873-4541-a435-5bc193f8dfe6" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/27811d90-c381-40f9-bc3e-1e9fc55f1227" />
 
-- [x] KFP UI reachable on port `5000`
-- [x] `fraud_training_pipeline` wires `train` after `prep_data`
-- [x] Pipeline compiled to `pipeline.yaml`
-- [x] Pipeline uploaded as `fraud-training`
-- [x] Pipeline available in the `Default` experiment
-- [x] A run was created from `fraud-training`
-- [x] Run reaches `SUCCEEDED`
+
+
+
+
+
+
+
