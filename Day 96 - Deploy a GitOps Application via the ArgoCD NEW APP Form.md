@@ -145,3 +145,18 @@ The Git repository remains the source of truth, and ArgoCD keeps the Kubernetes 
 ````
 
 ### Screenshots
+
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/89e5caca-c6e7-4f9f-a2d7-3ba724a9b91b" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/018f251e-5922-43e2-b846-6d508b0e1790" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/803df662-7e3c-477e-ab36-8303fdaeaa45" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/38275034-cd43-4df3-85ba-8de41b07cf9f" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/d0580d7d-0684-4c02-ba08-c4af3d3bdf54" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/48d72c4c-7b9e-4daa-a748-4251b25924c2" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/c8b5a492-b7d9-4658-8a64-c5fe848eda03" />
+
+
+
+
+
+
+
