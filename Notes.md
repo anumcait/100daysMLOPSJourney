@@ -43798,5 +43798,816 @@ prep_data → train
 
 The Python source is then compiled to `pipeline.yaml`, uploaded to KFP, and executed as a run in the **Default** experiment.
 
+## Day-96
+
+Absolutely — here is a **compact but complete lecturer-style `notes.md`**, covering the concepts, UI workflow, important pitfalls, verification, and troubleshooting without becoming unnecessarily long.
+
+````
+# Day 96 Notes — GitOps Application Deployment with ArgoCD
+
+## 1. What Are We Learning?
+
+Today we are deploying a Kubernetes application using **GitOps with ArgoCD**.
+
+The main idea is:
+
+> Git is the source of truth, and ArgoCD continuously reconciles the Kubernetes cluster to match the desired state stored in Git.
+
+Instead of manually creating Kubernetes resources with `kubectl`, we store the desired configuration in a Git repository and allow ArgoCD to deploy and maintain it.
+
+For this lab, the application is the `guestbook` example application.
+
+---
+
+## 2. What Is ArgoCD?
+
+**ArgoCD** is a declarative, GitOps continuous delivery tool for Kubernetes.
+
+It watches a Git repository and compares:
+
+```text
+Desired State
+    Git Repository
+         |
+         v
+      ArgoCD
+         |
+         v
+Actual State
+Kubernetes Cluster
+```
+
+If the desired state and actual state differ, ArgoCD can synchronize the cluster.
+
+This is called **reconciliation**.
+
+---
+
+## 3. Why GitOps?
+
+Traditional deployment might look like:
+
+```text
+Developer
+   |
+   v
+kubectl apply
+   |
+   v
+Kubernetes
+```
+
+With GitOps:
+
+```text
+Developer
+   |
+   v
+Git Repository
+   |
+   v
+ArgoCD
+   |
+   v
+Kubernetes
+```
+
+Git provides:
+
+- Version history
+- Auditability
+- Review through pull requests
+- A single source of truth
+- Repeatable deployments
+- Easy rollback to previous versions
+
+The cluster should represent what is declared in Git.
+
+---
+
+## 4. ArgoCD Application
+
+An **ArgoCD Application** connects a Git repository to a Kubernetes destination.
+
+An Application defines:
+
+1. What repository to watch
+2. Which revision to use
+3. Which path contains the Kubernetes manifests
+4. Which Kubernetes cluster to deploy to
+5. Which namespace to use
+6. How synchronization should happen
+
+For this lab:
+
+```text
+Application Name: guestbook
+Project:          default
+
+Repository:
+https://github.com/argoproj/argocd-example-apps
+
+Revision:
+HEAD
+
+Path:
+guestbook
+
+Cluster:
+https://kubernetes.default.svc
+
+Namespace:
+default
+```
+
+---
+
+## 5. Source Configuration
+
+The **Source** tells ArgoCD where the desired application configuration lives.
+
+### Repository URL
+
+```text
+https://github.com/argoproj/argocd-example-apps
+```
+
+This is the Git repository containing the example applications.
+
+### Revision
+
+```text
+HEAD
+```
+
+`HEAD` means ArgoCD tracks the current tip of the selected branch/revision.
+
+### Path
+
+```text
+guestbook
+```
+
+This is extremely important.
+
+The required path is:
+
+```text
+guestbook
+```
+
+Do not accidentally select:
+
+```text
+helm-guestbook
+```
+
+or:
+
+```text
+kustomize-guestbook
+```
+
+The lab specifically checks:
+
+```text
+spec.source.path == "guestbook"
+```
+
+---
+
+## 6. Destination Configuration
+
+The **Destination** tells ArgoCD where to deploy the application.
+
+For this lab:
+
+```text
+Cluster:
+https://kubernetes.default.svc
+
+Namespace:
+default
+```
+
+The Kubernetes API server address:
+
+```text
+https://kubernetes.default.svc
+```
+
+refers to the Kubernetes cluster from inside the cluster.
+
+In the ArgoCD UI this may appear as:
+
+```text
+in-cluster
+```
+
+The namespace must explicitly be:
+
+```text
+default
+```
+
+### Important Namespace Lesson
+
+If the Application's destination namespace is blank, ArgoCD may report errors such as:
+
+```text
+Namespace for guestbook-ui /v1, Kind=Service is missing.
+Namespace for guestbook-ui apps/v1, Kind=Deployment is missing.
+```
+
+Therefore, always verify that the Application summary shows:
+
+```text
+Namespace: default
+```
+
+---
+
+## 7. Sync Policy
+
+ArgoCD provides different synchronization approaches.
+
+### Manual Sync
+
+With manual synchronization:
+
+```text
+Git changes
+    |
+    v
+ArgoCD detects change
+    |
+    v
+Human clicks Sync
+    |
+    v
+Cluster updated
+```
+
+This requires human intervention.
+
+### Automatic Sync
+
+With automatic synchronization:
+
+```text
+Git changes
+    |
+    v
+ArgoCD detects change
+    |
+    v
+ArgoCD automatically syncs
+    |
+    v
+Cluster updated
+```
+
+For this lab, choose:
+
+```text
+Automatic
+```
+
+The task specifically requires automatic reconciliation.
+
+---
+
+## 8. Self-Heal
+
+**Self-heal** allows ArgoCD to correct drift in the cluster.
+
+For example, suppose Git says a Deployment should exist with three replicas.
+
+Someone manually changes the cluster:
+
+```text
+kubectl scale deployment guestbook-ui --replicas=1
+```
+
+Git still declares the desired configuration.
+
+ArgoCD detects:
+
+```text
+Desired State != Actual State
+```
+
+and reconciles the cluster back toward the Git-defined state.
+
+Conceptually:
+
+```text
+Git
+ |
+ | desired = 3 replicas
+ v
+ArgoCD
+ |
+ | actual = 1 replica
+ v
+Kubernetes
+ |
+ v
+ArgoCD fixes drift
+```
+
+Self-healing is important because Git remains the source of truth.
+
+---
+
+## 9. Prune Resources
+
+**Prune** allows ArgoCD to remove resources that are no longer defined in Git.
+
+For example:
+
+```text
+Before:
+Git -> Deployment + Service
+
+Later:
+Git -> Deployment
+```
+
+With pruning enabled, ArgoCD can remove the Service that is no longer part of the desired state.
+
+This helps prevent obsolete resources from remaining in the cluster.
+
+---
+
+## 10. Application Health vs Sync Status
+
+These are different concepts.
+
+### Sync Status
+
+Sync status answers:
+
+> Does the live cluster match the desired state from Git?
+
+Common states include:
+
+```text
+Synced
+OutOfSync
+Unknown
+```
+
+`Synced` means ArgoCD believes the live resources match the desired Git state.
+
+### Health Status
+
+Health status answers:
+
+> Are the deployed Kubernetes resources healthy?
+
+Common states include:
+
+```text
+Healthy
+Progressing
+Degraded
+Missing
+Unknown
+Suspended
+```
+
+A newly deployed application can temporarily be:
+
+```text
+Synced
+Progressing
+```
+
+This is normal while Kubernetes resources are starting.
+
+The final required state is:
+
+```text
+Synced
+Healthy
+```
+
+---
+
+## 11. Creating the Application
+
+Open the ArgoCD UI and log in:
+
+```text
+Username: admin
+Password: admin
+```
+
+Go to:
+
+```text
+Applications → New App
+```
+
+Enter:
+
+```text
+Application Name:
+guestbook
+
+Project:
+default
+```
+
+Configure Source:
+
+```text
+Repository URL:
+https://github.com/argoproj/argocd-example-apps
+
+Revision:
+HEAD
+
+Path:
+guestbook
+```
+
+Configure Destination:
+
+```text
+Cluster:
+https://kubernetes.default.svc
+
+Namespace:
+default
+```
+
+Configure synchronization:
+
+```text
+Sync Policy:
+Automatic
+
+Auto Sync:
+Enabled
+
+Self Heal:
+Enabled
+```
+
+Enable pruning if the UI provides the option.
+
+Then click:
+
+```text
+Create
+```
+
+---
+
+## 12. What Happens After Create?
+
+ArgoCD creates the Application object.
+
+It then:
+
+1. Connects to the Git repository.
+2. Reads the `guestbook` path.
+3. Resolves the desired Kubernetes resources.
+4. Compares them with the cluster.
+5. Detects that resources are missing.
+6. Automatically synchronizes them.
+7. Kubernetes creates the resources.
+8. ArgoCD monitors their health.
+9. The Application eventually becomes `Synced` and `Healthy`.
+
+Initially it is normal to see:
+
+```text
+Progressing
+Synced
+```
+
+After the resources finish starting:
+
+```text
+Healthy
+Synced
+```
+
+---
+
+## 13. How to Verify the Application
+
+The Application tile should show:
+
+```text
+guestbook
+
+Project:
+default
+
+Repository:
+https://github.com/argoproj/argocd-example-apps
+
+Target Revision:
+HEAD
+
+Path:
+guestbook
+
+Destination:
+in-cluster
+
+Namespace:
+default
+```
+
+The final status must be:
+
+```text
+SYNC STATUS:
+Synced
+
+HEALTH STATUS:
+Healthy
+```
+
+Automatic synchronization should also be enabled.
+
+---
+
+## 14. API Verification
+
+The lab ultimately checks the ArgoCD API:
+
+```text
+GET /api/v1/applications/guestbook
+```
+
+The returned Application must contain the expected source:
+
+```text
+spec.source.repoURL:
+https://github.com/argoproj/argocd-example-apps
+
+spec.source.path:
+guestbook
+```
+
+And the final status must be:
+
+```text
+status.sync.status:
+Synced
+
+status.health.status:
+Healthy
+```
+
+The tests may poll for up to **240 seconds**, so an immediately displayed `Progressing` state does not necessarily indicate failure.
+
+---
+
+## 15. Common Mistakes
+
+### Wrong Path
+
+Incorrect:
+
+```text
+helm-guestbook
+```
+
+Incorrect:
+
+```text
+kustomize-guestbook
+```
+
+Correct:
+
+```text
+guestbook
+```
+
+### Missing Namespace
+
+Incorrect:
+
+```text
+Namespace:
+```
+
+Correct:
+
+```text
+Namespace:
+default
+```
+
+A blank namespace can produce errors such as:
+
+```text
+Namespace for guestbook-ui /v1, Kind=Service is missing.
+```
+
+### Manual Sync
+
+The task requires automatic reconciliation.
+
+Use:
+
+```text
+Automatic
+```
+
+not:
+
+```text
+Manual
+```
+
+### Changing the Repository
+
+Do not change the repository.
+
+Use exactly:
+
+```text
+https://github.com/argoproj/argocd-example-apps
+```
+
+### Assuming Progressing Means Failure
+
+Immediately after creation, the application can be:
+
+```text
+Synced
+Progressing
+```
+
+Wait for Kubernetes resources to become ready.
+
+The required final state is:
+
+```text
+Synced
+Healthy
+```
+
+---
+
+## 16. Troubleshooting Checklist
+
+If the Application does not become healthy, verify:
+
+```text
+[ ] Application name = guestbook
+[ ] Project = default
+[ ] Repository URL is correct
+[ ] Revision = HEAD
+[ ] Path = guestbook
+[ ] Cluster = https://kubernetes.default.svc
+[ ] Namespace = default
+[ ] Automatic sync enabled
+[ ] Self-heal enabled
+[ ] Resources are not showing Sync errors
+```
+
+If ArgoCD reports a synchronization error, inspect:
+
+- Application Conditions
+- Sync Status
+- Resource Tree
+- Events
+- Manifest/Details information
+
+Do not immediately delete and recreate the Application. First identify the actual configuration or synchronization error.
+
+---
+
+## 17. The GitOps Reconciliation Loop
+
+The most important concept from this exercise is the reconciliation loop.
+
+```text
+              Git Repository
+                    |
+                    | Desired State
+                    v
+                 ArgoCD
+                    |
+                    | Compare
+                    v
+             Kubernetes Cluster
+                    |
+                    | Actual State
+                    v
+                 ArgoCD
+                    |
+                    | Difference?
+                    |
+              +-----+-----+
+              |           |
+             No          Yes
+              |           |
+              v           v
+           Healthy     Reconcile
+                          |
+                          v
+                    Cluster Updated
+```
+
+ArgoCD continuously works to make:
+
+```text
+Actual State = Desired State
+```
+
+This is the foundation of GitOps.
+
+---
+
+## 18. Why Automatic Sync + Self-Heal Matter
+
+Automatic sync handles changes coming from Git.
+
+Self-heal handles drift introduced directly in the cluster.
+
+For example:
+
+```text
+Git says:
+Deployment should exist
+
+Someone runs:
+kubectl delete deployment guestbook-ui
+```
+
+ArgoCD detects that the live state no longer matches Git and reconciles it.
+
+Therefore:
+
+```text
+Git
+ |
+ | source of truth
+ v
+ArgoCD
+ |
+ | reconciliation
+ v
+Kubernetes
+```
+
+No human needs to manually click Sync for every drift event.
+
+---
+
+## 19. Final Expected State
+
+The completed lab should have:
+
+```text
+Application:
+guestbook
+
+Project:
+default
+
+Repository:
+https://github.com/argoproj/argocd-example-apps
+
+Revision:
+HEAD
+
+Path:
+guestbook
+
+Cluster:
+https://kubernetes.default.svc
+
+Namespace:
+default
+
+Sync Policy:
+Automatic
+
+Self Heal:
+Enabled
+
+Sync Status:
+Synced
+
+Health Status:
+Healthy
+```
+
+The key lesson is:
+
+> **Git defines the desired state, ArgoCD continuously reconciles it, and Kubernetes runs the resulting state.**
+````
 ---
 
