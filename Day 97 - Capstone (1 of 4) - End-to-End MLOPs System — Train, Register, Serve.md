@@ -1,4 +1,3 @@
-````
 # Day 97: Capstone (1/4) — End-to-End MLOps System - Train, Register, Serve
 
 The xFusionCorp Industries MLOps team is standing up the serving path of their fraud-detector platform — the route a model takes from a training run to a live prediction endpoint. The backing stack is already running: a SeaweedFS object store (with a seeded training dataset) and an MLflow tracking server. Your task is to drive that path end to end: run the training script to produce a run, complete register.py so it registers the run as the fraud-detector model and assigns the production alias, then start the FastAPI inference server so it serves live predictions from the aliased model.
@@ -465,4 +464,3 @@ The production alias provides a stable handoff between model lifecycle managemen
 
 ### Screenshots
 
-````
