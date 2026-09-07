@@ -463,4 +463,12 @@ The Day 97 capstone establishes the complete MLOps serving path:
 The production alias provides a stable handoff between model lifecycle management and the serving layer, allowing future model versions to be promoted without changing the serving application's model URI.
 
 ### Screenshots
+<img width="1008" height="453" alt="image" src="https://github.com/user-attachments/assets/b996dfe0-92c3-40d4-a0fb-caf447cf5c60" />
+<img width="1000" height="450" alt="image" src="https://github.com/user-attachments/assets/be4b4880-7e58-44aa-abfd-1f38286a2fdc" />
+<img width="1012" height="450" alt="image" src="https://github.com/user-attachments/assets/747ffa86-3c0d-4866-b46f-4a4ccc3cff7d" />
+<img width="1012" height="445" alt="image" src="https://github.com/user-attachments/assets/2b430528-6ad2-4b1c-a144-deef8500d792" />
+<img width="992" height="438" alt="image" src="https://github.com/user-attachments/assets/1a4c8e41-18fb-4472-920c-3a3ce1dbd95d" />
+
+
+
 
