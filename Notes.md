@@ -44609,5 +44609,1105 @@ The key lesson is:
 
 > **Git defines the desired state, ArgoCD continuously reconciles it, and Kubernetes runs the resulting state.**
 ````
+
+## Day-97
+
+Here is a compact but lecturer-style `notes.md` covering the concepts, flow, code, commands, and important MLflow details without becoming overly large.
+
+````
+# Day 97 Notes — End-to-End MLOps System
+
+## 1. What Are We Building?
+
+This lab demonstrates a complete **MLOps model lifecycle**:
+
+```text
+Training Data
+     ↓
+SeaweedFS
+     ↓
+train.py
+     ↓
+MLflow Experiment / Run
+     ↓
+MLflow Model Registry
+     ↓
+fraud-detector:version
+     ↓
+production alias
+     ↓
+FastAPI
+     ↓
+/predict
+```
+
+The main idea is that a trained model should not simply remain as a file on a machine.
+
+In MLOps, we want to:
+
+- Track the training run.
+- Store model artifacts.
+- Register the model.
+- Give the model a version.
+- Promote a version to production.
+- Allow the serving application to load the production model.
+- Serve predictions through an API.
+
+---
+
+## 2. Technologies Used
+
+### SeaweedFS
+
+SeaweedFS provides object storage compatible with the S3 API.
+
+In this lab it stores:
+
+- `transactions.csv` in the `data` bucket.
+- MLflow artifacts in the `mlflow-artifacts` bucket.
+
+The training script reads the dataset from SeaweedFS rather than from a local file.
+
+---
+
+### MLflow
+
+MLflow handles:
+
+- Experiment tracking
+- Training runs
+- Parameters
+- Metrics
+- Model artifacts
+- Model Registry
+- Model versions
+- Model aliases
+
+The tracking server is:
+
+```text
+http://localhost:5000
+```
+
+---
+
+### Scikit-learn
+
+The model is:
+
+```python
+RandomForestClassifier(n_estimators=100, random_state=42)
+```
+
+It uses three features:
+
+```text
+amount
+hour
+num_tx_past_day
+```
+
+The target is:
+
+```text
+is_fraud
+```
+
+---
+
+### FastAPI
+
+FastAPI provides the prediction endpoint:
+
+```text
+POST /predict
+```
+
+The server listens on:
+
+```text
+http://localhost:8085
+```
+
+---
+
+# 3. The Training Stage
+
+The training script is `train.py`.
+
+It loads the configuration:
+
+```python
+cfg = yaml.safe_load((HERE / "config.yaml").read_text())
+```
+
+Then it configures S3/SeaweedFS credentials:
+
+```python
+os.environ["AWS_ACCESS_KEY_ID"] = cfg["s3"]["access_key"]
+os.environ["AWS_SECRET_ACCESS_KEY"] = cfg["s3"]["secret_key"]
+os.environ["MLFLOW_S3_ENDPOINT_URL"] = cfg["s3"]["endpoint"]
+```
+
+This tells MLflow where its artifact storage is located.
+
+---
+
+## 4. Reading the Dataset
+
+The script creates an S3 client:
+
+```python
+s3 = boto3.client(
+    "s3",
+    endpoint_url=cfg["s3"]["endpoint"],
+    aws_access_key_id=cfg["s3"]["access_key"],
+    aws_secret_access_key=cfg["s3"]["secret_key"],
+)
+```
+
+Then it reads:
+
+```python
+obj = s3.get_object(
+    Bucket=cfg["s3"]["data_bucket"],
+    Key="transactions.csv",
+)
+```
+
+The CSV is converted into a pandas DataFrame:
+
+```python
+df = pd.read_csv(BytesIO(obj["Body"].read()))
+```
+
+So the data flow is:
+
+```text
+SeaweedFS
+   ↓
+transactions.csv
+   ↓
+boto3
+   ↓
+pandas DataFrame
+```
+
+---
+
+# 5. Preparing Training Data
+
+The target column is:
+
+```python
+y = df["is_fraud"]
+```
+
+The remaining columns become features:
+
+```python
+X = df.drop(columns=["is_fraud"])
+```
+
+The data is split using:
+
+```python
+train_test_split(
+    X,
+    y,
+    test_size=0.3,
+    stratify=y,
+    random_state=42,
+)
+```
+
+Important points:
+
+- `test_size=0.3` means 30% is held out.
+- `stratify=y` maintains the class distribution.
+- `random_state=42` makes the split reproducible.
+
+---
+
+# 6. MLflow Experiment
+
+The script configures the tracking server:
+
+```python
+mlflow.set_tracking_uri(cfg["mlflow"]["tracking_uri"])
+```
+
+Then selects the experiment:
+
+```python
+mlflow.set_experiment("fraud-detection")
+```
+
+An **experiment** is a logical container for related MLflow runs.
+
+For this lab:
+
+```text
+Experiment
+    fraud-detection
+```
+
+Each time training runs, a new run can be created inside this experiment.
+
+---
+
+# 7. MLflow Autologging
+
+The script uses:
+
+```python
+mlflow.sklearn.autolog()
+```
+
+Autologging automatically captures useful information from the scikit-learn training process.
+
+Depending on the MLflow version, this can include:
+
+- Model
+- Parameters
+- Metrics
+- Model signature
+- Environment information
+- Other training metadata
+
+This reduces the amount of manual MLflow logging code we need to write.
+
+---
+
+# 8. Starting the Training Run
+
+The actual training happens inside:
+
+```python
+with mlflow.start_run() as run:
+    model = RandomForestClassifier(
+        n_estimators=100,
+        random_state=42,
+    )
+    model.fit(X_train, y_train)
+```
+
+`mlflow.start_run()` creates a new MLflow run.
+
+The run gets a unique ID.
+
+In this lab:
+
+```text
+47341459c7704903a725fccd604f4436
+```
+
+The important distinction is:
+
+```text
+Experiment
+    ↓
+fraud-detection
+
+Run
+    ↓
+47341459c7704903a725fccd604f4436
+```
+
+An experiment contains runs.
+
+---
+
+# 9. Why Artifacts Matter
+
+The model itself must be stored somewhere.
+
+MLflow separates:
+
+```text
+Tracking metadata
+```
+
+from:
+
+```text
+Artifacts
+```
+
+Tracking metadata includes things like:
+
+- Run ID
+- Parameters
+- Metrics
+- Tags
+
+Artifacts can include:
+
+- Trained model
+- Files
+- Plots
+- Other output
+
+In this lab:
+
+```text
+MLflow Tracking Server
+        ↓
+SeaweedFS
+        ↓
+mlflow-artifacts bucket
+```
+
+So the MLflow server manages the tracking information while SeaweedFS provides object storage for artifacts.
+
+---
+
+# 10. The Registration Stage
+
+After training, we need to make the model available through the MLflow Model Registry.
+
+This is what `register.py` does.
+
+It first connects to:
+
+```python
+TRACKING_URI = "http://localhost:5000"
+```
+
+Then creates a client:
+
+```python
+client = mlflow.tracking.MlflowClient()
+```
+
+The script finds the latest run:
+
+```python
+runs = client.search_runs(
+    [exp.experiment_id],
+    order_by=["attributes.start_time DESC"],
+    max_results=1,
+)
+```
+
+This means:
+
+> Find the most recently started run in the `fraud-detection` experiment.
+
+---
+
+# 11. The Model URI
+
+The registered model is created from the training run.
+
+The expected model URI is:
+
+```text
+runs:/<run_id>/model
+```
+
+For this run:
+
+```text
+runs:/47341459c7704903a725fccd604f4436/model
+```
+
+The code builds it dynamically:
+
+```python
+model_uri = f"runs:/{run_id}/model"
+```
+
+This is important because we should not hard-code a particular run ID.
+
+---
+
+# 12. Registering the Model
+
+The model is registered using:
+
+```python
+registered = mlflow.register_model(
+    model_uri=model_uri,
+    name=MODEL_NAME,
+)
+```
+
+Here:
+
+```python
+MODEL_NAME = "fraud-detector"
+```
+
+MLflow creates a registered model:
+
+```text
+fraud-detector
+```
+
+and gives it a version.
+
+In this lab:
+
+```text
+fraud-detector
+    version 1
+```
+
+---
+
+# 13. MLflow Model Registry
+
+The registry can be thought of as:
+
+```text
+Registered Model
+      |
+      +-- Version 1
+      +-- Version 2
+      +-- Version 3
+      +-- ...
+```
+
+This allows multiple trained versions to exist simultaneously.
+
+For example:
+
+```text
+fraud-detector
+    ├── version 1
+    ├── version 2
+    └── version 3
+```
+
+This is much better than replacing one model file every time we train.
+
+---
+
+# 14. Model Aliases
+
+The lab uses an alias called:
+
+```text
+production
+```
+
+The alias is assigned using:
+
+```python
+client.set_registered_model_alias(
+    name=MODEL_NAME,
+    alias=ALIAS,
+    version=registered.version,
+)
+```
+
+Where:
+
+```python
+ALIAS = "production"
+```
+
+The resulting relationship is:
+
+```text
+fraud-detector
+      |
+      └── production → version 1
+```
+
+---
+
+# 15. Why Use an Alias?
+
+This is one of the most important MLOps concepts in the lab.
+
+The FastAPI server does **not** directly load:
+
+```text
+fraud-detector version 1
+```
+
+Instead it loads:
+
+```text
+models:/fraud-detector@production
+```
+
+This means the application does not need to know which specific version is currently production.
+
+For example:
+
+```text
+Today:
+
+production → version 1
+```
+
+Later:
+
+```text
+production → version 2
+```
+
+The application still uses:
+
+```text
+models:/fraud-detector@production
+```
+
+No application code change is required.
+
+---
+
+# 16. Promotion Without Redeployment
+
+Suppose version 2 is better than version 1.
+
+We can promote version 2:
+
+```text
+Before:
+
+production → version 1
+```
+
+Then:
+
+```text
+After:
+
+production → version 2
+```
+
+The serving application still uses:
+
+```text
+models:/fraud-detector@production
+```
+
+Therefore:
+
+```text
+New model version
+       ↓
+Register
+       ↓
+Move alias
+       ↓
+Production automatically resolves to new model
+```
+
+This is why aliases are useful for deployment.
+
+---
+
+# 17. The Serving Stage
+
+`serve.py` is the FastAPI inference server.
+
+It creates the model URI:
+
+```python
+model_uri = (
+    f"models:/{cfg['mlflow']['model_name']}@{cfg['mlflow']['model_alias']}"
+)
+```
+
+With the lab configuration this becomes:
+
+```text
+models:/fraud-detector@production
+```
+
+The server then attempts to load that model:
+
+```python
+mlflow.pyfunc.load_model(model_uri)
+```
+
+---
+
+# 18. Background Model Loader
+
+The server starts a background thread:
+
+```python
+threading.Thread(
+    target=_loader,
+    daemon=True,
+).start()
+```
+
+The loader repeatedly tries to load the model:
+
+```python
+while _state["model"] is None:
+    try:
+        _state["model"] = mlflow.pyfunc.load_model(model_uri)
+        print(f"[serve] loaded {model_uri}")
+        return
+    except Exception:
+        time.sleep(5)
+```
+
+This is useful because the server can start before the model has been registered.
+
+The sequence can be:
+
+```text
+Start FastAPI
+    ↓
+Model unavailable
+    ↓
+Wait 5 seconds
+    ↓
+Try again
+    ↓
+Model registered
+    ↓
+Load model
+    ↓
+Ready for predictions
+```
+
+---
+
+# 19. Health Endpoint
+
+The server provides:
+
+```text
+GET /health
+```
+
+The implementation checks whether a model is loaded.
+
+If not:
+
+```json
+{
+  "status": "loading",
+  "model_uri": "models:/fraud-detector@production"
+}
+```
+
+After loading:
+
+```json
+{
+  "status": "healthy",
+  "model_uri": "models:/fraud-detector@production"
+}
+```
+
+This provides a simple way to determine whether the service is ready.
+
+---
+
+# 20. Prediction Endpoint
+
+The prediction endpoint is:
+
+```text
+POST /predict
+```
+
+It expects:
+
+```json
+{
+  "features": [100.5, 12, 3]
+}
+```
+
+The three values correspond to:
+
+```text
+amount
+hour
+num_tx_past_day
+```
+
+The server converts the values into a DataFrame:
+
+```python
+df = pd.DataFrame([
+    dict(zip(FEATURE_COLUMNS, values))
+])
+```
+
+The resulting data conceptually looks like:
+
+```text
+amount   hour   num_tx_past_day
+100.5    12     3
+```
+
+The model predicts:
+
+```python
+pred = int(model.predict(df)[0])
+```
+
+and returns:
+
+```json
+{
+  "prediction": 0
+}
+```
+
+or:
+
+```json
+{
+  "prediction": 1
+}
+```
+
+---
+
+# 21. Complete Execution Order
+
+The correct workflow is:
+
+### Step 1 — Train
+
+```bash
+cd /root/code
+python3 train.py
+```
+
+This creates:
+
+```text
+fraud-detection experiment
+        ↓
+training run
+        ↓
+model + artifacts
+```
+
+### Step 2 — Register
+
+```bash
+python3 register.py
+```
+
+This creates:
+
+```text
+fraud-detector
+    ↓
+version 1
+    ↓
+production alias
+```
+
+### Step 3 — Start Server
+
+```bash
+python3 serve.py
+```
+
+The server attempts:
+
+```text
+models:/fraud-detector@production
+```
+
+### Step 4 — Check Health
+
+```bash
+curl http://localhost:8085/health
+```
+
+Expected final state:
+
+```json
+{
+  "status": "healthy",
+  "model_uri": "models:/fraud-detector@production"
+}
+```
+
+### Step 5 — Predict
+
+```bash
+curl -X POST http://localhost:8085/predict \
+  -H "Content-Type: application/json" \
+  -d '{"features": [100.5, 12, 3]}'
+```
+
+Expected:
+
+```json
+{"prediction":0}
+```
+
+or:
+
+```json
+{"prediction":1}
+```
+
+---
+
+# 22. Important MLflow Warning
+
+During registration, MLflow may display:
+
+```text
+Run ... has no artifacts at artifact path 'model',
+registering model based on models:/m-...
+```
+
+This can happen because newer MLflow versions can log models using a model ID.
+
+If MLflow then reports:
+
+```text
+Created version '1' of model 'fraud-detector'.
+```
+
+and:
+
+```text
+[register] promoted fraud-detector version 1 to @production
+```
+
+registration succeeded.
+
+The important thing is the final registry state, not whether MLflow used the older artifact-path representation internally.
+
+---
+
+# 23. Common Failure: HTTP 503
+
+If `/predict` returns:
+
+```json
+{
+  "detail": "model models:/fraud-detector@production is not yet available..."
+}
+```
+
+it means:
+
+```text
+FastAPI is running
+        ↓
+Model is not loaded yet
+```
+
+First check:
+
+```bash
+curl http://localhost:8085/health
+```
+
+If it says:
+
+```json
+{"status":"loading", ...}
+```
+
+wait a few seconds.
+
+If the model has not been registered, run:
+
+```bash
+python3 register.py
+```
+
+The background loader will retry automatically.
+
+---
+
+# 24. Key Difference: Experiment vs Run vs Model
+
+These concepts should not be confused.
+
+### Experiment
+
+Groups related runs.
+
+```text
+fraud-detection
+```
+
+### Run
+
+One execution of training.
+
+```text
+47341459c7704903a725fccd604f4436
+```
+
+### Registered Model
+
+A deployable model name.
+
+```text
+fraud-detector
+```
+
+### Model Version
+
+A specific registered version.
+
+```text
+fraud-detector version 1
+```
+
+### Alias
+
+A movable label pointing to a version.
+
+```text
+production → version 1
+```
+
+The hierarchy is:
+
+```text
+Experiment
+    ↓
+Run
+    ↓
+Logged Model
+    ↓
+Registered Model
+    ↓
+Model Version
+    ↓
+Alias
+```
+
+---
+
+# 25. Key Difference: Tracking vs Registry
+
+MLflow Tracking answers:
+
+> What happened during training?
+
+It stores information about runs, parameters, metrics, and artifacts.
+
+The Model Registry answers:
+
+> Which model version should be used?
+
+For example:
+
+```text
+Tracking:
+
+Run A
+Run B
+Run C
+```
+
+Registry:
+
+```text
+fraud-detector
+    version 1
+    version 2
+    version 3
+
+production → version 2
+```
+
+Both parts are important in an MLOps system.
+
+---
+
+# 26. Key Commands to Remember
+
+Train:
+
+```bash
+python3 /root/code/train.py
+```
+
+Register:
+
+```bash
+python3 /root/code/register.py
+```
+
+Serve:
+
+```bash
+python3 /root/code/serve.py
+```
+
+Health:
+
+```bash
+curl http://localhost:8085/health
+```
+
+Prediction:
+
+```bash
+curl -X POST http://localhost:8085/predict \
+  -H "Content-Type: application/json" \
+  -d '{"features": [100.5, 12, 3]}'
+```
+
+---
+
+# 27. Final Mental Model
+
+Think of the entire system as a pipeline:
+
+```text
+1. DATA
+   SeaweedFS
+      ↓
+   transactions.csv
+
+2. TRAIN
+   train.py
+      ↓
+   RandomForest
+      ↓
+   MLflow run
+
+3. STORE
+   MLflow artifacts
+      ↓
+   SeaweedFS mlflow-artifacts
+
+4. REGISTER
+   register.py
+      ↓
+   fraud-detector version 1
+
+5. PROMOTE
+   production alias
+      ↓
+   models:/fraud-detector@production
+
+6. SERVE
+   FastAPI
+      ↓
+   mlflow.pyfunc.load_model()
+
+7. PREDICT
+   POST /predict
+      ↓
+   {"prediction": 0 or 1}
+```
+
+The central MLOps principle is:
+
+> **Training creates model versions; the registry manages those versions; an alias identifies the version currently used by production; the serving layer loads through that stable alias.**
+
+This separation allows models to evolve independently from the application serving them.
+````
 ---
 

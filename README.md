@@ -150,4 +150,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 96: Deploy a GitOps Application via the ArgoCD NEW APP Form](./Day%2096%20-%20Deploy%20a%20GitOps%20Application%20via%20the%20ArgoCD%20NEW%20APP%20Form.md)
 
+- [Day 97 - Capstone (1 of 4) - End-to-End MLOps System — Train, Register, Serve](./Day%2097%20-%20Capstone%20%281%20of%204%29%20-%20End-to-End%20MLOps%20System%20%E2%80%94%20Train%2C%20Register%2C%20Serve.md)
+
 ---
