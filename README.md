@@ -152,4 +152,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 97 - Capstone (1 of 4) - End-to-End MLOps System — Train, Register, Serve](./Day%2097%20-%20Capstone%20(1%20of%204)%20-%20End-to-End%20MLOPs%20System%20%E2%80%94%20Train%2C%20Register%2C%20Serve.md)
 
+- [Day 98 - Capstone (2 of 4) - Monitoring and Automated Retraining](./Day%2098%20-%20Capstone%20(2%20of%204)%20-%20Monitoring%20and%20Automated%20Retraining.md)
+
 ---

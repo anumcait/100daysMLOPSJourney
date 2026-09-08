@@ -45709,5 +45709,944 @@ The central MLOps principle is:
 
 This separation allows models to evolve independently from the application serving them.
 ````
+
+## Day-98
+
+Below is a concise but lecturer-style `notes.md` that covers the whole lab flow, including **why each step exists, what the code is doing, common mistakes, and how to verify the final state**.
+
+````
+# Day 98 Notes: Monitoring and Automated Retraining
+
+## 1. What Is This Lab About?
+
+This lab demonstrates **automated retraining triggered by data drift**.
+
+In production machine learning, a model can become less accurate when real-world data changes compared with the data used to train the model.
+
+The complete MLOps loop is:
+
+```text
+Monitor → Detect Drift → Decide → Retrain → Register → Promote
+```
+
+Here:
+
+- The production model is `fraud-detector`.
+- Version `1` is currently live through the `production` alias.
+- `reference.csv` represents the data used for the original model.
+- `current.csv` represents the new production data.
+- `current.csv` has intentionally shifted from the reference distribution.
+- `drift.py` detects the shift.
+- `retrain.py` trains a new model.
+- `retrain_if_drift.py` connects everything automatically.
+
+The important idea is:
+
+> **Do not retrain just because new data exists. Retrain when monitoring determines that the data has drifted.**
+
+---
+
+## 2. What Is Data Drift?
+
+**Data drift** means that the distribution of incoming data has changed compared with the reference or training data.
+
+For example, suppose a fraud model was trained when:
+
+```text
+average transaction = $50
+```
+
+but production transactions later become:
+
+```text
+average transaction = $500
+```
+
+The model is now seeing a different population from the one it learned from.
+
+This does not automatically mean the model is bad, but it is a warning that model performance may degrade.
+
+Therefore, production ML systems monitor incoming data.
+
+---
+
+## 3. Reference Data vs Current Data
+
+This lab contains:
+
+```text
+/root/code/data/reference.csv
+/root/code/data/current.csv
+```
+
+### Reference data
+
+`reference.csv` represents the historical/training distribution.
+
+It is the baseline used to answer:
+
+> "What did the data look like when the model was trained?"
+
+### Current data
+
+`current.csv` represents the new production stream.
+
+It answers:
+
+> "What does the data look like now?"
+
+The drift detector compares these two datasets.
+
+---
+
+## 4. What Does `drift.py` Do?
+
+The provided `drift.py` script is already implemented.
+
+It uses **Evidently** to compare the reference and current datasets.
+
+Its outputs include:
+
+```text
+/root/code/reports/drift.html
+/root/code/reports/drift-summary.json
+```
+
+The HTML file provides the human-readable drift report.
+
+The JSON summary gives the automation something easy to consume programmatically.
+
+The important field is:
+
+```json
+"dataset_drift": true
+```
+
+The automation reads this value to decide whether retraining is required.
+
+---
+
+## 5. Why Do We Need a Gate?
+
+The retraining process must not happen every time the automation runs.
+
+Imagine a monitoring job running every hour.
+
+Without a drift gate:
+
+```text
+Every hour → retrain
+```
+
+This would waste:
+
+- compute resources
+- storage
+- MLflow model versions
+- engineering time
+
+Instead:
+
+```text
+Every hour
+    ↓
+Check drift
+    ↓
+No drift → stop
+    ↓
+Drift → retrain
+```
+
+This is the purpose of TODO 1.
+
+---
+
+## 6. TODO 1: The Drift Gate
+
+The scaffold calculates:
+
+```python
+drifted = bool(summary.get("dataset_drift"))
+```
+
+This converts the value from the JSON summary into a Python boolean.
+
+Then we check:
+
+```python
+if not drifted:
+    print("[loop] no drift detected; no retraining needed")
+    raise SystemExit(0)
+```
+
+### What does `not drifted` mean?
+
+If:
+
+```python
+drifted = False
+```
+
+then:
+
+```python
+not drifted
+```
+
+is `True`.
+
+The script prints a message and exits.
+
+Therefore, the following steps are skipped:
+
+```text
+retrain.py
+model registration
+alias promotion
+```
+
+This is important because the requirement says:
+
+> Retrain only when the data has drifted.
+
+---
+
+## 7. What Happens When Drift Is Detected?
+
+In this lab:
+
+```text
+dataset_drift=True
+```
+
+Therefore the gate does not exit.
+
+Execution continues to:
+
+```python
+_run("retrain.py")
+```
+
+The provided retraining script trains a new model using the required combined data and logs the run to MLflow.
+
+---
+
+## 8. Finding the Retraining Run
+
+After retraining, the scaffold calls:
+
+```python
+run_id = _latest_retrain_run_id()
+```
+
+The helper searches the `fraud-detection` experiment for a run with:
+
+```text
+runName = retrain
+```
+
+and sorts by start time.
+
+This gives us the run ID of the newly created retraining run.
+
+For example:
+
+```text
+run_id = abc123...
+```
+
+We need this ID because MLflow stores logged models under runs.
+
+---
+
+## 9. MLflow Model URI
+
+The retrained model is stored under the run's `model` artifact path.
+
+The MLflow URI is:
+
+```text
+runs:/<run_id>/model
+```
+
+In Python:
+
+```python
+model_uri = f"runs:/{run_id}/model"
+```
+
+For example:
+
+```text
+runs:/abc123/model
+```
+
+This tells MLflow:
+
+> Find the model artifact named `model` inside this specific run.
+
+---
+
+## 10. Registering the New Model Version
+
+The next step is to register the retrained model:
+
+```python
+model_version = mlflow.register_model(
+    model_uri,
+    MODEL_NAME,
+)
+```
+
+Since:
+
+```python
+MODEL_NAME = "fraud-detector"
+```
+
+MLflow creates a new version of the existing registered model.
+
+The existing state is approximately:
+
+```text
+fraud-detector
+└── version 1
+    └── production
+```
+
+After registration:
+
+```text
+fraud-detector
+├── version 1
+└── version 2
+```
+
+The exact version may be higher if the automation has already been run before.
+
+---
+
+## 11. Why Register a Model Version?
+
+A training run and a registered model are related but different concepts.
+
+### MLflow Run
+
+A run records an execution of training.
+
+It can contain:
+
+- parameters
+- metrics
+- artifacts
+- model files
+- source information
+
+### Registered Model
+
+The registered model represents deployable model versions.
+
+For example:
+
+```text
+fraud-detector
+├── v1
+├── v2
+└── v3
+```
+
+This makes model lifecycle management possible.
+
+We can track which version is being served in production.
+
+---
+
+## 12. What Is the Production Alias?
+
+The lab uses:
+
+```python
+ALIAS = "production"
+```
+
+An alias is a convenient name pointing to a particular model version.
+
+Instead of applications hardcoding:
+
+```text
+fraud-detector version 2
+```
+
+they can refer to:
+
+```text
+fraud-detector@production
+```
+
+The alias can then be moved when a new version is ready.
+
+For example:
+
+```text
+production → v1
+```
+
+can become:
+
+```text
+production → v2
+```
+
+without changing the serving configuration.
+
+---
+
+## 13. Moving the Production Alias
+
+The final TODO uses:
+
+```python
+client.set_registered_model_alias(
+    MODEL_NAME,
+    ALIAS,
+    model_version.version,
+)
+```
+
+Here:
+
+```python
+MODEL_NAME
+```
+
+is:
+
+```text
+fraud-detector
+```
+
+`ALIAS` is:
+
+```text
+production
+```
+
+and:
+
+```python
+model_version.version
+```
+
+is the newly created version.
+
+Therefore MLflow changes:
+
+```text
+production → old version
+```
+
+to:
+
+```text
+production → new version
+```
+
+This is the promotion step.
+
+---
+
+## 14. Complete Automation Flow
+
+The finished script follows this sequence:
+
+```text
+Start
+  ↓
+Run drift.py
+  ↓
+Read drift-summary.json
+  ↓
+Is dataset_drift True?
+  │
+  ├── No → Print message → Exit
+  │
+  └── Yes
+       ↓
+    Run retrain.py
+       ↓
+    Find retrain run ID
+       ↓
+    Build runs:/<run_id>/model
+       ↓
+    Register new fraud-detector version
+       ↓
+    Move production alias
+       ↓
+    New model is live
+```
+
+This is the complete automated retraining loop.
+
+---
+
+## 15. Why the Order Matters
+
+The order of operations is intentional.
+
+First:
+
+```text
+detect drift
+```
+
+Then:
+
+```text
+retrain
+```
+
+Then:
+
+```text
+register
+```
+
+Finally:
+
+```text
+promote
+```
+
+We should not promote a model before retraining and registration are successful.
+
+The production alias should only be moved after a new model version exists.
+
+---
+
+## 16. Running the Script
+
+Run:
+
+```bash
+cd /root/code
+python3 retrain_if_drift.py
+```
+
+Because the current dataset is intentionally shifted, the expected flow is similar to:
+
+```text
+[loop] dataset_drift=True
+[loop] retrained: run_id=<run-id>
+[loop] promoted: fraud-detector version=2 alias=production
+```
+
+The run ID will be different in each environment.
+
+---
+
+## 17. Verify the Drift Report
+
+Check that the HTML report exists:
+
+```bash
+test -f /root/code/reports/drift.html && echo "drift.html OK"
+```
+
+Check the JSON summary:
+
+```bash
+cat /root/code/reports/drift-summary.json
+```
+
+The important result is:
+
+```json
+"dataset_drift": true
+```
+
+The HTML report can also be opened using the lab's **Drift Report** button.
+
+---
+
+## 18. Verify the Retrain Run
+
+The retraining run should exist inside the:
+
+```text
+fraud-detection
+```
+
+experiment.
+
+You can check it with:
+
+```bash
+python3 - <<'PY'
+import mlflow
+
+mlflow.set_tracking_uri("http://localhost:5000")
+
+exp = mlflow.get_experiment_by_name("fraud-detection")
+
+runs = mlflow.search_runs(
+    experiment_ids=[exp.experiment_id],
+    filter_string="tags.mlflow.runName = 'retrain'"
+)
+
+print(runs[["run_id", "tags.mlflow.runName"]].to_string(index=False))
+PY
+```
+
+There should be a run named:
+
+```text
+retrain
+```
+
+---
+
+## 19. Verify the Registered Model
+
+Check the registered versions:
+
+```bash
+python3 - <<'PY'
+import mlflow
+
+mlflow.set_tracking_uri("http://localhost:5000")
+client = mlflow.tracking.MlflowClient()
+
+versions = client.search_model_versions("name='fraud-detector'")
+
+for v in versions:
+    print(
+        f"version={v.version}, "
+        f"run_id={v.run_id}, "
+        f"aliases={v.aliases}"
+    )
+PY
+```
+
+The model should have at least:
+
+```text
+version 1
+version 2
+```
+
+Version 2 should correspond to the retraining run.
+
+---
+
+## 20. Verify the Production Alias
+
+The most important final check is:
+
+```bash
+python3 - <<'PY'
+import mlflow
+
+mlflow.set_tracking_uri("http://localhost:5000")
+client = mlflow.tracking.MlflowClient()
+
+v = client.get_model_version_by_alias(
+    "fraud-detector",
+    "production",
+)
+
+print("production version:", v.version)
+print("run_id:", v.run_id)
+PY
+```
+
+Expected result:
+
+```text
+production version: 2
+run_id: <retrain-run-id>
+```
+
+If the script has been executed multiple times, the production version may be greater than 2.
+
+The important requirement is:
+
+```text
+production → version 2 or higher
+```
+
+and **not version 1**.
+
+---
+
+## 21. Common Mistakes
+
+### Mistake 1: Retraining without checking drift
+
+Incorrect:
+
+```python
+_run("retrain.py")
+```
+
+without the drift gate.
+
+This violates the requirement that retraining happens only after drift is detected.
+
+---
+
+### Mistake 2: Using the wrong model URI
+
+The required URI is:
+
+```text
+runs:/<run_id>/model
+```
+
+not simply:
+
+```text
+<run_id>
+```
+
+The `model` artifact path is important.
+
+---
+
+### Mistake 3: Registering but not promoting
+
+Creating a new model version is not enough.
+
+You must also update:
+
+```text
+production
+```
+
+to point to the new version.
+
+Otherwise the old model remains live.
+
+---
+
+### Mistake 4: Hardcoding version 2
+
+Do not write:
+
+```python
+client.set_registered_model_alias(
+    MODEL_NAME,
+    ALIAS,
+    2,
+)
+```
+
+Instead use:
+
+```python
+model_version.version
+```
+
+Why?
+
+Because MLflow determines the next available version.
+
+If version 2 already exists, the next registration might create version 3.
+
+The code should always promote the version it just created.
+
+---
+
+### Mistake 5: Moving the alias before registration
+
+The alias must reference an existing model version.
+
+Therefore:
+
+```text
+register → promote
+```
+
+is the correct order.
+
+---
+
+## 22. Important MLflow Concepts
+
+### Tracking Server
+
+The lab uses:
+
+```text
+http://localhost:5000
+```
+
+for MLflow tracking.
+
+It stores information about experiments and runs.
+
+### Experiment
+
+The experiment is:
+
+```text
+fraud-detection
+```
+
+It organizes related training runs.
+
+### Run
+
+The retraining execution is recorded as:
+
+```text
+retrain
+```
+
+### Registered Model
+
+The registered model is:
+
+```text
+fraud-detector
+```
+
+### Model Version
+
+Each registered model can have multiple versions:
+
+```text
+fraud-detector v1
+fraud-detector v2
+fraud-detector v3
+```
+
+### Alias
+
+The alias:
+
+```text
+production
+```
+
+points to whichever version is currently serving.
+
+---
+
+## 23. The Big Picture
+
+This lab combines three important MLOps capabilities:
+
+### Monitoring
+
+Evidently detects whether production data has changed.
+
+```text
+reference.csv
+      +
+current.csv
+      ↓
+Drift Detection
+```
+
+### Retraining
+
+When drift is detected, the model is retrained using the required combined data.
+
+```text
+Drift
+ ↓
+retrain.py
+ ↓
+MLflow run
+```
+
+### Deployment/Promotion
+
+The new model is registered and the serving alias is moved.
+
+```text
+MLflow run
+    ↓
+Registered Model Version
+    ↓
+production alias
+```
+
+Together:
+
+```text
+Monitor
+   ↓
+Detect
+   ↓
+Gate
+   ↓
+Retrain
+   ↓
+Register
+   ↓
+Promote
+```
+
+This is a basic but important **closed-loop production ML system**.
+
+---
+
+## 24. Final Checklist
+
+Before considering the task complete, verify:
+
+- [ ] `retrain_if_drift.py` contains the drift gate.
+- [ ] `retrain_if_drift.py` registers the retrained model.
+- [ ] `retrain_if_drift.py` moves the `production` alias.
+- [ ] `/root/code/reports/drift.html` exists.
+- [ ] `drift-summary.json` reports `dataset_drift=True`.
+- [ ] `fraud-detection` contains a `retrain` run.
+- [ ] `fraud-detector` has version 2 or higher.
+- [ ] The new version comes from the retraining run.
+- [ ] `production` points to version 2 or higher.
+- [ ] Version 1 is no longer the production version.
+
+---
+
+## 25. Key Takeaway
+
+The main lesson is not simply how to call an MLflow API.
+
+The important MLOps pattern is:
+
+> **Use monitoring to automatically detect when the assumptions behind a production model have changed, use that signal to decide whether retraining is necessary, and automatically promote the resulting model.**
+
+Without automation:
+
+```text
+Data drifts
+   ↓
+Someone notices
+   ↓
+Someone retrains
+   ↓
+Someone deploys
+```
+
+With the closed loop:
+
+```text
+Data drifts
+   ↓
+Monitor detects it
+   ↓
+Automation retrains
+   ↓
+New version registered
+   ↓
+Production alias updated
+```
+
+That is the difference between **manual model maintenance** and an **automated MLOps retraining pipeline**.
+````
+
+
+
 ---
 
