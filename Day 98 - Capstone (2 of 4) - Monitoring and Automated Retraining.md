@@ -469,3 +469,13 @@ If the data has drifted, the system automatically:
 This turns model maintenance from a manual process into an automated production MLOps feedback loop.
 
 ### Screenshots
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/6871c811-7fa3-42c1-94fa-27aff18cb2bd" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/b024b7b9-db98-4d99-8a67-59e6ed38e34a" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/814fb5d2-bc98-45b3-a084-d1ae70d1c02b" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/76f229ad-305c-42bf-9a24-14e9d8c71544" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/f4ba46e3-eab4-4d53-af2a-92880021e437" />
+
+
+
+
+
