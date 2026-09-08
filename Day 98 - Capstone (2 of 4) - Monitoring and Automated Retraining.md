@@ -1,4 +1,23 @@
 # Day 98: Capstone (2/4): Monitoring and Automated Retraining
+The xFusionCorp Industries MLOps team is operating a fraud-detector in production. The live transaction stream has shifted away from the distribution the deployed model was trained on. fraud-detector is at version 1 with the production alias. Your task is to build the automated retraining loop: complete retrain_if_drift.py so it detects drift and—only when the data has drifted—retrains on the combined data, registers the new run as a new version, and moves the production alias to it. Then run it and confirm version 2 is live.
+
+
+The MLflow UI (port 5000), Drift Report (port 8086), and SeaweedFS Filer (port 8888) buttons at the top of the lab open the relevant UIs. Pre-staged state:
+
+MLflow tracking server on :5000 (SQLite metadata, SeaweedFS artefacts at :8333 / Filer :8888).
+Registered model fraud-detector at version 1 with the production alias (trained on reference.csv).
+/root/code/data/ holds reference.csv + current.csv (the shifted stream).
+A static-file server on :8086 (the Drift Report button) serves /root/code/reports/ — empty until the loop generates drift.html.
+Reference scripts under /root/code/: drift.py (Evidently drift → drift.html + drift-summary.json) and retrain.py (logs a retrain run to MLflow). Neither needs editing.
+/root/code/retrain_if_drift.py is scaffolded: the plumbing (running drift.py/retrain.py, finding the new run id) is written, with two TODO markers left for you to complete.
+The end state must include:
+
+/root/code/retrain_if_drift.py registers a new version and moves the alias in code (the automation).
+/root/code/reports/drift.html exists; the Evidently summary records dataset_drift=True.
+The fraud-detection experiment contains a run named retrain.
+The registered model fraud-detector has at least version 2, sourced from the retrain run.
+The production alias on fraud-detector points at version 2 (or higher) — no longer at version 1.
+Drift-triggered retraining is the closed loop of production ML: a monitor quantifies the shift, a gate decides whether retraining is warranted, and promotion swaps the serving alias to the new version. Wiring detect → retrain → promote into one script is the difference between 'we retrain when someone notices' and 'the system retrains itself'.
 
 ## Objective
 
