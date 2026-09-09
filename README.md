@@ -154,4 +154,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 98 - Capstone (2 of 4) - Monitoring and Automated Retraining](./Day%2098%20-%20Capstone%20(2%20of%204)%20-%20Monitoring%20and%20Automated%20Retraining.md)
 
+- [Day 99 - Capstone (3 of 4) - GitOps Continuous Deployment with ArgoCD](./Day%2099%20-%20Capstone%20(3%20of%204)%20-%20GitOps%20Continuous%20Deployment%20with%20ArgoCD.md)
+
 ---

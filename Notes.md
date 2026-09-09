@@ -46646,6 +46646,679 @@ Production alias updated
 That is the difference between **manual model maintenance** and an **automated MLOps retraining pipeline**.
 ````
 
+### Day-99
+
+# Day 99 — GitOps Continuous Deployment with ArgoCD
+
+## 1. What are we building?
+
+In this lab, we build a GitOps deployment workflow for a fraud-detector model server.
+
+The actual model server is represented by an Nginx container. The important concept is not Nginx itself, but the deployment process:
+
+```text
+Gitea Git Repository
+        |
+        | Kubernetes manifests
+        v
+      ArgoCD
+        |
+        | Reconciliation / Sync
+        v
+   Kubernetes Cluster
+        |
+        v
+fraud-detector Deployment
+        |
+        v
+   Service / NodePort
+        |
+        v
+ localhost:8085
+```
+
+The key GitOps principle is:
+
+> Git is the source of truth.
+
+We should change the Kubernetes configuration in Git, and ArgoCD should apply that change to the cluster.
+
+---
+
+## 2. What is already provided?
+
+The lab already contains:
+
+- A kind Kubernetes cluster
+- Gitea running inside the cluster
+- A seeded Gitea repository
+- ArgoCD installed
+- The Gitea repository already registered with ArgoCD
+- Kubernetes manifests in the repository
+
+The repository is:
+
+```text
+gitops-admin/mlops-deploy
+```
+
+Its Git URL is:
+
+```text
+http://gitea-http.gitea.svc.cluster.local:3000/gitops-admin/mlops-deploy.git
+```
+
+The repository contains:
+
+```text
+manifests/
+├── deployment.yaml
+└── service.yaml
+```
+
+Initially, the Deployment uses:
+
+```yaml
+image: nginx:1.25-alpine
+```
+
+The required final version is:
+
+```yaml
+image: nginx:1.27-alpine
+```
+
+---
+
+## 3. What is ArgoCD?
+
+ArgoCD is a GitOps continuous delivery tool for Kubernetes.
+
+Instead of manually running commands such as:
+
+```bash
+kubectl apply -f deployment.yaml
+```
+
+we tell ArgoCD:
+
+> This Kubernetes Application should use this Git repository and this directory as its desired state.
+
+ArgoCD then compares:
+
+```text
+Desired state = Git repository
+Actual state  = Kubernetes cluster
+```
+
+If they differ, the Application becomes:
+
+```text
+OutOfSync
+```
+
+When the cluster matches Git, it becomes:
+
+```text
+Synced
+```
+
+`Healthy` means the deployed Kubernetes resources are operating correctly according to ArgoCD's health checks.
+
+---
+
+# 4. Creating the ArgoCD Application
+
+The file:
+
+```text
+/root/code/application.yaml
+```
+
+is provided as a scaffold.
+
+There are three TODOs:
+
+1. Git repository URL
+2. Manifest directory
+3. Destination namespace
+
+The important section is:
+
+```yaml
+spec:
+  project: default
+  source:
+    repoURL: "http://gitea-http.gitea.svc.cluster.local:3000/gitops-admin/mlops-deploy.git"
+    targetRevision: HEAD
+    path: "manifests"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: "default"
+```
+
+### Meaning of these fields
+
+`repoURL` tells ArgoCD where the source code is stored.
+
+```yaml
+repoURL: "http://gitea-http.gitea.svc.cluster.local:3000/gitops-admin/mlops-deploy.git"
+```
+
+`targetRevision: HEAD` means ArgoCD tracks the latest revision of the configured branch/repository state.
+
+```yaml
+targetRevision: HEAD
+```
+
+`path` tells ArgoCD which directory contains the Kubernetes manifests.
+
+```yaml
+path: "manifests"
+```
+
+`server` identifies the Kubernetes API server. Since ArgoCD is running inside the same cluster, this is:
+
+```yaml
+server: https://kubernetes.default.svc
+```
+
+`namespace` specifies where the manifests should be deployed:
+
+```yaml
+namespace: "default"
+```
+
+---
+
+# 5. Apply the Application
+
+After completing the file:
+
+```bash
+kubectl apply -n argocd -f /root/code/application.yaml
+```
+
+Check it:
+
+```bash
+kubectl -n argocd get application fraud-detector
+```
+
+Immediately after creation, it can show:
+
+```text
+SYNC STATUS   HEALTH STATUS
+OutOfSync     Missing
+```
+
+This is normal.
+
+The Application exists, but its Kubernetes resources have not yet been synchronized.
+
+---
+
+# 6. First ArgoCD synchronization
+
+Open the ArgoCD UI from the lab.
+
+Credentials:
+
+```text
+Username: admin
+Password: adminadmin
+```
+
+Open:
+
+```text
+fraud-detector
+```
+
+The Application will show that its resources are missing or out of sync.
+
+Click:
+
+```text
+Sync → Synchronize
+```
+
+ArgoCD now reads the manifests from:
+
+```text
+Gitea → mlops-deploy → manifests
+```
+
+and creates the Kubernetes resources.
+
+After the synchronization completes, the Application should show:
+
+```text
+Synced
+Healthy
+```
+
+---
+
+# 7. Verify the first deployment
+
+Check the Deployment:
+
+```bash
+kubectl get deployment fraud-detector -n default
+```
+
+Check the pods:
+
+```bash
+kubectl get pods -n default
+```
+
+The pod should eventually show:
+
+```text
+1/1   Running
+```
+
+Check which image is running:
+
+```bash
+kubectl get deployment fraud-detector -n default \
+  -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
+```
+
+At this stage the expected result is:
+
+```text
+nginx:1.25-alpine
+```
+
+This confirms that ArgoCD successfully deployed the initial version from Git.
+
+---
+
+# 8. Why don't we edit the local manifest?
+
+The lab also provides reference manifests under:
+
+```text
+/root/code/manifests/
+```
+
+These are only for transparency/reference.
+
+They are **not the source of truth for this rollout**.
+
+If we edit:
+
+```text
+/root/code/manifests/deployment.yaml
+```
+
+that does not change the Gitea repository.
+
+GitOps works because the desired configuration is stored in Git.
+
+Therefore the correct flow is:
+
+```text
+Edit Gitea
+   ↓
+Commit to Git
+   ↓
+ArgoCD detects Git change
+   ↓
+Sync
+   ↓
+Kubernetes updated
+```
+
+Not:
+
+```text
+Edit local file
+   ↓
+kubectl set image
+```
+
+The second approach bypasses the GitOps workflow.
+
+---
+
+# 9. Updating the application version
+
+The task requires changing:
+
+```yaml
+image: nginx:1.25-alpine
+```
+
+to:
+
+```yaml
+image: nginx:1.27-alpine
+```
+
+This change must be made in the **Gitea web UI**.
+
+Open Gitea from the lab.
+
+Credentials:
+
+```text
+Username: gitops-admin
+Password: adminadmin
+```
+
+Open:
+
+```text
+gitops-admin/mlops-deploy
+```
+
+Then:
+
+```text
+manifests/deployment.yaml
+```
+
+Use the web editor.
+
+Change:
+
+```yaml
+image: nginx:1.25-alpine
+```
+
+to:
+
+```yaml
+image: nginx:1.27-alpine
+```
+
+Commit the change directly to:
+
+```text
+main
+```
+
+This Git commit is important because it becomes the new desired state.
+
+---
+
+# 10. What happens after the Git change?
+
+Before the Git change:
+
+```text
+Git:        nginx:1.25-alpine
+Kubernetes: nginx:1.25-alpine
+
+Result: Synced
+```
+
+After committing the new version:
+
+```text
+Git:        nginx:1.27-alpine
+Kubernetes: nginx:1.25-alpine
+
+Result: OutOfSync
+```
+
+This is exactly what we expect.
+
+ArgoCD is telling us:
+
+> The cluster does not currently match the desired state stored in Git.
+
+---
+
+# 11. Refresh and synchronize ArgoCD
+
+Return to the ArgoCD UI.
+
+Open:
+
+```text
+fraud-detector
+```
+
+Click **Refresh** so ArgoCD checks the repository for the latest commit.
+
+The Application should detect the difference and show:
+
+```text
+OutOfSync
+```
+
+Now click:
+
+```text
+Sync → Synchronize
+```
+
+ArgoCD updates the Deployment using the new Git configuration.
+
+Wait until the Application becomes:
+
+```text
+Synced
+Healthy
+```
+
+---
+
+# 12. Verify the new version
+
+Check the Deployment image:
+
+```bash
+kubectl get deployment fraud-detector -n default \
+  -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
+```
+
+The final result must be:
+
+```text
+nginx:1.27-alpine
+```
+
+Check the pod:
+
+```bash
+kubectl get pods -n default
+```
+
+The new pod should be:
+
+```text
+Running
+```
+
+The Deployment rollout happens because changing the container image changes the Deployment's pod template.
+
+---
+
+# 13. Verify the application endpoint
+
+The Service is exposed through NodePort and the lab maps it to:
+
+```text
+localhost:8085
+```
+
+Test it:
+
+```bash
+curl -i http://localhost:8085/
+```
+
+The response must contain:
+
+```text
+HTTP/1.1 200 OK
+```
+
+A simpler status-only check is:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8085/
+```
+
+Expected:
+
+```text
+200
+```
+
+This proves that traffic reaches the running application.
+
+---
+
+# 14. Final verification
+
+Check ArgoCD:
+
+```bash
+kubectl -n argocd get application fraud-detector
+```
+
+Expected:
+
+```text
+NAME             SYNC STATUS   HEALTH STATUS
+fraud-detector   Synced        Healthy
+```
+
+Check the image:
+
+```bash
+kubectl get deployment fraud-detector -n default \
+  -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
+```
+
+Expected:
+
+```text
+nginx:1.27-alpine
+```
+
+Check the endpoint:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8085/
+```
+
+Expected:
+
+```text
+200
+```
+
+---
+
+# 15. Complete GitOps flow
+
+The whole lab demonstrates this lifecycle:
+
+```text
+1. Create ArgoCD Application
+             ↓
+2. Application points to Gitea
+             ↓
+3. ArgoCD reads manifests
+             ↓
+4. First Sync
+             ↓
+5. Kubernetes runs nginx:1.25-alpine
+             ↓
+6. Edit deployment.yaml in Gitea
+             ↓
+7. Change image to nginx:1.27-alpine
+             ↓
+8. Commit to main
+             ↓
+9. Refresh ArgoCD
+             ↓
+10. Application becomes OutOfSync
+             ↓
+11. Sync again
+             ↓
+12. Kubernetes runs nginx:1.27-alpine
+             ↓
+13. Application becomes Synced + Healthy
+             ↓
+14. localhost:8085 returns HTTP 200
+```
+
+# 16. Common mistakes
+
+### Mistake 1: Editing the local manifest
+
+Do not rely on:
+
+```text
+/root/code/manifests/deployment.yaml
+```
+
+The grader expects the change in the Gitea repository.
+
+### Mistake 2: Using `kubectl set image`
+
+Avoid:
+
+```bash
+kubectl set image deployment/fraud-detector ...
+```
+
+That changes the cluster directly and bypasses the intended GitOps process.
+
+### Mistake 3: Forgetting to commit the Gitea change
+
+Changing the file in the Gitea editor is not enough.
+
+The change must be committed to `main`.
+
+### Mistake 4: Expecting ArgoCD to remain Synced immediately
+
+After changing Git, the normal state is:
+
+```text
+Git = 1.27
+Cluster = 1.25
+```
+
+Therefore:
+
+```text
+OutOfSync
+```
+
+is expected until synchronization occurs.
+
+### Mistake 5: Checking too quickly
+
+After syncing, Kubernetes may need time to:
+
+- Pull the image
+- Create the new ReplicaSet
+- Start the new pod
+- Terminate the old pod
+
+Check:
+
+```bash
+kubectl get pods -n default
+```
+
+until the new pod is `Running`.
+
+The most important lesson is:
+
+> **Git is the source of truth; ArgoCD reconciles Kubernetes to Git.**
+
+
 
 
 ---
