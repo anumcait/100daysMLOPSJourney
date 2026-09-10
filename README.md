@@ -156,4 +156,6 @@ Tracking my 100-day journey into Machine Learning Operations.
 
 - [Day 99 - Capstone (3 of 4) - GitOps Continuous Deployment with ArgoCD](./Day%2099%20-%20Capstone%20(3%20of%204)%20-%20GitOps%20Continuous%20Deployment%20with%20ArgoCD.md)
 
+- [Day 100 - Capstone (4 of 4) - Close the Loop with Prometheus + Grafana Observability](./Day%20100%20-%20Capstone%20(4%20of%204)%20-%20Close%20the%20Loop%20with%20Prometheus%20%2B%20Grafana%20Observability.md)
+
 ---

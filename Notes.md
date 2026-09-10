@@ -47318,6 +47318,692 @@ The most important lesson is:
 
 > **Git is the source of truth; ArgoCD reconciles Kubernetes to Git.**
 
+# Day 100 — Prometheus + Grafana Observability
+
+## 1. What We Are Building
+
+The fraud-detector service is already running and exposing Prometheus metrics. Prometheus is already collecting those metrics, and synthetic traffic is already being generated.
+
+Our job is to complete the **observability layer** using Grafana.
+
+The final architecture is:
+
+```text
+                    ┌──────────────────┐
+                    │  FastAPI Service  │
+                    │   fraud-detector  │
+                    │      :8085        │
+                    └────────┬─────────┘
+                             │
+                         /metrics
+                             │
+                             ▼
+                    ┌──────────────────┐
+                    │    Prometheus    │
+                    │      :9090       │
+                    └────────┬─────────┘
+                             │
+                  http://prometheus:9090
+                             │
+                             ▼
+                    ┌──────────────────┐
+                    │      Grafana     │
+                    │      :3000       │
+                    └────────┬─────────┘
+                             │
+                  ┌──────────┴──────────┐
+                  ▼                     ▼
+             Dashboard                Alert
+```
+
+Observability has two important purposes:
+
+1. **Dashboard:** tells us what is happening.
+2. **Alert:** tells us when a human needs to care.
+
+---
+
+## 2. Existing Service Metrics
+
+The FastAPI application exposes metrics at:
+
+```text
+http://localhost:8085/metrics
+```
+
+Important metrics are:
+
+```text
+http_requests_total
+http_request_duration_seconds
+```
+
+### `http_requests_total`
+
+This is a Prometheus **counter**.
+
+A counter continuously increases as requests are received.
+
+For example:
+
+```text
+10
+15
+23
+42
+```
+
+The raw value is not normally used to display request rate because it only tells us the total number of requests since the process started.
+
+To calculate requests per second, use `rate()`.
+
+Example:
+
+```promql
+rate(http_requests_total[1m])
+```
+
+Because the application is scraped under the `fraud-detector` job, we can be more specific:
+
+```promql
+sum(rate(http_requests_total{job="fraud-detector"}[1m]))
+```
+
+This gives the approximate requests per second during the previous minute.
+
+---
+
+## 3. Request Rate vs Counter
+
+This distinction is important.
+
+### Counter
+
+```promql
+http_requests_total
+```
+
+Answers:
+
+> How many requests have happened in total?
+
+### Rate
+
+```promql
+rate(http_requests_total[1m])
+```
+
+Answers:
+
+> How quickly are requests arriving?
+
+For an operations dashboard, **rate is generally more useful** because on-call engineers care about current traffic behavior.
+
+---
+
+## 4. Request Latency Histogram
+
+The service also exposes:
+
+```text
+http_request_duration_seconds
+```
+
+This is a Prometheus **histogram**.
+
+Histograms expose bucket metrics such as:
+
+```text
+http_request_duration_seconds_bucket
+```
+
+along with count and sum information.
+
+The `_bucket` series is used to calculate latency percentiles such as P50, P95, and P99.
+
+For example, P95 latency can be calculated with:
+
+```promql
+histogram_quantile(
+  0.95,
+  sum(
+    rate(http_request_duration_seconds_bucket{job="fraud-detector"}[5m])
+  ) by (le)
+)
+```
+
+### What does P95 mean?
+
+P95 means:
+
+> 95% of requests completed at or below this latency, while the slowest 5% took longer.
+
+P95 is useful for detecting slow requests without allowing a few extreme outliers to completely dominate the displayed value.
+
+---
+
+# 5. Why Grafana?
+
+Prometheus is excellent at:
+
+- collecting metrics
+- storing time-series data
+- querying metrics with PromQL
+- evaluating alert conditions
+
+Grafana is excellent at:
+
+- visualizing metrics
+- creating dashboards
+- combining multiple panels
+- providing an operational view for humans
+- managing alert rules and notifications
+
+Therefore:
+
+```text
+Application
+    ↓
+Prometheus
+    ↓
+Grafana
+```
+
+Prometheus provides the data and Grafana provides the visual/operational interface.
+
+---
+
+# 6. Configure Grafana's Prometheus Data Source
+
+Grafana initially has no knowledge of Prometheus.
+
+Create a data source through:
+
+**Connections → Data sources → Add data source → Prometheus**
+
+Configure:
+
+```text
+Name: Prometheus
+URL: http://prometheus:9090
+```
+
+The important detail is that Grafana runs inside the Compose environment.
+
+Therefore, Grafana should communicate with Prometheus using the Compose service name:
+
+```text
+http://prometheus:9090
+```
+
+rather than:
+
+```text
+http://localhost:9090
+```
+
+`localhost` from inside the Grafana container refers to the Grafana container itself, not the Prometheus container.
+
+Click:
+
+**Save & test**
+
+A successful connection confirms that Grafana can query Prometheus.
+
+---
+
+# 7. Create the Fraud Monitor Dashboard
+
+The required dashboard name is:
+
+```text
+fraud-monitor
+```
+
+This name is important because the lab grader checks for a dashboard with this exact name.
+
+The dashboard should contain at least two panels:
+
+```text
+fraud-monitor
+├── Request rate
+└── Latency
+```
+
+---
+
+# 8. Request Rate Panel
+
+Use PromQL:
+
+```promql
+sum(rate(http_requests_total{job="fraud-detector"}[1m]))
+```
+
+Recommended visualization:
+
+```text
+Time series
+```
+
+Suggested title:
+
+```text
+Request rate
+```
+
+### Query explanation
+
+```text
+http_requests_total
+```
+
+Selects the request counter.
+
+```text
+{job="fraud-detector"}
+```
+
+Restricts the query to the fraud-detector service.
+
+```text
+rate(...[1m])
+```
+
+Calculates the per-second increase over the previous minute.
+
+```text
+sum(...)
+```
+
+Combines the matching request series into an overall request rate.
+
+The resulting graph answers:
+
+> How much traffic is the fraud-detector receiving right now?
+
+---
+
+# 9. Latency Panel
+
+Use:
+
+```promql
+histogram_quantile(
+  0.95,
+  sum(
+    rate(http_request_duration_seconds_bucket{job="fraud-detector"}[5m])
+  ) by (le)
+)
+```
+
+Recommended visualization:
+
+```text
+Time series
+```
+
+Suggested title:
+
+```text
+Latency
+```
+
+### Query explanation
+
+```text
+http_request_duration_seconds_bucket
+```
+
+Selects the histogram bucket data.
+
+```text
+rate(...[5m])
+```
+
+Calculates how quickly observations are entering each bucket.
+
+```text
+sum(...) by (le)
+```
+
+Combines series while preserving the histogram bucket boundary represented by `le`.
+
+```text
+histogram_quantile(0.95, ...)
+```
+
+Calculates the 95th percentile latency.
+
+The resulting graph answers:
+
+> How slow are requests becoming?
+
+---
+
+# 10. Creating the Alert
+
+A dashboard only shows a problem.
+
+An alert tells someone that action may be required.
+
+Go to:
+
+**Alerting → Alert rules → New alert rule**
+
+Example name:
+
+```text
+fraud-detector-traffic
+```
+
+Use the service metric:
+
+```promql
+sum(rate(http_requests_total{job="fraud-detector"}[1m]))
+```
+
+A simple condition is:
+
+```text
+IS BELOW 0.01
+```
+
+This means the alert becomes active when the request rate drops below approximately 0.01 requests per second.
+
+A pending period such as:
+
+```text
+1m
+```
+
+prevents a very brief fluctuation from immediately triggering an alert.
+
+---
+
+# 11. Why Alert on Request Rate?
+
+The lab only requires an alert whose query references a service metric.
+
+`http_requests_total` is a good example because it directly represents service traffic.
+
+A very low request rate can indicate:
+
+- the service is unavailable
+- traffic is not reaching the application
+- the application has stopped responding
+- an upstream component is failing
+- synthetic traffic has stopped
+
+The exact threshold depends on the expected workload. For this lab, the important thing is demonstrating the complete alerting path.
+
+---
+
+# 12. Contact Points
+
+Grafana needs to know where alert notifications should be delivered.
+
+A **contact point** defines the notification destination/integration.
+
+Create one through:
+
+**Alerting → Notification configuration → Contact points**
+
+Example:
+
+```text
+Name: lab-contact
+Integration: Alertmanager
+URL: http://localhost:9093
+```
+
+Then select `lab-contact` in the alert rule.
+
+The important distinction is:
+
+```text
+Alert rule
+    ↓
+Contact point
+    ↓
+Notification destination
+```
+
+Without a contact point, Grafana may prevent the alert rule from being saved.
+
+---
+
+# 13. Alert Evaluation
+
+Grafana periodically evaluates the PromQL expression.
+
+Conceptually:
+
+```text
+PromQL query
+     ↓
+Current value
+     ↓
+Compare with threshold
+     ↓
+Condition true?
+     ↓
+Pending period
+     ↓
+Alert fires
+```
+
+For example:
+
+```text
+Request rate = 3.9 requests/sec
+Threshold    = 0.01 requests/sec
+```
+
+The condition:
+
+```text
+3.9 < 0.01
+```
+
+is false, so the alert does not need to fire.
+
+If traffic falls to:
+
+```text
+0.005 requests/sec
+```
+
+then:
+
+```text
+0.005 < 0.01
+```
+
+is true.
+
+If the condition remains true for the configured pending period, the alert fires.
+
+---
+
+# 14. Dashboard vs Alert
+
+These solve different operational problems.
+
+### Dashboard
+
+Answers:
+
+> What is happening?
+
+Example:
+
+```text
+Request rate: 4 req/s
+P95 latency: 0.15 s
+```
+
+An engineer can inspect trends and investigate.
+
+### Alert
+
+Answers:
+
+> When should a human care?
+
+Example:
+
+```text
+Request rate has dropped below the expected threshold.
+```
+
+The alert can notify the responsible team.
+
+Good observability uses both.
+
+---
+
+# 15. Important Grafana Naming Detail
+
+A folder and dashboard are different objects.
+
+For example:
+
+```text
+Folder:
+Fraud Monitoring
+
+Dashboard:
+fraud-monitor
+```
+
+The lab requires the **dashboard** to be named:
+
+```text
+fraud-monitor
+```
+
+Creating only a folder named `Fraud Monitoring` does not satisfy the requirement.
+
+Always verify the dashboard itself appears as:
+
+```text
+fraud-monitor
+```
+
+under Grafana Dashboards.
+
+---
+
+# 16. Final Expected State
+
+The final Grafana configuration should look conceptually like:
+
+```text
+Grafana
+│
+├── Data Sources
+│   └── Prometheus
+│       └── http://prometheus:9090
+│
+├── Dashboards
+│   └── fraud-monitor
+│       ├── Request rate
+│       │   └── http_requests_total
+│       │
+│       └── Latency
+│           └── http_request_duration_seconds
+│
+└── Alerting
+    └── fraud-detector-traffic
+        └── http_requests_total
+```
+
+---
+
+# 17. Verification Checklist
+
+Before completing the lab, verify:
+
+- [ ] Grafana is accessible on port `3000`.
+- [ ] Prometheus is accessible on port `9090`.
+- [ ] Grafana has a Prometheus data source.
+- [ ] Data source URL is `http://prometheus:9090`.
+- [ ] Data source test succeeds.
+- [ ] Dashboard is named exactly `fraud-monitor`.
+- [ ] Dashboard contains at least two panels.
+- [ ] One panel queries `http_requests_total`.
+- [ ] One panel queries `http_request_duration_seconds` / its histogram bucket series.
+- [ ] Request rate displays non-zero data.
+- [ ] Latency displays data.
+- [ ] At least one Grafana alert rule exists.
+- [ ] Alert query references a service metric.
+- [ ] Alert has an evaluation configuration.
+- [ ] Alert has a contact point.
+- [ ] The alert rule is saved successfully.
+
+---
+
+# 18. Key PromQL to Remember
+
+### Request counter
+
+```promql
+http_requests_total
+```
+
+### Request rate
+
+```promql
+sum(rate(http_requests_total{job="fraud-detector"}[1m]))
+```
+
+### P95 latency
+
+```promql
+histogram_quantile(
+  0.95,
+  sum(rate(http_request_duration_seconds_bucket{job="fraud-detector"}[5m])) by (le)
+)
+```
+
+These demonstrate three important Prometheus concepts:
+
+```text
+Metric
+  ↓
+rate()
+  ↓
+Aggregation / histogram_quantile()
+  ↓
+Dashboard or Alert
+```
+
+---
+
+# 19. Core Takeaway
+
+The complete observability loop is:
+
+```text
+Application
+    ↓
+Expose metrics
+    ↓
+Prometheus scrapes metrics
+    ↓
+PromQL transforms metrics into useful signals
+    ↓
+Grafana dashboard visualizes the signals
+    ↓
+Grafana alert evaluates important conditions
+    ↓
+Contact point notifies humans
+```
+
+The dashboard provides visibility, while alerting provides action.
+
+That is the purpose of closing the observability loop: **measure the service, visualize its behavior, detect abnormal behavior, and notify the people responsible for it.**
 
 
 
