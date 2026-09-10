@@ -412,3 +412,13 @@ HTTP 200
 - `http://localhost:8085/` must return HTTP `200`.
 
 ### Screenshots
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/fe0423b3-2c27-4cd7-8d00-bc76e0f10279" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/9d92f961-2a49-43ec-96cd-d41d9f1c223b" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/c671977a-cc4e-410c-98e6-4e878063c5f9" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/b15ab24b-b926-4a6e-86d8-5d839637df67" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/058b9d1c-0af0-4337-beee-5077971572b5" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/afbc528b-59e8-4385-a1ca-e6d4f79f9e33" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/c12e886c-f137-4abb-ac63-3c1b1ff85beb" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/3e381ab2-cdac-4ed3-ba07-dd0679a515cd" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/8f2b1b31-4746-41e7-8c83-d79a6ec9b9b5" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/33a001fc-ce0d-43b8-9b19-e8bf4ea35943" />
