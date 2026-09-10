@@ -201,3 +201,13 @@ Grafana now provides a single observability pane for the fraud-detector service.
 - **Alerting** identifies when service traffic falls below the configured threshold.
 
 No files under `/root/code/observability/` need to be modified.
+
+### Screenshots
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/9521ad75-89f7-47e4-b793-46b0b8c03dea" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/16992289-5b88-4bd2-8c12-fb675b5da4f9" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/60a427dd-32fe-4c26-9be5-04776da48046" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/c31ac959-60e7-4bb5-aec3-2294f5e4e173" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/729a7527-b4f6-49fb-baed-a41c7bcbe3e6" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/81c77370-f6a0-4fbc-a483-39937633d8a0" />
+<img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/34067de1-cf7f-4083-b667-307656cc2ab9" />
+
